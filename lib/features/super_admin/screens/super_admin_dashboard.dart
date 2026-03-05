@@ -1,9 +1,10 @@
+// features/super_admin/screens/super_admin_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/platform_provider.dart';
 import '../data/school_service.dart';
 import 'package:school_app/features/super_admin/providers/schools_provider.dart'
-  as schools;
+    as schools;
 
 class SuperAdminDashboard extends ConsumerWidget {
   const SuperAdminDashboard({super.key});
@@ -14,12 +15,10 @@ class SuperAdminDashboard extends ConsumerWidget {
     final schoolsData = ref.watch(schools.schoolsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Super Admin Dashboard"),
-      ),
+      appBar: AppBar(title: const Text("Super Admin Dashboard")),
       body: platformData.when(
         data: (doc) {
-          final data = doc.data() as Map<String, dynamic>? ?? {};
+          final data = (doc.data() as Map<String, dynamic>?) ?? {};
 
           final totalSchools = data['totalSchools'] ?? 0;
           final totalStudents = data['totalStudents'] ?? 0;
@@ -55,10 +54,7 @@ class SuperAdminDashboard extends ConsumerWidget {
                 const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 12),
-                Text(
-                  "Schools",
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+                Text("Schools", style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
                 schoolsData.when(
                   data: (snapshot) {
@@ -75,10 +71,11 @@ class SuperAdminDashboard extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         final school = docs[index].data();
 
-                        final name = (school['name'] ?? school['schoolName'] ?? '')
+                        final name =
+                            (school['name'] ?? school['schoolName'] ?? '')
+                                .toString();
+                        final schoolId = (school['schoolId'] ?? docs[index].id)
                             .toString();
-                        final schoolId =
-                            (school['schoolId'] ?? docs[index].id).toString();
                         final subscriptionPlan =
                             (school['subscriptionPlan'] ?? '').toString();
 
@@ -92,9 +89,8 @@ class SuperAdminDashboard extends ConsumerWidget {
                       },
                     );
                   },
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Text("Error: $e"),
                 ),
               ],

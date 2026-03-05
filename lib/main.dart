@@ -8,17 +8,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
-
-// await FirebaseAuth.instance.signInWithEmailAndPassword(
-//   email: "sadiq.smile@gmail.com",
-//   password: "admin@123",
-// );
-
-
-  
   runApp(
     const ProviderScope(
       child: SchoolApp(),
@@ -26,17 +18,15 @@ Future<void> main() async {
   );
 }
 
-class SchoolApp extends ConsumerWidget {
+class SchoolApp extends StatelessWidget {
   const SchoolApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(goRouterProvider);
-
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'SK School Master',
       debugShowCheckedModeBanner: false,
-      routerConfig: router,
+      routerConfig: appRouter,
     );
   }
 }

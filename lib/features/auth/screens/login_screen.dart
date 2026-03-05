@@ -1,5 +1,7 @@
+// features/auth/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,10 +15,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
 
   Future<void> login() async {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: emailController.text.trim(),
-      password: passwordController.text.trim(),
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
     );
+
+    print("LOGIN SUCCESS UID: ${credential.user?.uid}");
+
+    if (mounted) {
+      context.go("/school-admin");
+    }
   }
 
   @override
@@ -31,16 +42,18 @@ class _LoginScreenState extends State<LoginScreen> {
               controller: emailController,
               decoration: const InputDecoration(labelText: "Email"),
             ),
+
+            const SizedBox(height: 20),
+
             TextField(
               controller: passwordController,
-              decoration: const InputDecoration(labelText: "Password"),
               obscureText: true,
+              decoration: const InputDecoration(labelText: "Password"),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: login,
-              child: const Text("Login"),
-            )
+
+            const SizedBox(height: 30),
+
+            ElevatedButton(onPressed: login, child: const Text("Login")),
           ],
         ),
       ),

@@ -1,10 +1,15 @@
+// features/auth/providers/user_role_provider.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_state_provider.dart';
 
-final userRoleProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
-  final user = ref.watch(authStateProvider).value;
+final userRoleProvider =
+    FutureProvider<Map<String, dynamic>?>((ref) async {
+
+  final authState = ref.watch(authStateProvider);
+
+  final user = authState.value;
 
   if (user == null) return null;
 
