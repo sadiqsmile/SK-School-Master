@@ -3,8 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-final schoolProvider = FutureProvider<DocumentSnapshot>((ref) async {
-  final user = FirebaseAuth.instance.currentUser;
+import '../../auth/providers/auth_state_provider.dart';
+
+final schoolProvider = FutureProvider.autoDispose<DocumentSnapshot>((
+  ref,
+) async {
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value ?? FirebaseAuth.instance.currentUser;
 
   if (user == null) {
     throw Exception("User not logged in");

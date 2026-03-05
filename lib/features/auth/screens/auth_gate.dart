@@ -1,4 +1,3 @@
-// features/auth/screens/auth_gate.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -51,7 +50,10 @@ class AuthGate extends ConsumerWidget {
               return const LoginScreen();
             }
 
-            final role = roleData['role'];
+            final role = roleData['role']?.toString();
+
+            // DEBUG
+            debugPrint("CURRENT USER ROLE = $role");
 
             if (role == "superAdmin") {
               return const SuperAdminDashboard();

@@ -1,8 +1,11 @@
 // features/super_admin/screens/super_admin_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/platform_provider.dart';
 import '../data/school_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:school_app/features/super_admin/providers/schools_provider.dart'
     as schools;
 
@@ -15,7 +18,23 @@ class SuperAdminDashboard extends ConsumerWidget {
     final schoolsData = ref.watch(schools.schoolsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Super Admin Dashboard")),
+      appBar: AppBar(
+        title: const Text("Super Admin Dashboard"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+
+              if (context.mounted) {
+                // Keep navigation within GoRouter; pushing LoginScreen via
+                // Navigator can leave the app outside the router context on web.
+                context.go('/');
+              }
+            },
+          ),
+        ],
+      ),
       body: platformData.when(
         data: (doc) {
           final data = (doc.data() as Map<String, dynamic>?) ?? {};
@@ -40,16 +59,37 @@ class SuperAdminDashboard extends ConsumerWidget {
                 const SizedBox(height: 40),
                 ElevatedButton(
                   onPressed: () async {
-                    final schoolService = SchoolService();
+                    debugPrint('ADD SCHOOL BUTTON CLICKED');
 
-                    await schoolService.createSchool(
-                      schoolName: "Test School",
-                      adminEmail: "testadmin@school.com",
-                      adminPassword: "12345678",
-                      themeColor: "#1976D2",
-                    );
+                    try {
+                      final schoolService = SchoolService();
+
+                      await schoolService.createSchool(
+                        schoolName: 'Test School 2',
+                        adminEmail: 'testadmin2@school.com',
+                        adminPassword: '12345678',
+                        themeColor: '#1976D2',
+                      );
+
+                      debugPrint('SCHOOL CREATED SUCCESS');
+
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('School created successfully'),
+                        ),
+                      );
+                    } catch (e, st) {
+                      debugPrint('ERROR CREATING SCHOOL: $e');
+                      debugPrintStack(stackTrace: st);
+
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error creating school: $e')),
+                      );
+                    }
                   },
-                  child: const Text("Add School"),
+                  child: const Text('Add School'),
                 ),
                 const SizedBox(height: 24),
                 const Divider(),

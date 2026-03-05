@@ -23,10 +23,11 @@ class _LoginScreenState extends State<LoginScreen> {
       password: password,
     );
 
-    print("LOGIN SUCCESS UID: ${credential.user?.uid}");
+    debugPrint("LOGIN SUCCESS UID: ${credential.user?.uid}");
 
     if (mounted) {
-      context.go("/school-admin");
+      // Let AuthGate decide which dashboard to show based on Firestore role.
+      context.go("/");
     }
   }
 
