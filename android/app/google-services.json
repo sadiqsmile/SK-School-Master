@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "836702428678",
+    "project_id": "sk-school-master",
+    "storage_bucket": "sk-school-master.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836702428678:android:9fee2feeaa97e2bc1bad87",
+        "android_client_info": {
+          "package_name": "com.example.school_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADFBhWXoGky6dBvppRGkd3_kimI8CNCLI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:836702428678:android:cc3657204e1a1ff51bad87",
+        "android_client_info": {
+          "package_name": "com.sk.schoolmaster"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADFBhWXoGky6dBvppRGkd3_kimI8CNCLI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
