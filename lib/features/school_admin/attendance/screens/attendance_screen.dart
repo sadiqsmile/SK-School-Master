@@ -132,7 +132,7 @@ class _AttendanceBody extends StatelessWidget {
                               final info = data['info'] ?? 'Attendance marked';
                               return _listRow(
                                 className,
-                                info,
+                                '$info • $date',
                                 Icons.trending_up_rounded,
                               );
                             }),

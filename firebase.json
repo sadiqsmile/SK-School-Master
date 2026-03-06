@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"sk-school-master","appId":"1:836702428678:android:9fee2feeaa97e2bc1bad87","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"sk-school-master","configurations":{"android":"1:836702428678:android:9fee2feeaa97e2bc1bad87","web":"1:836702428678:web:0744a0e5276096fd1bad87"}}}}}}
+{
+	"flutter": {
+		"platforms": {
+			"android": {
+				"default": {
+					"projectId": "sk-school-master",
+					"appId": "1:836702428678:android:9fee2feeaa97e2bc1bad87",
+					"fileOutput": "android/app/google-services.json"
+				}
+			},
+			"dart": {
+				"lib/firebase_options.dart": {
+					"projectId": "sk-school-master",
+					"configurations": {
+						"android": "1:836702428678:android:9fee2feeaa97e2bc1bad87",
+						"web": "1:836702428678:web:0744a0e5276096fd1bad87"
+					}
+				}
+			}
+		}
+	},
+	"firestore": {
+		"rules": "firestore.rules"
+	},
+	"functions": {
+		"source": "functions"
+	}
+}

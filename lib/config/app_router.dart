@@ -6,15 +6,23 @@ import 'package:school_app/features/super_admin/screens/super_admin_dashboard.da
 import 'package:school_app/features/school_admin/dashboard/screens/school_admin_dashboard.dart';
 import 'package:school_app/features/school_admin/teachers/screens/teachers_screen.dart';
 import 'package:school_app/features/school_admin/students/screens/students_screen.dart';
+import 'package:school_app/features/school_admin/students/screens/add_student_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/classes_screen.dart';
+import 'package:school_app/features/school_admin/classes/screens/add_class_screen.dart';
+import 'package:school_app/features/school_admin/classes/screens/sections_screen.dart';
 import 'package:school_app/features/school_admin/attendance/screens/attendance_screen.dart';
 import 'package:school_app/features/school_admin/homework/screens/homework_screen.dart';
 import 'package:school_app/features/school_admin/fees/screens/fees_screen.dart';
+import 'package:school_app/features/parent/screens/parent_login_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const AuthGate()),
+    GoRoute(
+      path: '/parent-login',
+      builder: (context, state) => const ParentLoginScreen(),
+    ),
     GoRoute(
       path: '/super-admin',
       builder: (context, state) => const SuperAdminDashboard(),
@@ -32,8 +40,28 @@ final appRouter = GoRouter(
       builder: (context, state) => const StudentsScreen(),
     ),
     GoRoute(
+      path: '/add-student',
+      builder: (context, state) => const AddStudentScreen(),
+    ),
+    GoRoute(
       path: '/school-admin/classes',
       builder: (context, state) => const ClassesScreen(),
+    ),
+    GoRoute(
+      path: '/classes',
+      builder: (context, state) => const ClassesScreen(),
+    ),
+    GoRoute(
+      path: '/add-class',
+      builder: (context, state) => const AddClassScreen(),
+    ),
+    GoRoute(
+      path: '/sections/:classId',
+      builder: (context, state) {
+        final raw = state.pathParameters['classId'] ?? '';
+        final classId = Uri.decodeComponent(raw);
+        return SectionsScreen(classId: classId);
+      },
     ),
     GoRoute(
       path: '/school-admin/attendance',

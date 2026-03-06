@@ -1,8 +1,13 @@
 // features/auth/screens/login_screen.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'package:school_app/services/parent_account_service.dart';
+ 
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -64,10 +69,10 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     try {
-      final email = emailController.text.trim();
-      final password = passwordController.text.trim();
+      final identifier = emailController.text.trim();
+      final secret = passwordController.text.trim();
 
-      if (email.isEmpty || password.isEmpty) {
+      if (identifier.isEmpty || secret.isEmpty) {
         setState(() {
           _errorMessage = 'Please fill in all fields';
           _isLoading = false;
@@ -75,12 +80,41 @@ class _LoginScreenState extends State<LoginScreen>
         return;
       }
 
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final mode = _getLoginMode(identifier);
+      if (mode == _LoginMode.none) {
+        setState(() {
+          _errorMessage = 'Enter email or phone number';
+          _isLoading = false;
+        });
+        return;
+      }
 
-      debugPrint("LOGIN SUCCESS UID: ${credential.user?.uid}");
+      if (mode == _LoginMode.parent) {
+        if (!_isPinLike(secret)) {
+          setState(() {
+            _errorMessage = 'Enter a valid PIN (4-12 digits)';
+            _isLoading = false;
+          });
+          return;
+        }
+
+        final token = await ParentAccountService().parentLogin(
+          phone: identifier,
+          pin: secret,
+        );
+
+        final credential = await FirebaseAuth.instance.signInWithCustomToken(
+          token,
+        );
+        debugPrint('PARENT LOGIN SUCCESS UID: ${credential.user?.uid}');
+      } else {
+        final credential =
+            await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: identifier,
+          password: secret,
+        );
+        debugPrint("STAFF LOGIN SUCCESS UID: ${credential.user?.uid}");
+      }
 
       if (mounted) {
         context.go("/");
@@ -90,7 +124,16 @@ class _LoginScreenState extends State<LoginScreen>
         _errorMessage = e.message ?? 'Authentication failed';
         _isLoading = false;
       });
+    } on FirebaseFunctionsException catch (e) {
+      debugPrint(
+        'FUNCTIONS LOGIN ERROR: code=${e.code} message=${e.message} details=${e.details}',
+      );
+      setState(() {
+        _errorMessage = _friendlyFunctionsError(e);
+        _isLoading = false;
+      });
     } catch (e) {
+      debugPrint('LOGIN ERROR: $e');
       setState(() {
         _errorMessage = 'An error occurred. Please try again.';
         _isLoading = false;
@@ -103,6 +146,11 @@ class _LoginScreenState extends State<LoginScreen>
     final isMobile = MediaQuery.of(context).size.width < 600;
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+
+    final identifier = emailController.text.trim();
+    final mode = _getLoginMode(identifier);
+    final isParent = mode == _LoginMode.parent;
+    final isStaff = mode == _LoginMode.staff;
 
     // Modern gradient colors matching the SK logo
     const primaryBlue = Color(0xFF06B6D4); // Cyan blue from logo
@@ -278,15 +326,20 @@ class _LoginScreenState extends State<LoginScreen>
                                           controller: emailController,
                                           enabled: !_isLoading,
                                           decoration: InputDecoration(
-                                            hintText: 'name@example.com',
-                                            labelText: 'Email',
-                                            prefixIcon: const Icon(
-                                              Icons.email_rounded,
+                                            hintText: isParent
+                                                ? 'Enter phone number'
+                                                : 'name@example.com',
+                                            labelText: 'Email/Phone',
+                                            prefixIcon: Icon(
+                                              isParent
+                                                  ? Icons.phone_rounded
+                                                  : Icons.email_rounded,
                                               color: primaryBlue,
                                             ),
-                                            suffixIcon: _isValidEmail(
-                                                  emailController.text,
-                                                )
+                                            suffixIcon: (isStaff &&
+                                                    _isValidEmail(
+                                                      emailController.text,
+                                                    ))
                                                 ? const Icon(
                                                     Icons.check_circle,
                                                     color: primaryBlue,
@@ -324,8 +377,17 @@ class _LoginScreenState extends State<LoginScreen>
                                                   vertical: 16,
                                                 ),
                                           ),
-                                          keyboardType:
-                                              TextInputType.emailAddress,
+                                          keyboardType: isParent
+                                              ? TextInputType.phone
+                                              : TextInputType.emailAddress,
+                                          inputFormatters: isParent
+                                              ? [
+                                                  FilteringTextInputFormatter
+                                                      .allow(
+                                                    RegExp(r'[0-9+\-\s()]'),
+                                                  ),
+                                                ]
+                                              : null,
                                           onChanged: (_) => setState(() {}),
                                         ),
                                         const SizedBox(height: 16),
@@ -333,8 +395,11 @@ class _LoginScreenState extends State<LoginScreen>
                                           controller: passwordController,
                                           enabled: !_isLoading,
                                           decoration: InputDecoration(
-                                            hintText: 'Enter your password',
-                                            labelText: 'Password',
+                                            hintText: isParent
+                                                ? 'Enter 4-digit PIN'
+                                                : 'Enter your password',
+                                            labelText:
+                                                isParent ? 'PIN' : 'Password',
                                             prefixIcon: const Icon(
                                               Icons.lock_rounded,
                                               color: primaryBlue,
@@ -385,8 +450,57 @@ class _LoginScreenState extends State<LoginScreen>
                                                 ),
                                           ),
                                           obscureText: _obscurePassword,
+                                          keyboardType: isParent
+                                              ? TextInputType.number
+                                              : TextInputType.text,
+                                          inputFormatters: isParent
+                                              ? [
+                                                  FilteringTextInputFormatter
+                                                      .digitsOnly,
+                                                  LengthLimitingTextInputFormatter(
+                                                    12,
+                                                  ),
+                                                ]
+                                              : null,
                                           onChanged: (_) => setState(() {}),
                                         ),
+                                        if (mode != _LoginMode.none) ...[
+                                          const SizedBox(height: 12),
+                                          Center(
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 6,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: (isParent
+                                                        ? primaryPink
+                                                        : primaryBlue)
+                                                    .withValues(alpha: 0.10),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                                border: Border.all(
+                                                  color: (isParent
+                                                          ? primaryPink
+                                                          : primaryBlue)
+                                                      .withValues(alpha: 0.25),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                isParent
+                                                    ? 'Parent login'
+                                                    : 'Staff login',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isParent
+                                                      ? primaryPink
+                                                      : primaryBlue,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                         const SizedBox(height: 24),
                                         SizedBox(
                                           width: double.infinity,
@@ -447,9 +561,13 @@ class _LoginScreenState extends State<LoginScreen>
                                                                 ),
                                                           ),
                                                     )
-                                                  : const Text(
-                                                      'LOGIN',
-                                                      style: TextStyle(
+                                                  : Text(
+                                                      isParent
+                                                          ? 'PARENT LOGIN'
+                                                          : isStaff
+                                                              ? 'STAFF LOGIN'
+                                                              : 'LOGIN',
+                                                      style: const TextStyle(
                                                         fontSize: 16,
                                                         fontWeight:
                                                             FontWeight.bold,
@@ -540,4 +658,44 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isValidEmail(String email) {
     return email.isNotEmpty && email.contains('@');
   }
+
+  _LoginMode _getLoginMode(String identifier) {
+    if (identifier.trim().isEmpty) return _LoginMode.none;
+
+    // Staff: only when it looks like a valid email.
+    if (_isValidEmail(identifier)) return _LoginMode.staff;
+
+    // Parent: only when it clearly looks like a phone number.
+    if (identifier.contains('@')) return _LoginMode.none;
+    final digits = identifier.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length >= 10) return _LoginMode.parent;
+
+    // Otherwise ambiguous -> show nothing.
+    return _LoginMode.none;
+  }
+
+  bool _isPinLike(String pin) {
+    return RegExp(r'^[0-9]{4,12}$').hasMatch(pin.trim());
+  }
+
+  String _friendlyFunctionsError(FirebaseFunctionsException e) {
+    // Prefer server message when available.
+    final msg = (e.message ?? '').trim();
+    if (msg.isNotEmpty) return msg;
+
+    switch (e.code) {
+      case 'not-found':
+        return 'Parent account not found. Please check phone number.';
+      case 'permission-denied':
+        return 'Invalid phone or PIN.';
+      case 'invalid-argument':
+        return 'Please enter a valid phone number and PIN.';
+      case 'unauthenticated':
+        return 'Please try again.';
+      default:
+        return 'Login failed. Please try again.';
+    }
+  }
 }
+
+enum _LoginMode { none, staff, parent }

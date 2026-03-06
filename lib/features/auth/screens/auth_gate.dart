@@ -10,6 +10,8 @@ import 'login_screen.dart';
 
 import '../../super_admin/screens/super_admin_dashboard.dart';
 import '../../school_admin/dashboard/screens/school_admin_dashboard.dart';
+import '../../parent/screens/force_change_password_screen.dart';
+import '../../parent/screens/parent_dashboard_screen.dart';
 
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
@@ -44,6 +46,20 @@ class AuthGate extends ConsumerWidget {
 
             if (role == UserRole.admin) {
               return const SchoolAdminDashboard();
+            }
+
+            if (role == UserRole.parent) {
+              final mustChangeAsync = ref.watch(mustChangePasswordProvider);
+              return mustChangeAsync.when(
+                loading: () => const Scaffold(body: AppLoader()),
+                error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
+                data: (mustChange) {
+                  if (mustChange) {
+                    return const ForceChangePasswordScreen();
+                  }
+                  return const ParentDashboardScreen();
+                },
+              );
             }
 
             return const LoginScreen();

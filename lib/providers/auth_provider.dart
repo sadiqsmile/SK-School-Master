@@ -32,5 +32,24 @@ final userRoleProvider = FutureProvider.autoDispose<UserRole>((ref) async {
   final role = (data['role'] ?? '').toString();
   if (role == 'superAdmin') return UserRole.superAdmin;
   if (role == 'admin') return UserRole.admin;
+  if (role == 'parent') return UserRole.parent;
   return UserRole.unknown;
+});
+
+/// Whether the signed-in user must change their password (used for parent flow).
+final mustChangePasswordProvider = StreamProvider.autoDispose<bool>((ref) {
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
+  if (user == null) {
+    return Stream.value(false);
+  }
+
+  return ref
+      .watch(firestoreServiceProvider)
+      .userDocStream(user.uid)
+      .map((userDoc) {
+    final data = userDoc.data();
+    if (data == null) return false;
+    return (data['mustChangePassword'] ?? false) == true;
+  });
 });

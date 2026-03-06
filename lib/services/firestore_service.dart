@@ -13,6 +13,10 @@ class FirestoreService {
     return _firestore.collection('users').doc(uid).get();
   }
 
+  Stream<DocumentSnapshot<Map<String, dynamic>>> userDocStream(String uid) {
+    return _firestore.collection('users').doc(uid).snapshots();
+  }
+
   Future<DocumentSnapshot<Map<String, dynamic>>> getSchoolDoc(String schoolId) {
     return _firestore.collection('schools').doc(schoolId).get();
   }

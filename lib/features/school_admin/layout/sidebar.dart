@@ -52,7 +52,7 @@ class Sidebar extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.class_rounded, color: Color(0xFF1E40AF)),
             title: const Text('Classes'),
-            onTap: () => context.go('/school-admin/classes'),
+            onTap: () => context.go('/classes'),
           ),
           ListTile(
             leading: const Icon(

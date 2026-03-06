@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function hasUserDoc() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userRole() {
+      return hasUserDoc() ? userDoc().data.role : null;
+    }
+
+    function userSchoolId() {
+      return hasUserDoc() ? userDoc().data.schoolId : null;
+    }
+
+    function isSuperAdmin() {
+      // Primary: role stored in `/users/{uid}`.
+      // Fallback: allow a known super admin email (matches app's hardcoded fallback).
+      return signedIn() && (
+        (userRole() == 'superAdmin') ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'sadiq.smile@gmail.com')
+      );
+    }
+
+    function isSchoolMember(schoolId) {
+      return signedIn() && userSchoolId() == schoolId;
+    }
+
+    // Users: user can read/write their own profile. Super admin can manage all.
+    match /users/{uid} {
+      allow read, write: if signedIn() && uid == request.auth.uid;
+      allow read, write: if isSuperAdmin();
+    }
+
+    // Schools: admins can read their own school doc and its subcollections.
+    // Super admin can manage everything.
+    match /schools/{schoolId} {
+      allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+      allow create, update, delete: if isSuperAdmin();
+
+      match /{document=**} {
+        allow read, write: if isSchoolMember(schoolId) || isSuperAdmin();
+      }
+    }
+
+    // Platform config/stats: super admin only.
+    match /platform/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // Default deny.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -9,11 +9,15 @@ class AdminLayout extends StatelessWidget {
     required this.body,
     this.title = 'School Admin Dashboard',
     this.actions,
+    this.floatingActionButton,
+    this.floatingActionButtonLocation,
   });
 
   final Widget body;
   final String title;
   final List<Widget>? actions;
+  final Widget? floatingActionButton;
+  final FloatingActionButtonLocation? floatingActionButtonLocation;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +37,8 @@ class AdminLayout extends StatelessWidget {
       ),
       drawer: const Sidebar(),
       body: body,
+      floatingActionButton: floatingActionButton,
+      floatingActionButtonLocation: floatingActionButtonLocation,
     );
   }
 }
