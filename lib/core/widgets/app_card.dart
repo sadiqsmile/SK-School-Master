@@ -1,3 +1,4 @@
+// core/widgets/app_card.dart
 import 'package:flutter/material.dart';
 
 class AppCard extends StatelessWidget {
@@ -9,10 +10,7 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: EdgeInsets.all(padding),
-        child: child,
-      ),
+      child: Padding(padding: EdgeInsets.all(padding), child: child),
     );
   }
 }

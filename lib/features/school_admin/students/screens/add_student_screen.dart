@@ -1,3 +1,4 @@
+// features/school_admin/students/screens/add_student_screen.dart
 import 'package:flutter/material.dart';
 
 class AddStudentScreen extends StatelessWidget {
@@ -5,8 +6,6 @@ class AddStudentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: Text('Add Student Screen')),
-    );
+    return const Scaffold(body: Center(child: Text('Add Student Screen')));
   }
 }

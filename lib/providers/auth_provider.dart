@@ -1,3 +1,4 @@
+// providers/auth_provider.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -14,7 +15,9 @@ final userRoleProvider = FutureProvider.autoDispose<UserRole>((ref) async {
 
   if (user == null) return UserRole.unknown;
 
-  final userDoc = await ref.watch(firestoreServiceProvider).getUserDoc(user.uid);
+  final userDoc = await ref
+      .watch(firestoreServiceProvider)
+      .getUserDoc(user.uid);
   final data = userDoc.data();
 
   if (data == null) {

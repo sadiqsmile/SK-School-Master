@@ -1,3 +1,4 @@
+// models/fee.dart
 class Fee {
   const Fee({required this.studentId, required this.amount, required this.status});
 

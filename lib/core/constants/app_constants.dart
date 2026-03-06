@@ -1,3 +1,4 @@
+// core/constants/app_constants.dart
 class AppConstants {
   AppConstants._();
 

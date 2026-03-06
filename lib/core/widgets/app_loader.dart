@@ -1,3 +1,4 @@
+// core/widgets/app_loader.dart
 import 'package:flutter/material.dart';
 
 class AppLoader extends StatelessWidget {

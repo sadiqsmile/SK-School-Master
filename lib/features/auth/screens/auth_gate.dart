@@ -1,3 +1,4 @@
+// features/auth/screens/auth_gate.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,21 +16,14 @@ class AuthGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-
     final authState = ref.watch(authStateProvider);
 
     return authState.when(
+      loading: () => const Scaffold(body: AppLoader()),
 
-      loading: () => const Scaffold(
-        body: AppLoader(),
-      ),
-
-      error: (e, _) => Scaffold(
-        body: Center(child: Text(e.toString())),
-      ),
+      error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
 
       data: (user) {
-
         if (user == null) {
           return const LoginScreen();
         }
@@ -37,14 +31,9 @@ class AuthGate extends ConsumerWidget {
         final roleAsync = ref.watch(userRoleProvider);
 
         return roleAsync.when(
+          loading: () => const Scaffold(body: AppLoader()),
 
-          loading: () => const Scaffold(
-            body: AppLoader(),
-          ),
-
-          error: (e, _) => Scaffold(
-            body: Center(child: Text(e.toString())),
-          ),
+          error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
 
           data: (role) {
             debugPrint('CURRENT USER ROLE = $role');

@@ -1,5 +1,10 @@
+// models/homework.dart
 class Homework {
-  const Homework({required this.id, required this.title, required this.classId});
+  const Homework({
+    required this.id,
+    required this.title,
+    required this.classId,
+  });
 
   final String id;
   final String title;

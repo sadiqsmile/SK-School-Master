@@ -1,3 +1,4 @@
+// models/teacher.dart
 class Teacher {
   const Teacher({required this.id, required this.name, required this.email});
 

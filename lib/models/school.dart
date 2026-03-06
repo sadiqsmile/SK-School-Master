@@ -1,3 +1,4 @@
+// models/school.dart
 class School {
   const School({
     required this.id,
