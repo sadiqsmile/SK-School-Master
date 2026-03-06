@@ -2,12 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../providers/platform_provider.dart';
-import '../data/school_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:school_app/features/super_admin/providers/schools_provider.dart'
-    as schools;
+import 'package:school_app/providers/super_admin_provider.dart';
+import 'create_school_screen.dart';
+import 'schools_screen.dart';
 
 class SuperAdminDashboard extends ConsumerWidget {
   const SuperAdminDashboard({super.key});
@@ -15,7 +14,6 @@ class SuperAdminDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final platformData = ref.watch(platformProvider);
-    final schoolsData = ref.watch(schools.schoolsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -37,7 +35,7 @@ class SuperAdminDashboard extends ConsumerWidget {
       ),
       body: platformData.when(
         data: (doc) {
-          final data = (doc.data() as Map<String, dynamic>?) ?? {};
+          final data = doc.data() ?? <String, dynamic>{};
 
           final totalSchools = data['totalSchools'] ?? 0;
           final totalStudents = data['totalStudents'] ?? 0;
@@ -58,36 +56,14 @@ class SuperAdminDashboard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 40),
                 ElevatedButton(
-                  onPressed: () async {
-                    debugPrint('ADD SCHOOL BUTTON CLICKED');
-
-                    try {
-                      final schoolService = SchoolService();
-
-                      await schoolService.createSchool(
-                        schoolName: 'Test School 2',
-                        adminEmail: 'testadmin2@school.com',
-                        adminPassword: '12345678',
-                        themeColor: '#1976D2',
-                      );
-
-                      debugPrint('SCHOOL CREATED SUCCESS');
-
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('School created successfully'),
-                        ),
-                      );
-                    } catch (e, st) {
-                      debugPrint('ERROR CREATING SCHOOL: $e');
-                      debugPrintStack(stackTrace: st);
-
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error creating school: $e')),
-                      );
-                    }
+                  onPressed: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (context) => const SafeArea(
+                        child: CreateSchoolScreen(),
+                      ),
+                    );
                   },
                   child: const Text('Add School'),
                 ),
@@ -96,42 +72,9 @@ class SuperAdminDashboard extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text("Schools", style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
-                schoolsData.when(
-                  data: (snapshot) {
-                    final docs = snapshot.docs;
-
-                    if (docs.isEmpty) {
-                      return const Text("No schools created yet");
-                    }
-
-                    return ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: docs.length,
-                      itemBuilder: (context, index) {
-                        final school = docs[index].data();
-
-                        final name =
-                            (school['name'] ?? school['schoolName'] ?? '')
-                                .toString();
-                        final schoolId = (school['schoolId'] ?? docs[index].id)
-                            .toString();
-                        final subscriptionPlan =
-                            (school['subscriptionPlan'] ?? '').toString();
-
-                        return Card(
-                          child: ListTile(
-                            title: Text(name),
-                            subtitle: Text("School ID: $schoolId"),
-                            trailing: Text(subscriptionPlan),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text("Error: $e"),
+                const SizedBox(
+                  height: 320,
+                  child: SchoolsScreen(),
                 ),
               ],
             ),

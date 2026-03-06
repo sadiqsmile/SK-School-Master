@@ -1,0 +1,3 @@
+class ClassService {
+  const ClassService();
+}

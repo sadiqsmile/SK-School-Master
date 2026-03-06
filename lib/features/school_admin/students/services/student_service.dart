@@ -1,0 +1,3 @@
+class StudentService {
+  const StudentService();
+}

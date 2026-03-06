@@ -1,0 +1,3 @@
+class AttendanceService {
+  const AttendanceService();
+}

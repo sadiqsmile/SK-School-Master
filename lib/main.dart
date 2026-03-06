@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'core/router/app_router.dart';
+import 'package:school_app/config/app_router.dart';
+import 'package:school_app/core/constants/app_constants.dart';
+import 'package:school_app/core/theme/app_theme.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -24,8 +26,9 @@ class SchoolApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'SK School Master',
+      title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme(),
       routerConfig: appRouter,
     );
   }
