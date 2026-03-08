@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import 'package:school_app/features/super_admin/services/backfill_service.dart';
 import 'package:school_app/providers/super_admin_provider.dart';
@@ -23,10 +24,59 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
   BackfillResult? _result;
   final List<String> _logs = [];
 
+  bool _recomputing = false;
+  Map<String, dynamic>? _counterResult;
+
   void _log(String msg) {
     setState(() {
       _logs.insert(0, msg);
     });
+  }
+
+  Future<void> _recomputeCounters() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final schoolId = _schoolId;
+
+    if (schoolId == null || schoolId.trim().isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Please select a school.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _recomputing = true;
+      _counterResult = null;
+    });
+
+    try {
+      // Callable is deployed in us-central1.
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      final callable = functions.httpsCallable('recomputeSchoolCounters');
+      final resp = await callable.call(<String, dynamic>{'schoolId': schoolId});
+
+      if (!mounted) return;
+      final data = (resp.data is Map) ? Map<String, dynamic>.from(resp.data as Map) : <String, dynamic>{};
+
+      setState(() {
+        _counterResult = data;
+      });
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Counters recomputed.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Recompute failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _recomputing = false;
+        });
+      }
+    }
   }
 
   Future<void> _run() async {
@@ -196,6 +246,42 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                               : const Icon(Icons.play_circle_fill_rounded),
                           label: Text(_running ? 'Running…' : 'Run Backfill'),
                         ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: (_running || _recomputing) ? null : _recomputeCounters,
+                          icon: _recomputing
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.calculate_rounded),
+                          label: Text(_recomputing ? 'Recomputing…' : 'Recompute Counters'),
+                        ),
+                        if (_counterResult != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Counters',
+                                  style: TextStyle(fontWeight: FontWeight.w900),
+                                ),
+                                const SizedBox(height: 8),
+                                Text('Students: ${_counterResult!['totalStudents'] ?? '-'}'),
+                                Text('Teachers: ${_counterResult!['totalTeachers'] ?? '-'}'),
+                                Text('Classes: ${_counterResult!['totalClasses'] ?? '-'}'),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (_result != null) ...[
                           const SizedBox(height: 12),
                           _ResultCard(result: _result!),
