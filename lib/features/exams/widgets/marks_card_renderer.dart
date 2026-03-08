@@ -15,6 +15,7 @@ class MarksCardRenderer extends StatelessWidget {
     required this.student,
     required this.marks,
     this.schoolName,
+    this.schoolLogoUrl,
     this.gradingSystem,
   });
 
@@ -23,6 +24,7 @@ class MarksCardRenderer extends StatelessWidget {
   final Student student;
   final ExamMarks? marks;
   final String? schoolName;
+  final String? schoolLogoUrl;
   final GradingSystem? gradingSystem;
 
   @override
@@ -40,6 +42,7 @@ class MarksCardRenderer extends StatelessWidget {
             _Header(
               template: template,
               schoolName: schoolName,
+              schoolLogoUrl: schoolLogoUrl,
               exam: exam,
               academicYear: student.academicYear,
             ),
@@ -77,12 +80,14 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.template,
     required this.schoolName,
+    required this.schoolLogoUrl,
     required this.exam,
     required this.academicYear,
   });
 
   final ExamTemplate template;
   final String? schoolName;
+  final String? schoolLogoUrl;
   final Exam exam;
   final String academicYear;
 
@@ -109,9 +114,10 @@ class _Header extends StatelessWidget {
       lines.add('Academic Year: ${academicYear.trim()}');
     }
 
-    if (lines.isEmpty) return const SizedBox.shrink();
+    final logoUrl = (schoolLogoUrl ?? '').trim();
+    if (lines.isEmpty && logoUrl.isEmpty) return const SizedBox.shrink();
 
-    return Column(
+    final textBlock = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (var i = 0; i < lines.length; i++)
@@ -125,6 +131,35 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
+      ],
+    );
+
+    if (logoUrl.isEmpty) {
+      return textBlock;
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Image.network(
+            logoUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(Icons.school_rounded, color: Color(0xFF0F172A));
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: textBlock),
       ],
     );
   }

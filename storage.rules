@@ -1,0 +1,61 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // SECURITY DEFAULT:
+    // Deny-by-default for Cloud Storage.
+    //
+    // Exception: School branding logos are uploaded by School Admins and read
+    // by signed-in users of the same school to render dashboards/marks cards.
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function hasUserDoc() {
+      return signedIn() && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function userRole() {
+      return hasUserDoc() ? userDoc().data.role : null;
+    }
+
+    function userSchoolId() {
+      return hasUserDoc() ? userDoc().data.schoolId : null;
+    }
+
+    function isSuperAdmin() {
+      return signedIn() && (request.auth.token.superAdmin == true || userRole() == 'superAdmin');
+    }
+
+    function isSchoolMember(schoolId) {
+      return signedIn() && userSchoolId() == schoolId;
+    }
+
+    function isSchoolAdmin(schoolId) {
+      return isSchoolMember(schoolId) && userRole() == 'admin';
+    }
+
+    function isImageUpload() {
+      return request.resource != null
+        && request.resource.contentType != null
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /schools/{schoolId}/branding/{fileName} {
+      // Only allow a single canonical object name to avoid unbounded uploads.
+      allow read: if (fileName == 'logo') && (isSuperAdmin() || isSchoolMember(schoolId));
+      allow write: if (fileName == 'logo')
+        && (isSuperAdmin() || isSchoolAdmin(schoolId))
+        && isImageUpload()
+        && request.resource.size < 2 * 1024 * 1024;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

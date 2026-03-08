@@ -28,3 +28,7 @@ Helpful Flutter resources:
 - [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
 
 For Flutter docs, see https://docs.flutter.dev/
+
+## Deployment
+
+See `docs/deployment.md` for the safest deploy order (local + GitHub Actions), and the required GitHub secrets.

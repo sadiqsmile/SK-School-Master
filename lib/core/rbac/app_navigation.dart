@@ -131,9 +131,19 @@ class AppNavigation {
 
           const AppNavEntry.header('Settings'),
           const AppNavEntry.item(
+            label: 'Data Tools (Export/Import)',
+            icon: Icons.import_export_rounded,
+            route: '/school-admin/data-tools',
+          ),
+          const AppNavEntry.item(
             label: 'Module Control',
             icon: Icons.tune_rounded,
             route: '/school-admin/settings/modules',
+          ),
+          const AppNavEntry.item(
+            label: 'Branding',
+            icon: Icons.palette_rounded,
+            route: '/school-admin/settings/branding',
           ),
 
           const AppNavEntry.header('Academic Management'),
@@ -151,6 +161,16 @@ class AppNavigation {
             label: 'Dashboard',
             icon: Icons.admin_panel_settings_rounded,
             route: '/super-admin',
+          ),
+          AppNavEntry.item(
+            label: 'Backup & Restore',
+            icon: Icons.backup_rounded,
+            route: '/super-admin/backup-restore',
+          ),
+          AppNavEntry.item(
+            label: 'Google Sheets Sync',
+            icon: Icons.table_view_rounded,
+            route: '/super-admin/google-sheets',
           ),
           AppNavEntry.item(
             label: 'Maintenance',

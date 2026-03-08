@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
+import 'package:school_app/models/school_branding.dart';
+import 'package:school_app/providers/school_branding_provider.dart';
 import 'package:school_app/providers/school_provider.dart';
 
 class SchoolAdminDashboard extends ConsumerWidget {
@@ -10,8 +12,13 @@ class SchoolAdminDashboard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const primaryBlue = Color(0xFF2563EB);
-    const accentCyan = Color(0xFF06B6D4);
+    final branding = ref.watch(schoolBrandingProvider).maybeWhen(
+          data: (b) => b,
+          orElse: () => SchoolBranding.defaults(),
+        );
+
+    final primaryBlue = branding.primaryColor;
+    final accentCyan = branding.secondaryColor;
     const deepBlue = Color(0xFF1E40AF);
     final schoolAsync = ref.watch(schoolProvider);
 
@@ -74,7 +81,7 @@ class SchoolAdminDashboard extends ConsumerWidget {
               : 'No attendance marked yet';
 
           return Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,

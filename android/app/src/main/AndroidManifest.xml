@@ -6,6 +6,8 @@
         android:label="SK School Master"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"

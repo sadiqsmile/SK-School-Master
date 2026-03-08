@@ -1,0 +1,13 @@
+# Copy this file to android/key.properties and fill in real values.
+# IMPORTANT: android/key.properties must NOT be committed to git.
+#
+# storeFile should be a path relative to the android/ folder.
+# Example:
+# storeFile=upload-keystore.jks
+#
+# Use your Play Console "Upload key" keystore.
+
+storeFile=CHANGE_ME
+storePassword=CHANGE_ME
+keyAlias=CHANGE_ME
+keyPassword=CHANGE_ME

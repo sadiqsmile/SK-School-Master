@@ -10,6 +10,7 @@ import 'package:school_app/providers/grading_system_provider.dart';
 import 'package:school_app/providers/exam_provider.dart';
 import 'package:school_app/providers/exam_template_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
+import 'package:school_app/providers/school_branding_provider.dart';
 
 class ParentResultScreen extends ConsumerStatefulWidget {
   const ParentResultScreen({super.key});
@@ -40,6 +41,7 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
     );
 
     final schoolNameAsync = ref.watch(currentSchoolProvider);
+    final schoolLogoUrlAsync = ref.watch(schoolBrandingLogoUrlProvider);
 
     return examsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -140,6 +142,11 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
                       orElse: () => '',
                     );
 
+                    final schoolLogoUrl = schoolLogoUrlAsync.maybeWhen(
+                      data: (u) => u,
+                      orElse: () => null,
+                    );
+
                     final template = templateAsync.maybeWhen(data: (t) => t, orElse: () => null);
 
                     if (template != null) {
@@ -149,6 +156,7 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
                         student: child,
                         marks: marks,
                         schoolName: schoolName,
+                        schoolLogoUrl: schoolLogoUrl,
                         gradingSystem: grading,
                       );
                     }

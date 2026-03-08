@@ -9,9 +9,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 Future<void> configureFirestoreOfflinePersistence() async {
   // This should be called after Firebase.initializeApp().
   try {
+    // SECURITY NOTE:
+    // Firestore persistence stores cached data unencrypted on device.
+    // We keep persistence enabled for offline UX, but DO NOT allow unlimited
+    // growth to reduce privacy exposure on lost/stolen devices.
+    const boundedCacheBytes = 40 * 1024 * 1024; // 40 MB
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      cacheSizeBytes: boundedCacheBytes,
     );
   } catch (_) {
     // Best-effort: some platforms/configs may throw if settings were already set.

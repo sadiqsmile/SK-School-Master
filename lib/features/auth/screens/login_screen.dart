@@ -92,39 +92,9 @@ class _LoginScreenState extends State<LoginScreen>
       }
 
       if (mode == _LoginMode.parent) {
-        // IMPORTANT: If the school disabled the Parents module, parents must not login.
-        final selectedSchoolId = (await SchoolStorage.getSchoolId())?.trim();
-        if (selectedSchoolId == null || selectedSchoolId.isEmpty) {
-          setState(() {
-            _errorMessage =
-                'Select your School ID first (tap “Change School”), then try again.';
-            _isLoading = false;
-          });
-          return;
-        }
-
-        try {
-          final modulesSnap = await FirebaseFirestore.instance
-              .collection('schools')
-              .doc(selectedSchoolId)
-              .collection('settings')
-              .doc('modules')
-              .get();
-
-          final parentsEnabled = (modulesSnap.data()?['parents'] ?? true) == true;
-          if (!parentsEnabled) {
-            setState(() {
-              _errorMessage =
-                  'Parent access is disabled by your school admin.';
-              _isLoading = false;
-            });
-            return;
-          }
-        } catch (_) {
-          // Fail-open here to avoid blocking login if settings doc doesn't exist
-          // yet (defaults are enabled). AuthGate will re-check after login.
-        }
-
+        // Login-first UX: do not require a locally selected School ID.
+        // The backend resolves the parent account + school from the phone.
+        // Module access is enforced post-login in AuthGate.
         if (!_isPinLike(secret)) {
           setState(() {
             _errorMessage = 'Enter a valid PIN (4-12 digits)';
@@ -670,46 +640,8 @@ class _LoginScreenState extends State<LoginScreen>
                                           ),
                                         ),
                                         const SizedBox(height: 24),
-                                        FutureBuilder<String?>(
-                                          future: SchoolStorage.getSchoolId(),
-                                          builder: (context, snapshot) {
-                                            final stored =
-                                                (snapshot.data ?? '').trim();
-                                            if (stored.isEmpty) {
-                                              return const SizedBox.shrink();
-                                            }
-
-                                            return Column(
-                                              children: [
-                                                Text(
-                                                  'Selected School: $stored',
-                                                  style: TextStyle(
-                                                    color: Colors.grey[700],
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 6),
-                                                TextButton.icon(
-                                                  onPressed: _isLoading
-                                                      ? null
-                                                      : () async {
-                                                          final router =
-                                                              GoRouter.of(context);
-                                                          await SchoolStorage
-                                                              .clearSchool();
-                                                          if (!mounted) return;
-                                                          router.go('/enter-school');
-                                                        },
-                                                  icon: const Icon(
-                                                    Icons.swap_horiz_rounded,
-                                                  ),
-                                                  label:
-                                                      const Text('Change School'),
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        ),
+                                        // Login-first UX: hide legacy school pre-selection.
+                                        const SizedBox.shrink(),
                                         const SizedBox(height: 30),
                                         Row(
                                           mainAxisAlignment:

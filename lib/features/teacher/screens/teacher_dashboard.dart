@@ -10,6 +10,10 @@ import 'package:school_app/models/announcement.dart';
 import 'package:school_app/providers/announcement_provider.dart';
 import 'package:school_app/features/announcements/screens/announcement_detail_screen.dart';
 import 'package:school_app/core/offline/firestore_sync_status_action.dart';
+import 'package:school_app/core/widgets/school_brand_banner.dart';
+import 'package:school_app/models/school_branding.dart';
+import 'package:school_app/providers/school_branding_provider.dart';
+import 'package:school_app/providers/school_provider.dart';
 
 class TeacherDashboard extends ConsumerWidget {
   const TeacherDashboard({super.key});
@@ -18,6 +22,21 @@ class TeacherDashboard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final teacherData = ref.watch(teacherProvider);
     final announcementsAsync = ref.watch(announcementsProvider);
+
+    final schoolName = ref.watch(schoolProvider).maybeWhen(
+          data: (doc) => (doc.data()?['name'] ?? '').toString().trim(),
+          orElse: () => '',
+        );
+
+    final branding = ref.watch(schoolBrandingProvider).maybeWhen(
+          data: (b) => b,
+          orElse: () => SchoolBranding.defaults(),
+        );
+
+    final logoUrl = ref.watch(schoolBrandingLogoUrlProvider).maybeWhen(
+          data: (u) => u,
+          orElse: () => null,
+        );
 
     return Scaffold(
       appBar: AppBar(
@@ -39,6 +58,8 @@ class TeacherDashboard extends ConsumerWidget {
           final rawClasses = data['classes'];
           final classes = rawClasses is List ? rawClasses : const [];
 
+          final teacherName = (data['name'] ?? data['fullName'] ?? '').toString().trim();
+
           if (classes.isEmpty) {
             return const Center(
               child: Text('No classes assigned'),
@@ -59,6 +80,14 @@ class TeacherDashboard extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(12),
             children: [
+              SchoolBrandBanner(
+                schoolName: schoolName,
+                subtitle: teacherName.isEmpty ? 'Teacher' : teacherName,
+                primary: branding.primaryColor,
+                secondary: branding.secondaryColor,
+                logoUrl: logoUrl,
+              ),
+              const SizedBox(height: 12),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),

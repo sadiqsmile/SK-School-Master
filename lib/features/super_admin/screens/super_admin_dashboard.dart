@@ -3,19 +3,46 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:school_app/providers/super_admin_provider.dart';
+import 'package:school_app/providers/platform_status_provider.dart';
 import 'create_school_screen.dart';
 import 'schools_screen.dart';
+import '../widgets/reset_school_data_sheet.dart';
 
 class SuperAdminDashboard extends ConsumerWidget {
   const SuperAdminDashboard({super.key});
+
+  Future<bool> _confirmEnableMaintenance(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enable Maintenance Mode?'),
+        content: const Text(
+          'This will block Admin/Teacher/Parent access and show “System under maintenance”.\n\nOnly Super Admin will be able to use the app.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     const primaryGreen = Color(0xFF00C896);
     const darkGreen = Color(0xFF00A876);
     final platformData = ref.watch(platformProvider);
+    final maintenanceAsync = ref.watch(maintenanceModeProvider);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -104,6 +131,224 @@ class SuperAdminDashboard extends ConsumerWidget {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Maintenance Mode',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            maintenanceAsync.when(
+                              loading: () => const LinearProgressIndicator(),
+                              error: (e, _) => Text(
+                                'Failed to load status: $e',
+                                style: const TextStyle(color: Colors.black54),
+                              ),
+                              data: (enabled) {
+                                return SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    enabled ? 'Enabled' : 'Disabled',
+                                    style: const TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                  subtitle: Text(
+                                    enabled
+                                        ? 'All non-super-admin users are blocked.'
+                                        : 'Normal app usage is allowed.',
+                                    style: const TextStyle(color: Colors.black54),
+                                  ),
+                                  value: enabled,
+                                  onChanged: (value) async {
+                                    bool nextValue = value;
+                                    if (value) {
+                                      final ok = await _confirmEnableMaintenance(context);
+                                      if (!ok) return;
+                                      nextValue = true;
+                                    }
+
+                                    await FirebaseFirestore.instance
+                                        .collection('platform')
+                                        .doc('status')
+                                        .set(
+                                      {
+                                        'maintenanceMode': nextValue,
+                                        'updatedAt': FieldValue.serverTimestamp(),
+                                      },
+                                      SetOptions(merge: true),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Backup & Restore',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Create a single-file database backup and restore later if needed.',
+                              style: TextStyle(color: Colors.black54, height: 1.3),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 48,
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryGreen,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                onPressed: () => context.go('/super-admin/backup-restore'),
+                                icon: const Icon(Icons.backup_rounded),
+                                label: const Text(
+                                  'Open Backup & Restore',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Google Sheets Sync',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Export school data to a Google Spreadsheet (server-side, super-admin only).',
+                              style: TextStyle(color: Colors.black54, height: 1.3),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 48,
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryGreen,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                onPressed: () => context.go('/super-admin/google-sheets'),
+                                icon: const Icon(Icons.table_view_rounded),
+                                label: const Text(
+                                  'Open Google Sheets Sync',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        side: BorderSide(color: Colors.red.withAlpha(46)),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Danger Zone',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Reset a school\'s Firebase data. This is destructive and cannot be undone.',
+                              style: TextStyle(color: Colors.black54, height: 1.3),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 48,
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red.shade700,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  showModalBottomSheet<void>(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    showDragHandle: true,
+                                    builder: (context) => const ResetSchoolDataSheet(),
+                                  );
+                                },
+                                icon: const Icon(Icons.delete_forever_rounded),
+                                label: const Text(
+                                  'Reset School Data',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),

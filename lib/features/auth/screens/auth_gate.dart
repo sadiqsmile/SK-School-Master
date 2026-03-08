@@ -7,6 +7,8 @@ import 'package:school_app/providers/auth_provider.dart';
 import 'package:school_app/core/widgets/app_loader.dart';
 import 'package:school_app/providers/school_modules_provider.dart';
 import 'package:school_app/providers/core_providers.dart';
+import 'package:school_app/providers/platform_status_provider.dart';
+import 'package:school_app/core/widgets/maintenance_mode_screen.dart';
 
 import 'login_screen.dart';
 
@@ -23,6 +25,10 @@ class AuthGate extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+    final maintenanceAsync = ref.watch(maintenanceModeProvider);
+
+    // Fail-open if status doc is missing/unreadable.
+    final isMaintenance = maintenanceAsync.asData?.value == true;
 
     return authState.when(
       loading: () => const Scaffold(body: AppLoader()),
@@ -30,6 +36,16 @@ class AuthGate extends ConsumerWidget {
       error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
 
       data: (user) {
+        if (isMaintenance && user == null) {
+          return MaintenanceModeScreen(
+            onSignIn: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
+          );
+        }
+
         if (user == null) {
           return const LoginScreen();
         }
@@ -44,6 +60,13 @@ class AuthGate extends ConsumerWidget {
           data: (role) {
             // Avoid logging roles in production (PII/security). If needed, wrap
             // a log here in kDebugMode.
+
+            // Maintenance mode: block everyone except super admin.
+            if (isMaintenance && role != UserRole.superAdmin) {
+              return MaintenanceModeScreen(
+                onLogout: () => ref.read(authServiceProvider).signOut(),
+              );
+            }
 
             if (role == UserRole.superAdmin) {
               return const SuperAdminDashboard();
