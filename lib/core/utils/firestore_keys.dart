@@ -16,6 +16,24 @@ String sanitizeFirestoreId(String input) {
       .replaceAll(RegExp(r'^_+|_+$'), '');
 }
 
+/// Normalizes a user-facing name into a canonical lowercase key.
+///
+/// Used for stable document IDs and cross-collection linking.
+///
+/// Example:
+/// - "Unit Test" -> "unit_test"
+/// - "FA-1" -> "fa_1"
+String normalizeKeyLower(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll('-', '_')
+      .replaceAll(' ', '_')
+      .replaceAll(RegExp(r'[^a-z0-9_]'), '')
+      .replaceAll(RegExp(r'_+'), '_')
+      .replaceAll(RegExp(r'^_+|_+$'), '');
+}
+
 /// Returns the canonical class key used across the app.
 ///
 /// Example: classId="5", sectionId="A" => "class_5_A"

@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:school_app/features/parent/providers/parent_children_provider.dart';
+import 'package:school_app/features/exams/widgets/marks_card_renderer.dart';
 import 'package:school_app/models/exam.dart';
 import 'package:school_app/models/exam_marks.dart';
+import 'package:school_app/core/utils/marks_calc.dart';
+import 'package:school_app/providers/grading_system_provider.dart';
 import 'package:school_app/providers/exam_provider.dart';
+import 'package:school_app/providers/exam_template_provider.dart';
+import 'package:school_app/providers/current_school_provider.dart';
 
 class ParentResultScreen extends ConsumerStatefulWidget {
   const ParentResultScreen({super.key});
@@ -19,6 +24,7 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
   @override
   Widget build(BuildContext context) {
     final child = ref.watch(selectedChildProvider);
+    final gradingAsync = ref.watch(gradingSystemProvider);
 
     if (child == null) {
       return const Center(
@@ -32,6 +38,8 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
     final examsAsync = ref.watch(
       examsByClassProvider(ExamClassKey(classId: child.classId, section: child.section)),
     );
+
+    final schoolNameAsync = ref.watch(currentSchoolProvider);
 
     return examsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -105,7 +113,16 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
               error: (e, _) => Text('Failed to load exam details: $e'),
               data: (doc) {
                 final exam = Exam.fromDoc(doc);
-                final subjectMax = exam.subjectMaxMarks;
+                final grading = gradingAsync.maybeWhen(data: (g) => g, orElse: () => null);
+
+                final templateAsync = ref.watch(
+                  resolvedExamTemplateProvider(
+                    ResolvedExamTemplateArgs(
+                      templateId: exam.templateId,
+                      examTypeKey: exam.examTypeKey.isNotEmpty ? exam.examTypeKey : exam.examType,
+                    ),
+                  ),
+                );
 
                 return marksAsync.when(
                   loading: () => const Padding(
@@ -115,10 +132,26 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
                   error: (e, _) => Text('Failed to load marks: $e'),
                   data: (marksDoc) {
                     final marks = marksDoc.exists ? ExamMarks.fromDoc(marksDoc) : null;
-                    final subjectMarks = marks?.subjectMarks ?? const <String, int>{};
+                    final derived = deriveSubjectRows(exam: exam, marks: marks);
+                    final calc = calcTotalsFromRows(derived);
 
-                    final calc = _calcTotals(subjectMarks: subjectMarks, subjectMaxMarks: subjectMax);
-                    final subjects = subjectMarks.keys.toList(growable: false)..sort();
+                    final schoolName = schoolNameAsync.maybeWhen(
+                      data: (d) => (d.data()?['name'] ?? '').toString(),
+                      orElse: () => '',
+                    );
+
+                    final template = templateAsync.maybeWhen(data: (t) => t, orElse: () => null);
+
+                    if (template != null) {
+                      return MarksCardRenderer(
+                        template: template,
+                        exam: exam,
+                        student: child,
+                        marks: marks,
+                        schoolName: schoolName,
+                        gradingSystem: grading,
+                      );
+                    }
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,13 +178,13 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
                                 ],
                                 const SizedBox(height: 6),
                                 Text('Total: ${calc.total} / ${calc.outOf}'),
-                                Text('Grade: ${_grade(calc.percent)}'),
+                                Text('Grade: ${gradeForPercent(calc.percent, system: grading)}'),
                               ],
                             ),
                           ),
                         ),
                         const SizedBox(height: 12),
-                        if (subjects.isEmpty)
+                        if (derived.isEmpty)
                           const Center(
                             child: Padding(
                               padding: EdgeInsets.all(16),
@@ -162,12 +195,12 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
                             ),
                           )
                         else
-                          for (final s in subjects)
+                          for (final r in derived)
                             Card(
                               child: ListTile(
-                                title: Text(_prettySubject(s)),
+                                title: Text(_prettySubject(r.subjectKey)),
                                 trailing: Text(
-                                  '${subjectMarks[s] ?? 0} / ${subjectMax[s] ?? 50}',
+                                  '${r.obtained} / ${r.outOf}',
                                   style: const TextStyle(fontWeight: FontWeight.w800),
                                 ),
                               ),
@@ -183,34 +216,6 @@ class _ParentResultScreenState extends ConsumerState<ParentResultScreen> {
       },
     );
   }
-}
-
-({int total, int outOf, double percent}) _calcTotals({
-  required Map<String, int> subjectMarks,
-  required Map<String, int> subjectMaxMarks,
-}) {
-  var total = 0;
-  var outOf = 0;
-
-  for (final e in subjectMarks.entries) {
-    final subj = e.key;
-    final mark = e.value;
-    final max = subjectMaxMarks[subj] ?? 50;
-    total += mark;
-    outOf += max;
-  }
-
-  final percent = outOf <= 0 ? 0.0 : (total / outOf) * 100.0;
-  return (total: total, outOf: outOf, percent: percent);
-}
-
-String _grade(double percent) {
-  if (percent >= 90) return 'A+';
-  if (percent >= 80) return 'A';
-  if (percent >= 70) return 'B';
-  if (percent >= 60) return 'C';
-  if (percent >= 50) return 'D';
-  return 'F';
 }
 
 String _prettySubject(String key) {

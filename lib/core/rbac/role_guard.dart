@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:school_app/core/widgets/app_loader.dart';
+import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/models/user_role.dart';
 import 'package:school_app/providers/auth_provider.dart';
 import 'package:school_app/providers/core_providers.dart';
+import 'package:school_app/providers/school_modules_provider.dart';
 
 /// A lightweight route guard to ensure users can only access screens allowed
 /// for their role.
@@ -18,11 +20,13 @@ class RoleGuard extends ConsumerWidget {
     required this.allowedRoles,
     required this.child,
     this.title,
+    this.requiredModules,
   });
 
   final List<UserRole> allowedRoles;
   final Widget child;
   final String? title;
+  final List<SchoolModuleKey>? requiredModules;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -55,7 +59,42 @@ class RoleGuard extends ConsumerWidget {
       ),
       data: (role) {
         if (allowedRoles.contains(role)) {
-          return child;
+          final req = requiredModules;
+          if (req == null || req.isEmpty) {
+            return child;
+          }
+
+          // Module gating only applies for school-scoped roles.
+          if (role == UserRole.superAdmin) {
+            return child;
+          }
+
+          final modulesAsync = ref.watch(schoolModulesProvider);
+          return modulesAsync.when(
+            loading: () => const Scaffold(body: AppLoader()),
+            error: (e, _) => _UnauthorizedScreen(
+              title: title,
+              message: 'Failed to load school modules: $e',
+              onGoHome: () => context.go('/'),
+              onLogout: () => ref.read(authServiceProvider).signOut(),
+            ),
+            data: (modules) {
+              final allEnabled = req.every(modules.isEnabled);
+              if (allEnabled) {
+                return child;
+              }
+
+              final disabled = req.where((m) => !modules.isEnabled(m)).toList(growable: false);
+              final names = disabled.map((m) => m.label).join(', ');
+              return _UnauthorizedScreen(
+                title: title,
+                message:
+                    'This feature is disabled by your school admin (${names.isEmpty ? 'module OFF' : names}).',
+                onGoHome: () => context.go('/'),
+                onLogout: () => ref.read(authServiceProvider).signOut(),
+              );
+            },
+          );
         }
 
         return _UnauthorizedScreen(

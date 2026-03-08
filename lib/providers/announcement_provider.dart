@@ -17,6 +17,7 @@ final announcementsProvider = StreamProvider.autoDispose<
         .doc(schoolId)
         .collection('announcements')
         .orderBy('createdAt', descending: true)
+        .limit(100)
         .snapshots();
   },
 );

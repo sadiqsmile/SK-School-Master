@@ -21,6 +21,11 @@ class FirestoreService {
     return _firestore.collection('schools').doc(schoolId).get();
   }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> schoolsStreamLimited({int limit = 200}) {
+    return _firestore.collection('schools').limit(limit).snapshots();
+  }
+
+  @Deprecated('Unbounded stream can be expensive. Prefer schoolsStreamLimited().')
   Stream<QuerySnapshot<Map<String, dynamic>>> schoolsStream() {
     return _firestore.collection('schools').snapshots();
   }

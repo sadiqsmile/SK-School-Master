@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import 'package:school_app/core/rbac/app_navigation.dart';
 import 'package:school_app/core/widgets/app_loader.dart';
+import 'package:school_app/models/user_role.dart';
 import 'package:school_app/providers/auth_provider.dart';
+import 'package:school_app/providers/school_modules_provider.dart';
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -24,67 +26,103 @@ class AppDrawer extends ConsumerWidget {
           ),
         ),
         data: (role) {
-          final entries = AppNavigation.drawerEntriesFor(role);
-
-          return ListView(
-            children: [
-              DrawerHeader(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
-                  ),
-                ),
-                child: Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Text(
-                    AppNavigation.roleTitle(role),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+          // Only School Admin drawer is module-aware today.
+          if (role == UserRole.admin) {
+            final modulesAsync = ref.watch(schoolModulesProvider);
+            return modulesAsync.when(
+              loading: () => const Center(child: AppLoader()),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Failed to load modules: $e'),
                 ),
               ),
-              if (entries.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'No menu items for this role.',
-                    style: TextStyle(color: Color(0xFF64748B)),
-                  ),
-                )
-              else
-                for (final e in entries)
-                  if (e.isHeader)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-                      child: Text(
-                        e.header!,
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    )
-                  else
-                    ListTile(
-                      leading: Icon(
-                        e.icon,
-                        color: const Color(0xFF1E40AF),
-                      ),
-                      title: Text(e.label!),
-                      onTap: () {
-                        Navigator.of(context).maybePop();
-                        context.go(e.route!);
-                      },
-                    ),
-            ],
-          );
+              data: (modules) {
+                final entries = AppNavigation.drawerEntriesFor(
+                  role,
+                  modules: modules,
+                );
+                return _DrawerList(entries: entries, role: role);
+              },
+            );
+          }
+
+          final entries = AppNavigation.drawerEntriesFor(role);
+
+          return _DrawerList(entries: entries, role: role);
         },
       ),
+    );
+  }
+}
+
+class _DrawerList extends StatelessWidget {
+  const _DrawerList({
+    required this.entries,
+    required this.role,
+  });
+
+  final List<AppNavEntry> entries;
+  final UserRole role;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: [
+        DrawerHeader(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
+            ),
+          ),
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Text(
+              AppNavigation.roleTitle(role),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+        if (entries.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'No menu items for this role.',
+              style: TextStyle(color: Color(0xFF64748B)),
+            ),
+          )
+        else
+          for (final e in entries)
+            if (e.isHeader)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                child: Text(
+                  e.header!,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              )
+            else
+              ListTile(
+                leading: Icon(
+                  e.icon,
+                  color: const Color(0xFF1E40AF),
+                ),
+                title: Text(e.label!),
+                onTap: () {
+                  Navigator.of(context).maybePop();
+                  context.go(e.route!);
+                },
+              ),
+      ],
     );
   }
 }

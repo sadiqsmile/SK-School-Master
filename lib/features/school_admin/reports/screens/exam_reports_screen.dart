@@ -5,8 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:school_app/features/school_admin/classes/providers/classes_provider.dart' as classes_stream;
 import 'package:school_app/features/school_admin/classes/providers/sections_provider.dart';
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
+import 'package:school_app/core/utils/marks_calc.dart';
 import 'package:school_app/models/exam.dart';
 import 'package:school_app/models/exam_marks.dart';
+import 'package:school_app/models/grading_system.dart';
+import 'package:school_app/providers/grading_system_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 
 class ExamReportsScreen extends ConsumerStatefulWidget {
@@ -28,34 +31,8 @@ class _ExamReportsScreenState extends ConsumerState<ExamReportsScreen> {
     return t.isEmpty ? e.examName : '$t • ${e.examName}';
   }
 
-  ({int total, int outOf, double percent}) _calcTotals({
-    required Map<String, int> subjectMarks,
-    required Map<String, int> subjectMaxMarks,
-  }) {
-    int total = 0;
-    int outOf = 0;
-
-    for (final e in subjectMarks.entries) {
-      final subj = e.key;
-      final mark = e.value;
-      final max = subjectMaxMarks[subj] ?? 50;
-      total += mark;
-      outOf += max;
-    }
-
-    final percent = outOf <= 0 ? 0.0 : (total / outOf) * 100;
-
-    return (total: total, outOf: outOf, percent: percent);
-  }
-
-  String _grade(double percent) {
-    if (percent >= 90) return 'A+';
-    if (percent >= 80) return 'A';
-    if (percent >= 70) return 'B+';
-    if (percent >= 60) return 'B';
-    if (percent >= 50) return 'C';
-    if (percent >= 40) return 'D';
-    return 'F';
+  String _grade(double percent, {GradingSystem? system}) {
+    return gradeForPercent(percent, system: system);
   }
 
   Future<_ExamReport> _buildReport({
@@ -65,6 +42,8 @@ class _ExamReportsScreenState extends ConsumerState<ExamReportsScreen> {
     required String examId,
   }) async {
     final db = FirebaseFirestore.instance;
+
+    final grading = await ref.read(gradingSystemProvider.future);
 
     final examDoc = await db
         .collection('schools')
@@ -108,16 +87,12 @@ class _ExamReportsScreenState extends ConsumerState<ExamReportsScreen> {
 
     final studentTotals = <_StudentScore>[];
 
-    const passPercent = 33.0;
     int passCount = 0;
 
     for (final m in marks) {
-      final calc = _calcTotals(
-        subjectMarks: m.subjectMarks,
-        subjectMaxMarks: exam.subjectMaxMarks,
-      );
+      final calc = calcTotals(exam: exam, marks: m);
 
-      if (calc.percent >= passPercent) passCount++;
+      if (calc.percent >= grading.passPercent) passCount++;
 
       studentTotals.add(
         _StudentScore(
@@ -126,25 +101,30 @@ class _ExamReportsScreenState extends ConsumerState<ExamReportsScreen> {
           total: calc.total,
           outOf: calc.outOf,
           percent: calc.percent,
-          grade: _grade(calc.percent),
+          grade: _grade(calc.percent, system: grading),
         ),
       );
 
-      for (final e in m.subjectMarks.entries) {
-        final k = e.key;
-        final v = e.value;
-        subjectSums[k] = (subjectSums[k] ?? 0) + v;
+      final derived = deriveSubjectRows(exam: exam, marks: m);
+      for (final r in derived) {
+        final k = r.subjectKey;
+        subjectSums[k] = (subjectSums[k] ?? 0) + r.obtained;
         subjectCounts[k] = (subjectCounts[k] ?? 0) + 1;
       }
     }
 
     studentTotals.sort((a, b) => b.percent.compareTo(a.percent));
 
+    final examMaxRows = deriveSubjectRows(exam: exam, marks: null);
+    final maxBySubject = <String, int>{
+      for (final r in examMaxRows) r.subjectKey: r.outOf,
+    };
+
     final subjectAverages = <_SubjectAverage>[];
     for (final subj in subjectSums.keys) {
       final sum = subjectSums[subj] ?? 0;
       final count = subjectCounts[subj] ?? 0;
-      final max = exam.subjectMaxMarks[subj] ?? 50;
+      final max = maxBySubject[subj] ?? (exam.subjectMaxMarks[subj] ?? 50);
       final avg = count <= 0 ? 0.0 : sum / count;
       final percent = max <= 0 ? 0.0 : (avg / max) * 100;
 

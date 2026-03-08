@@ -5,12 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:school_app/features/teacher/providers/students_by_class_provider.dart';
 import 'package:school_app/models/exam.dart';
 import 'package:school_app/models/exam_marks.dart';
+import 'package:school_app/models/exam_template.dart';
 import 'package:school_app/models/student.dart';
 import 'package:school_app/providers/exam_provider.dart';
+import 'package:school_app/providers/exam_template_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/services/exam_service.dart';
 import 'package:school_app/core/offline/firestore_sync_tracker.dart';
 import 'package:school_app/core/offline/firestore_sync_status_action.dart';
+import 'package:school_app/core/utils/firestore_keys.dart';
 
 class EnterMarksScreen extends ConsumerStatefulWidget {
   const EnterMarksScreen({
@@ -35,6 +38,10 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
   final Map<String, TextEditingController> _markControllers = {};
   String _lastSyncedSubjectKey = '';
 
+  /// '' = total marks (legacy subjectMarks). Otherwise component key (oral/written/etc).
+  String _entryKey = '';
+  bool _entryKeyInitialized = false;
+
   @override
   void dispose() {
     _subjectController.dispose();
@@ -51,6 +58,34 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
     final schoolIdAsync = ref.watch(schoolIdProvider);
     final studentsAsync = ref.watch(studentsByClassProvider((widget.classId, widget.sectionId)));
     final marksAsync = ref.watch(examMarksProvider(widget.exam.id));
+
+    final templateAsync = ref.watch(
+      resolvedExamTemplateProvider(
+        ResolvedExamTemplateArgs(
+          templateId: widget.exam.templateId,
+          examTypeKey: widget.exam.examTypeKey.isNotEmpty
+              ? widget.exam.examTypeKey
+              : widget.exam.examType,
+        ),
+      ),
+    );
+
+    final template = templateAsync.maybeWhen(data: (t) => t, orElse: () => null);
+    final componentCols = (template?.columns ?? <ExamTemplateColumn>[]) 
+      .where((c) => c.type == MarksCardColumnType.component && (c.componentKey ?? '').trim().isNotEmpty)
+      .map((c) => (
+          key: (c.componentKey ?? '').trim(),
+          label: c.label.trim().isEmpty ? (c.componentKey ?? '').trim() : c.label.trim(),
+        ))
+        .toList(growable: false);
+
+    if (!_entryKeyInitialized && componentCols.isNotEmpty) {
+      // Default to first component for component-based templates.
+      _entryKey = componentCols.first.key;
+      _entryKeyInitialized = true;
+    } else if (!_entryKeyInitialized) {
+      _entryKeyInitialized = true;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -93,6 +128,7 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
                   if (_lastSyncedSubjectKey != subjectKey) {
                     _syncControllersFromExisting(
                       subjectKey: subjectKey,
+                      entryKey: _entryKey,
                       students: students,
                       marksByStudentId: marksByStudentId,
                     );
@@ -105,6 +141,18 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
                       _TopControls(
                         subjectController: _subjectController,
                         maxMarksController: _maxMarksController,
+                        entryKey: _entryKey,
+                        entryOptions: [
+                          const (key: '', label: 'Total marks'),
+                          ...componentCols,
+                        ],
+                        showEntryPicker: componentCols.isNotEmpty,
+                        onEntryChanged: (v) {
+                          setState(() {
+                            _entryKey = v;
+                            _lastSyncedSubjectKey = '';
+                          });
+                        },
                         onQuickSubject: (s) {
                           setState(() {
                             _subjectController.text = s;
@@ -135,6 +183,7 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
                                   context: context,
                                   schoolId: schoolId,
                                   students: students,
+                                  entryKey: _entryKey,
                                 ),
                                 icon: const Icon(Icons.save_rounded),
                                 label: const Text('Save'),
@@ -180,6 +229,7 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
 
   void _syncControllersFromExisting({
     required String subjectKey,
+    required String entryKey,
     required List<Student> students,
     required Map<String, ExamMarks> marksByStudentId,
   }) {
@@ -190,7 +240,9 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
       // Only prefill if blank to avoid overriding user edits.
       if (c.text.trim().isNotEmpty) continue;
 
-      final existing = marksByStudentId[s.id]?.subjectMarks[subjectKey];
+      final existing = entryKey.trim().isEmpty
+          ? marksByStudentId[s.id]?.subjectMarks[subjectKey]
+          : marksByStudentId[s.id]?.subjectComponentMarks[subjectKey]?[entryKey.trim()];
       if (existing == null) continue;
       c.text = existing.toString();
     }
@@ -200,6 +252,7 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
     required BuildContext context,
     required String schoolId,
     required List<Student> students,
+    required String entryKey,
   }) async {
     final subjectKey = _normalizedSubjectKey(_subjectController.text);
     final maxMarks = int.tryParse(_maxMarksController.text.trim()) ?? 0;
@@ -243,13 +296,24 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
     }
 
     try {
-      await ExamService().saveSubjectMarks(
-        schoolId: schoolId,
-        examId: widget.exam.id,
-        subjectKey: subjectKey,
-        maxMarks: maxMarks,
-        marksByStudentId: marksByStudentId,
-      );
+      if (entryKey.trim().isEmpty) {
+        await ExamService().saveSubjectMarks(
+          schoolId: schoolId,
+          examId: widget.exam.id,
+          subjectKey: subjectKey,
+          maxMarks: maxMarks,
+          marksByStudentId: marksByStudentId,
+        );
+      } else {
+        await ExamService().saveSubjectComponentMarks(
+          schoolId: schoolId,
+          examId: widget.exam.id,
+          subjectKey: subjectKey,
+          componentKey: entryKey,
+          maxMarks: maxMarks,
+          marksByStudentId: marksByStudentId,
+        );
+      }
 
       FirestoreSyncTracker.instance.notifyWriteQueued();
       final synced = await FirestoreSyncTracker.instance.waitForServerSync(
@@ -286,12 +350,20 @@ class _TopControls extends StatelessWidget {
   const _TopControls({
     required this.subjectController,
     required this.maxMarksController,
+    required this.entryKey,
+    required this.entryOptions,
+    required this.showEntryPicker,
+    required this.onEntryChanged,
     required this.onQuickSubject,
     required this.onChanged,
   });
 
   final TextEditingController subjectController;
   final TextEditingController maxMarksController;
+  final String entryKey;
+  final List<({String key, String label})> entryOptions;
+  final bool showEntryPicker;
+  final ValueChanged<String> onEntryChanged;
   final ValueChanged<String> onQuickSubject;
   final VoidCallback onChanged;
 
@@ -308,6 +380,32 @@ class _TopControls extends StatelessWidget {
               'Setup',
               style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
             ),
+            if (showEntryPicker) ...[
+              const SizedBox(height: 10),
+              InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Entering',
+                  border: OutlineInputBorder(),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: entryOptions.any((o) => o.key == entryKey) ? entryKey : entryOptions.first.key,
+                    isExpanded: true,
+                    items: [
+                      for (final o in entryOptions)
+                        DropdownMenuItem(
+                          value: o.key,
+                          child: Text(o.label),
+                        ),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      onEntryChanged(v);
+                    },
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
@@ -363,11 +461,7 @@ class _TopControls extends StatelessWidget {
 }
 
 String _normalizedSubjectKey(String raw) {
-  return raw
-      .trim()
-      .toLowerCase()
-      .replaceAll(' ', '_')
-      .replaceAll('-', '_');
+  return normalizeKeyLower(raw);
 }
 
 String _prettySubject(String key) {

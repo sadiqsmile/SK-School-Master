@@ -5,6 +5,8 @@ class NotificationService {
   const NotificationService();
 
   void showInfo(String message) {
-    debugPrint('INFO: $message');
+    if (kDebugMode) {
+      debugPrint('INFO: $message');
+    }
   }
 }

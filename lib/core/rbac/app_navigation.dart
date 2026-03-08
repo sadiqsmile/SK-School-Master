@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/models/user_role.dart';
 
 /// A single navigation entry used to build role-based navigation.
@@ -48,71 +49,100 @@ class AppNavigation {
   ///
   /// Note: Teacher and Parent currently use dedicated UIs (dashboard / bottom
   /// navigation). This list primarily powers the School Admin drawer today.
-  static List<AppNavEntry> drawerEntriesFor(UserRole role) {
+  static List<AppNavEntry> drawerEntriesFor(
+    UserRole role, {
+    SchoolModules? modules,
+  }) {
     switch (role) {
       case UserRole.admin:
-        return const [
-          AppNavEntry.item(
+        final m = modules ?? SchoolModules.defaults();
+        return [
+          const AppNavEntry.item(
             label: 'Dashboard',
             icon: Icons.dashboard_rounded,
             route: '/school-admin',
           ),
-          AppNavEntry.item(
-            label: 'Teachers',
-            icon: Icons.school_rounded,
-            route: '/school-admin/teachers',
-          ),
-          AppNavEntry.item(
-            label: 'Students',
-            icon: Icons.groups_rounded,
-            route: '/school-admin/students',
-          ),
-          AppNavEntry.item(
-            label: 'Classes',
-            icon: Icons.class_rounded,
-            route: '/classes',
-          ),
-          AppNavEntry.item(
-            label: 'Attendance',
-            icon: Icons.fact_check_rounded,
-            route: '/school-admin/attendance',
-          ),
-          AppNavEntry.item(
-            label: 'Homework',
-            icon: Icons.menu_book_rounded,
-            route: '/school-admin/homework',
-          ),
-          AppNavEntry.item(
-            label: 'Fees',
-            icon: Icons.payments_rounded,
-            route: '/school-admin/fees',
-          ),
-          AppNavEntry.item(
-            label: 'Announcements',
-            icon: Icons.campaign_rounded,
-            route: '/school-admin/announcements',
-          ),
-          AppNavEntry.item(
-            label: 'Exam Types',
-            icon: Icons.category_rounded,
-            route: '/school-admin/exam-types',
-          ),
-          AppNavEntry.item(
+
+          if (m.teachers)
+            const AppNavEntry.item(
+              label: 'Teachers',
+              icon: Icons.school_rounded,
+              route: '/school-admin/teachers',
+            ),
+          if (m.students)
+            const AppNavEntry.item(
+              label: 'Students',
+              icon: Icons.groups_rounded,
+              route: '/school-admin/students',
+            ),
+          if (m.students)
+            const AppNavEntry.item(
+              label: 'Classes',
+              icon: Icons.class_rounded,
+              route: '/classes',
+            ),
+          if (m.attendance)
+            const AppNavEntry.item(
+              label: 'Attendance',
+              icon: Icons.fact_check_rounded,
+              route: '/school-admin/attendance',
+            ),
+          if (m.homework)
+            const AppNavEntry.item(
+              label: 'Homework',
+              icon: Icons.menu_book_rounded,
+              route: '/school-admin/homework',
+            ),
+          if (m.fees)
+            const AppNavEntry.item(
+              label: 'Fees',
+              icon: Icons.payments_rounded,
+              route: '/school-admin/fees',
+            ),
+          if (m.messages)
+            const AppNavEntry.item(
+              label: 'Announcements',
+              icon: Icons.campaign_rounded,
+              route: '/school-admin/announcements',
+            ),
+          if (m.exams)
+            const AppNavEntry.item(
+              label: 'Exam Types',
+              icon: Icons.category_rounded,
+              route: '/school-admin/exam-types',
+            ),
+          if (m.exams)
+            const AppNavEntry.item(
+              label: 'Marks Card Templates',
+              icon: Icons.description_rounded,
+              route: '/school-admin/marks-card-templates',
+            ),
+
+          const AppNavEntry.item(
             label: 'Reports',
             icon: Icons.bar_chart_rounded,
             route: '/school-admin/reports',
           ),
-          AppNavEntry.item(
+          const AppNavEntry.item(
             label: 'Analytics',
             icon: Icons.analytics_rounded,
             route: '/school-admin/analytics',
           ),
-          AppNavEntry.header('Academic Management'),
-          AppNavEntry.item(
-            label: 'Promote Students',
-            icon: Icons.trending_up_rounded,
-            route: '/school-admin/academic/promote',
+
+          const AppNavEntry.header('Settings'),
+          const AppNavEntry.item(
+            label: 'Module Control',
+            icon: Icons.tune_rounded,
+            route: '/school-admin/settings/modules',
           ),
+
+          const AppNavEntry.header('Academic Management'),
+          if (m.students)
+            const AppNavEntry.item(
+              label: 'Promote Students',
+              icon: Icons.trending_up_rounded,
+              route: '/school-admin/academic/promote',
+            ),
         ];
 
       case UserRole.superAdmin:

@@ -7,16 +7,6 @@ class ExamService {
 
   final FirebaseFirestore _db;
 
-  String _normalizeKey(String value) {
-    return value
-        .trim()
-        .toLowerCase()
-        .replaceAll('-', '_')
-        .replaceAll(' ', '_')
-        .replaceAll(RegExp(r'[^a-z0-9_]'), '')
-        .replaceAll(RegExp(r'_+'), '_');
-  }
-
   /// Creates/updates an exam type under:
   /// schools/{schoolId}/examTypes/{examTypeId}
   ///
@@ -29,7 +19,7 @@ class ExamService {
     final trimmed = name.trim();
     if (trimmed.isEmpty) throw Exception('Exam type name is required');
 
-    final normalizedId = _normalizeKey(trimmed);
+    final normalizedId = normalizeKeyLower(trimmed);
     if (normalizedId.isEmpty) throw Exception('Invalid exam type name');
 
     final col = _db.collection('schools').doc(schoolId).collection('examTypes');
@@ -42,13 +32,21 @@ class ExamService {
         throw Exception('Exam type already exists');
       }
 
+      final oldDoc = await col.doc(existingId).get();
+      final oldData = oldDoc.data() ?? const <String, dynamic>{};
+
       final batch = _db.batch();
       batch.set(
         newRef,
         {
+          // Carry over any existing fields (e.g. defaultTemplateId) so renaming
+          // doesn't lose settings.
+          ...oldData,
           'name': trimmed,
           'normalizedName': normalizedId,
-          'createdAt': FieldValue.serverTimestamp(),
+          // Keep existing createdAt if present, otherwise set it.
+          if (oldData['createdAt'] is! Timestamp)
+            'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         },
       );
@@ -112,6 +110,8 @@ class ExamService {
     required String examName,
     required String classId,
     required String section,
+    String? examTypeKey,
+    String? templateId,
   }) async {
     final trimmedExamName = examName.trim();
     if (trimmedExamName.isEmpty) {
@@ -119,6 +119,7 @@ class ExamService {
     }
 
     final trimmedType = examType.trim();
+    final normalizedTypeKey = (examTypeKey ?? normalizeKeyLower(trimmedType)).trim();
 
     final ref = _db.collection('schools').doc(schoolId).collection('exams').doc();
 
@@ -126,6 +127,13 @@ class ExamService {
       // New fields
       'examType': trimmedType,
       'examName': trimmedExamName,
+
+      // Stable linking key for templates/defaults.
+      if (normalizedTypeKey.isNotEmpty) 'examTypeKey': normalizedTypeKey,
+
+      // Optional: lock a specific template to this exam.
+      if (templateId != null && templateId.trim().isNotEmpty)
+        'templateId': templateId.trim(),
 
       // Backward compatibility field (older screens read `name`).
       'name': trimmedExamName,
@@ -166,7 +174,7 @@ class ExamService {
     required int maxMarks,
     required Map<String, int> marksByStudentId,
   }) async {
-    final subj = subjectKey.trim().toLowerCase();
+    final subj = normalizeKeyLower(subjectKey);
     if (subj.isEmpty) throw Exception('Subject is required');
     if (maxMarks <= 0) throw Exception('Max marks must be greater than 0');
 
@@ -175,10 +183,14 @@ class ExamService {
     final batch = _db.batch();
 
     // Persist max marks for the subject.
+    // - Legacy: subjectMaxMarks.{subj} = max
+    // - Canonical: subjectMaxByComponent.{subj}.total = max
     batch.set(
       examRef,
       {
-        'subjectMaxMarks': {subj: maxMarks},
+        'subjects': FieldValue.arrayUnion([subj]),
+        'subjectMaxMarks.$subj': maxMarks,
+        'subjectMaxByComponent.$subj.total': maxMarks,
         'updatedAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
@@ -198,7 +210,78 @@ class ExamService {
       batch.set(
         docRef,
         {
-          'subjectMarks': {subj: safeMark},
+          // Legacy
+          'subjectMarks.$subj': safeMark,
+          // Canonical
+          'subjects.$subj.total': safeMark,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    }
+
+    await batch.commit();
+  }
+
+  /// Saves marks for a single subject *component* (e.g. oral/written/practical)
+  /// for many students.
+  ///
+  /// Data structure:
+  /// schools/{schoolId}/exams/{examId}
+  ///   subjectComponentMaxMarks: { math: { oral: 10, written: 40 } }
+  ///
+  /// schools/{schoolId}/exams/{examId}/marks/{studentId}
+  ///   subjectComponentMarks: { math: { oral: 8, written: 35 } }
+  ///
+  /// This intentionally does NOT try to keep `subjectMarks` in sync on write,
+  /// because updating totals safely would require reading existing component
+  /// values first. Clients can compute totals when rendering.
+  Future<void> saveSubjectComponentMarks({
+    required String schoolId,
+    required String examId,
+    required String subjectKey,
+    required String componentKey,
+    required int maxMarks,
+    required Map<String, int> marksByStudentId,
+  }) async {
+    final subj = normalizeKeyLower(subjectKey);
+    final comp = normalizeKeyLower(componentKey);
+    if (subj.isEmpty) throw Exception('Subject is required');
+    if (comp.isEmpty) throw Exception('Component key is required');
+    if (maxMarks <= 0) throw Exception('Max marks must be greater than 0');
+
+    final examRef = _db.collection('schools').doc(schoolId).collection('exams').doc(examId);
+    final batch = _db.batch();
+
+    // Persist max marks for the component.
+    // - Legacy: subjectComponentMaxMarks.{subj}.{comp} = max
+    // - Canonical: subjectMaxByComponent.{subj}.{comp} = max
+    batch.set(
+      examRef,
+      {
+        'subjects': FieldValue.arrayUnion([subj]),
+        'subjectComponentMaxMarks.$subj.$comp': maxMarks,
+        'subjectMaxByComponent.$subj.$comp': maxMarks,
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    final marksCol = examRef.collection('marks');
+    for (final entry in marksByStudentId.entries) {
+      final studentId = entry.key;
+      final mark = entry.value;
+      if (studentId.trim().isEmpty) continue;
+
+      final safeMark = mark.clamp(0, maxMarks);
+      final docRef = marksCol.doc(studentId);
+      batch.set(
+        docRef,
+        {
+          // Legacy
+          'subjectComponentMarks.$subj.$comp': safeMark,
+          // Canonical
+          'subjects.$subj.$comp': safeMark,
           'updatedAt': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),

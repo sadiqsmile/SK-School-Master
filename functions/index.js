@@ -190,9 +190,7 @@ async function authorizeSchoolAdminOrSuperAdmin({ request, schoolId }) {
   const callerRole = String((callerDoc.data() || {}).role || "");
   const callerSchoolId = String((callerDoc.data() || {}).schoolId || "");
 
-  const isSuperAdmin = callerRole === "superAdmin" ||
-    (request.auth.token && request.auth.token.email &&
-      String(request.auth.token.email).toLowerCase() === "sadiq.smile@gmail.com");
+  const isSuperAdmin = callerRole === "superAdmin" || (request.auth.token && request.auth.token.superAdmin === true);
 
   if (!isSuperAdmin && callerRole !== "admin") {
     throw new HttpsError("permission-denied", "Only admin/superAdmin can run analytics");
@@ -1328,6 +1326,11 @@ function normalizePin(input) {
   return pin;
 }
 
+function generateNumericPin(length = 6) {
+  const n = crypto.randomInt(0, Math.pow(10, length));
+  return String(n).padStart(length, "0");
+}
+
 function normalizeEmail(input) {
   const email = String(input || "").trim().toLowerCase();
   // Simple sanity check (Auth will validate further).
@@ -1372,9 +1375,9 @@ exports.createOrResetParentAccount = onCall(async (request) => {
   }
 
   const email = parentEmailFromPhoneDigits(phoneDigits);
-  const defaultPin = phoneDigits.slice(-4);
+  const initialPin = generateNumericPin(6);
   const pinSalt = crypto.randomBytes(16).toString("hex");
-  const pinHash = hashPin(defaultPin, pinSalt);
+  const pinHash = hashPin(initialPin, pinSalt);
 
   // Create or reset the Auth user.
   let userRecord;
@@ -1456,7 +1459,8 @@ exports.createOrResetParentAccount = onCall(async (request) => {
   return {
     uid: userRecord.uid,
     email,
-    defaultPasswordHint: "last4",
+    initialPin,
+    defaultPasswordHint: "random",
     mustChangePassword: true,
   };
 });
@@ -1478,10 +1482,21 @@ exports.parentLogin = onCall(async (request) => {
     throw new HttpsError("not-found", "Parent account not found");
   }
 
-  const userDoc = await admin.firestore().collection("users").doc(uid).get();
+  const mappingSchoolId = String(mapping.schoolId || "");
+
+  const userDocRef = admin.firestore().collection("users").doc(uid);
+  const userDoc = await userDocRef.get();
   const userData = userDoc.data() || {};
   if (String(userData.role || "") !== "parent") {
     throw new HttpsError("permission-denied", "Not a parent account");
+  }
+
+  const userSchoolId = String(userData.schoolId || "");
+  if (mappingSchoolId && userSchoolId && mappingSchoolId !== userSchoolId) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Parent login mapping is inconsistent. Contact school admin."
+    );
   }
 
   const salt = String(userData.pinSalt || "");
@@ -1490,13 +1505,55 @@ exports.parentLogin = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Parent PIN not initialized");
   }
 
+  // Basic rate limiting / lockout (prevents brute force).
+  const nowMs = Date.now();
+  const lockUntil = userData.pinLockedUntil;
+  if (lockUntil && typeof lockUntil.toMillis === "function" && lockUntil.toMillis() > nowMs) {
+    throw new HttpsError("resource-exhausted", "Too many failed attempts. Try again later.");
+  }
+
+  const lastFailAt = userData.pinLastFailAt;
+  const lastFailMs = lastFailAt && typeof lastFailAt.toMillis === "function" ? lastFailAt.toMillis() : 0;
+  const windowMs = 10 * 60 * 1000;
+  const baseFailCount = Number(userData.pinFailCount || 0);
+  const failCount = lastFailMs > 0 && nowMs - lastFailMs <= windowMs ? baseFailCount : 0;
+
   const actual = hashPin(pin, salt);
   if (actual !== expected) {
+    const newCount = failCount + 1;
+    const maxAttempts = 8;
+    const lockMs = 15 * 60 * 1000;
+
+    const update = {
+      pinFailCount: newCount,
+      pinLastFailAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (newCount >= maxAttempts) {
+      update.pinLockedUntil = admin.firestore.Timestamp.fromMillis(nowMs + lockMs);
+    }
+
+    await userDocRef.set(update, { merge: true });
     throw new HttpsError("permission-denied", "Invalid PIN");
   }
 
-  const schoolId = String(userData.schoolId || "");
+  const schoolId = userSchoolId;
   const mustChangePassword = (userData.mustChangePassword || false) === true;
+
+  // Clear any previous lockout counters on success.
+  if (failCount > 0 || (lockUntil && typeof lockUntil.toMillis === "function")) {
+    await userDocRef.set(
+      {
+        pinFailCount: 0,
+        pinLastFailAt: admin.firestore.FieldValue.delete(),
+        pinLockedUntil: admin.firestore.FieldValue.delete(),
+        lastParentLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
 
   let token;
   try {
@@ -1541,9 +1598,8 @@ exports.recomputeSchoolCounters = onCall(async (request) => {
   const callerUid = request.auth.uid;
   const callerDoc = await admin.firestore().collection("users").doc(callerUid).get();
   const callerRole = String((callerDoc.data() || {}).role || "");
-  const callerEmail = String((request.auth.token && request.auth.token.email) || "").toLowerCase();
 
-  const isSuper = callerRole === "superAdmin" || callerEmail === "sadiq.smile@gmail.com";
+  const isSuper = callerRole === "superAdmin" || (request.auth.token && request.auth.token.superAdmin === true);
   if (!isSuper) {
     throw new HttpsError("permission-denied", "Only superAdmin can run maintenance");
   }

@@ -5,6 +5,9 @@ import 'package:school_app/features/teacher/providers/students_by_class_provider
 import 'package:school_app/models/exam.dart';
 import 'package:school_app/models/exam_marks.dart';
 import 'package:school_app/models/student.dart';
+import 'package:school_app/core/utils/marks_calc.dart';
+import 'package:school_app/models/grading_system.dart';
+import 'package:school_app/providers/grading_system_provider.dart';
 import 'package:school_app/providers/exam_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/services/exam_service.dart';
@@ -234,6 +237,7 @@ class ExamResultsScreen extends ConsumerWidget {
     final studentsAsync = ref.watch(studentsByClassProvider((classId, sectionId)));
     final marksAsync = ref.watch(examMarksProvider(exam.id));
     final examLiveAsync = ref.watch(examDocProvider(exam.id));
+    final gradingAsync = ref.watch(gradingSystemProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -260,19 +264,24 @@ class ExamResultsScreen extends ConsumerWidget {
                 for (final d in marksSnap.docs) d.id: ExamMarks.fromDoc(d),
               };
 
-              final subjectMax = examLiveAsync.maybeWhen(
-                data: (doc) => Exam.fromDoc(doc).subjectMaxMarks,
-                orElse: () => exam.subjectMaxMarks,
+              final liveExam = examLiveAsync.maybeWhen(
+                data: (doc) => Exam.fromDoc(doc),
+                orElse: () => exam,
               );
+
+              final grading = gradingAsync.maybeWhen(data: (g) => g, orElse: () => null);
 
               final rows = students
                   .map((s) {
                     final m = marksByStudentId[s.id];
-                    final calc = _calcTotals(
-                      subjectMarks: m?.subjectMarks ?? const <String, int>{},
-                      subjectMaxMarks: subjectMax,
+                    final calc = calcTotals(exam: liveExam, marks: m);
+                    return _ResultRow(
+                      student: s,
+                      total: calc.total,
+                      outOf: calc.outOf,
+                      percent: calc.percent,
+                      grade: gradeForPercent(calc.percent, system: grading),
                     );
-                    return _ResultRow(student: s, total: calc.total, outOf: calc.outOf, percent: calc.percent, grade: _grade(calc.percent));
                   })
                   .toList(growable: false)
                 ..sort((a, b) => b.total.compareTo(a.total));
@@ -301,10 +310,10 @@ class ExamResultsScreen extends ConsumerWidget {
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => _StudentMarksDetailScreen(
-                                examName: exam.name,
+                                exam: liveExam,
                                 student: r.student,
                                 marks: marksByStudentId[r.student.id],
-                                subjectMaxMarks: subjectMax,
+                                grading: grading,
                               ),
                             ),
                           );
@@ -362,23 +371,22 @@ class _SummaryHeader extends StatelessWidget {
 
 class _StudentMarksDetailScreen extends StatelessWidget {
   const _StudentMarksDetailScreen({
-    required this.examName,
+    required this.exam,
     required this.student,
     required this.marks,
-    required this.subjectMaxMarks,
+    required this.grading,
   });
 
-  final String examName;
+  final Exam exam;
   final Student student;
   final ExamMarks? marks;
-  final Map<String, int> subjectMaxMarks;
+  final GradingSystem? grading;
 
   @override
   Widget build(BuildContext context) {
-    final subjectMarks = marks?.subjectMarks ?? const <String, int>{};
-    final calc = _calcTotals(subjectMarks: subjectMarks, subjectMaxMarks: subjectMaxMarks);
-
-    final subjects = subjectMarks.keys.toList(growable: false)..sort();
+    final derived = deriveSubjectRows(exam: exam, marks: marks);
+    final totals = calcTotalsFromRows(derived);
+    final grade = gradeForPercent(totals.percent, system: grading);
 
     return Scaffold(
       appBar: AppBar(
@@ -395,18 +403,18 @@ class _StudentMarksDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    examName.trim().isEmpty ? 'Exam' : examName.trim(),
+                    exam.examName.trim().isEmpty ? 'Exam' : exam.examName.trim(),
                     style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                   ),
                   const SizedBox(height: 6),
-                  Text('Total: ${calc.total} / ${calc.outOf}'),
-                  Text('Grade: ${_grade(calc.percent)}'),
+                  Text('Total: ${totals.total} / ${totals.outOf}'),
+                  Text('Grade: $grade'),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 10),
-          if (subjects.isEmpty)
+          if (derived.isEmpty)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(16),
@@ -414,12 +422,12 @@ class _StudentMarksDetailScreen extends StatelessWidget {
               ),
             )
           else
-            for (final s in subjects)
+            for (final r in derived)
               Card(
                 child: ListTile(
-                  title: Text(_prettySubject(s)),
+                  title: Text(_prettySubject(r.subjectKey)),
                   trailing: Text(
-                    '${subjectMarks[s] ?? 0} / ${subjectMaxMarks[s] ?? 50}',
+                    '${r.obtained} / ${r.outOf}',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -436,34 +444,6 @@ String? _formatCreatedAt(DateTime? dt) {
   final m = dt.month.toString().padLeft(2, '0');
   final d = dt.day.toString().padLeft(2, '0');
   return '$y-$m-$d';
-}
-
-({int total, int outOf, double percent}) _calcTotals({
-  required Map<String, int> subjectMarks,
-  required Map<String, int> subjectMaxMarks,
-}) {
-  var total = 0;
-  var outOf = 0;
-
-  for (final e in subjectMarks.entries) {
-    final subj = e.key;
-    final mark = e.value;
-    final max = subjectMaxMarks[subj] ?? 50;
-    total += mark;
-    outOf += max;
-  }
-
-  final percent = outOf <= 0 ? 0.0 : (total / outOf) * 100.0;
-  return (total: total, outOf: outOf, percent: percent);
-}
-
-String _grade(double percent) {
-  if (percent >= 90) return 'A+';
-  if (percent >= 80) return 'A';
-  if (percent >= 70) return 'B';
-  if (percent >= 60) return 'C';
-  if (percent >= 50) return 'D';
-  return 'F';
 }
 
 String _prettySubject(String key) {

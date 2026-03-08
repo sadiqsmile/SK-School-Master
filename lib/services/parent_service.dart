@@ -18,6 +18,7 @@ class ParentService {
         .doc(schoolId)
         .collection('students')
         .where('parentUid', isEqualTo: parentUid)
+        .limit(50)
         .snapshots();
   }
 }

@@ -20,6 +20,7 @@ import 'package:school_app/features/school_admin/homework/screens/homework_scree
 import 'package:school_app/features/school_admin/fees/screens/fees_screen.dart';
 import 'package:school_app/features/school_admin/announcements/screens/announcements_screen.dart';
 import 'package:school_app/features/school_admin/exams/screens/exam_types_screen.dart';
+import 'package:school_app/features/school_admin/exams/screens/marks_card_templates_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/attendance_reports_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/exam_reports_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/fee_reports_screen.dart';
@@ -29,6 +30,7 @@ import 'package:school_app/features/school_admin/analytics/providers/student_ris
 import 'package:school_app/features/school_admin/analytics/screens/school_analytics_screen.dart';
 import 'package:school_app/features/school_admin/analytics/screens/student_risk_list_screen.dart';
 import 'package:school_app/features/school_admin/notifications/screens/notifications_screen.dart';
+import 'package:school_app/features/school_admin/settings/screens/modules_control_screen.dart';
 import 'package:school_app/features/parent/screens/parent_login_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/teacher_attendance_screen.dart';
 import 'package:school_app/features/teacher/homework/screens/homework_screen.dart';
@@ -38,6 +40,7 @@ import 'package:school_app/features/teacher/screens/teacher_students_screen.dart
 import 'package:school_app/features/teacher/risk/screens/class_risk_screen.dart';
 
 import 'package:school_app/core/rbac/role_guard.dart';
+import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/models/user_role.dart';
 
 final appRouter = GoRouter(
@@ -85,6 +88,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Teachers',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.teachers],
         child: TeachersScreen(),
       ),
     ),
@@ -93,6 +97,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Add Teacher',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.teachers],
         child: AddTeacherScreen(),
       ),
     ),
@@ -101,6 +106,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Students',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.students],
         child: StudentsScreen(),
       ),
     ),
@@ -109,6 +115,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Add Student',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.students],
         child: AddStudentScreen(),
       ),
     ),
@@ -117,6 +124,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Classes',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.students],
         child: ClassesScreen(),
       ),
     ),
@@ -125,6 +133,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Classes',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.students],
         child: ClassesScreen(),
       ),
     ),
@@ -133,6 +142,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Add Class',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.students],
         child: AddClassScreen(),
       ),
     ),
@@ -144,6 +154,7 @@ final appRouter = GoRouter(
         return RoleGuard(
           title: 'Sections',
           allowedRoles: const [UserRole.admin],
+          requiredModules: const [SchoolModuleKey.students],
           child: SectionsScreen(classId: classId),
         );
       },
@@ -153,6 +164,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Attendance',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.attendance],
         child: AttendanceScreen(),
       ),
     ),
@@ -161,6 +173,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Homework',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.homework],
         child: HomeworkScreen(),
       ),
     ),
@@ -169,6 +182,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Fees',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.fees],
         child: FeesScreen(),
       ),
     ),
@@ -177,6 +191,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Announcements',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.messages],
         child: AnnouncementsScreen(),
       ),
     ),
@@ -185,7 +200,26 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Exam Types',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.exams],
         child: ExamTypesScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/school-admin/marks-card-templates',
+      builder: (context, state) => const RoleGuard(
+        title: 'Marks Card Templates',
+        allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.exams],
+        child: MarksCardTemplatesScreen(),
+      ),
+    ),
+
+    GoRoute(
+      path: '/school-admin/settings/modules',
+      builder: (context, state) => const RoleGuard(
+        title: 'Module Control',
+        allowedRoles: [UserRole.admin],
+        child: ModulesControlScreen(),
       ),
     ),
     GoRoute(
@@ -221,6 +255,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Notifications',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.messages],
         child: NotificationsScreen(),
       ),
     ),
@@ -229,6 +264,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Attendance Reports',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.attendance],
         child: AttendanceReportsScreen(),
       ),
     ),
@@ -237,6 +273,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Fee Reports',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.fees],
         child: FeeReportsScreen(),
       ),
     ),
@@ -245,6 +282,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Exam Reports',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.exams],
         child: ExamReportsScreen(),
       ),
     ),
@@ -253,6 +291,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Student Reports',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.students],
         child: StudentReportsScreen(),
       ),
     ),
@@ -264,6 +303,7 @@ final appRouter = GoRouter(
         return RoleGuard(
           title: 'Student Report',
           allowedRoles: const [UserRole.admin],
+          requiredModules: const [SchoolModuleKey.students],
           child: StudentReportDetailScreen(studentId: studentId),
         );
       },
@@ -273,6 +313,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Promote Students',
         allowedRoles: [UserRole.admin],
+        requiredModules: [SchoolModuleKey.students],
         child: PromoteStudentsScreen(),
       ),
     ),
@@ -283,6 +324,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const RoleGuard(
         title: 'Teacher Dashboard',
         allowedRoles: [UserRole.teacher],
+        requiredModules: [SchoolModuleKey.teachers],
         child: TeacherDashboard(),
       ),
     ),
@@ -296,6 +338,7 @@ final appRouter = GoRouter(
         return RoleGuard(
           title: 'Class',
           allowedRoles: const [UserRole.teacher],
+          requiredModules: const [SchoolModuleKey.teachers],
           child: TeacherClassHomeScreen(classId: classId, sectionId: sectionId),
         );
       },
@@ -310,6 +353,7 @@ final appRouter = GoRouter(
         return RoleGuard(
           title: 'Students',
           allowedRoles: const [UserRole.teacher],
+          requiredModules: const [SchoolModuleKey.students],
           child: TeacherStudentsScreen(classId: classId, sectionId: sectionId),
         );
       },
@@ -324,6 +368,7 @@ final appRouter = GoRouter(
         return RoleGuard(
           title: 'Attendance',
           allowedRoles: const [UserRole.teacher],
+          requiredModules: const [SchoolModuleKey.attendance],
           child: TeacherAttendanceScreen(
             classId: classId,
             sectionId: sectionId,
@@ -341,6 +386,7 @@ final appRouter = GoRouter(
         return RoleGuard(
           title: 'Homework',
           allowedRoles: const [UserRole.teacher],
+          requiredModules: const [SchoolModuleKey.homework],
           child: TeacherHomeworkScreen(classId: classId, sectionId: sectionId),
         );
       },

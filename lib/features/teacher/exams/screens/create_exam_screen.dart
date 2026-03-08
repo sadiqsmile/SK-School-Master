@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:school_app/core/utils/firestore_keys.dart';
 import 'package:school_app/providers/exam_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/services/exam_service.dart';
@@ -63,6 +64,7 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
                     context: context,
                     schoolId: schoolId,
                     examTypeName: _manualExamTypeController.text,
+                    examTypeKey: normalizeKeyLower(_manualExamTypeController.text),
                   ),
                 ),
               ],
@@ -72,7 +74,8 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
                   .map((d) {
                     final data = d.data();
                     final name = (data['name'] ?? '').toString();
-                    return (id: d.id, name: name);
+                    final defaultTemplateId = (data['defaultTemplateId'] ?? '').toString();
+                    return (id: d.id, name: name, defaultTemplateId: defaultTemplateId);
                   })
                   .where((t) => t.name.trim().isNotEmpty)
                   .toList(growable: false)
@@ -84,6 +87,11 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
               final selectedTypeName = types
                   .where((t) => t.id == _selectedExamTypeId)
                   .map((t) => t.name)
+                  .firstOrNull;
+
+                final selectedDefaultTemplateId = types
+                  .where((t) => t.id == _selectedExamTypeId)
+                  .map((t) => t.defaultTemplateId)
                   .firstOrNull;
 
               final showManual = types.isEmpty;
@@ -155,6 +163,14 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
                       examTypeName: showManual
                           ? _manualExamTypeController.text
                           : (selectedTypeName ?? ''),
+                      examTypeKey: showManual
+                          ? normalizeKeyLower(_manualExamTypeController.text)
+                          : (_selectedExamTypeId ?? ''),
+                      templateId: showManual
+                          ? null
+                          : (selectedDefaultTemplateId?.trim().isEmpty ?? true)
+                              ? null
+                              : selectedDefaultTemplateId,
                     ),
                   ),
                 ],
@@ -170,6 +186,8 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
     required BuildContext context,
     required String schoolId,
     required String examTypeName,
+    required String examTypeKey,
+    String? templateId,
   }) async {
     try {
       await ExamService().createExamV2(
@@ -178,6 +196,8 @@ class _CreateExamScreenState extends ConsumerState<CreateExamScreen> {
         examName: _examNameController.text,
         classId: widget.classId,
         section: widget.sectionId,
+        examTypeKey: examTypeKey,
+        templateId: templateId,
       );
 
       if (context.mounted) {

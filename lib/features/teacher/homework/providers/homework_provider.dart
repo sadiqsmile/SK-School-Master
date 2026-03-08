@@ -16,6 +16,7 @@ final teacherHomeworkProvider = StreamProvider.family
         .collection('homework')
         .where('classId', isEqualTo: classId)
         .where('section', isEqualTo: section)
+        .limit(200)
         .snapshots();
   },
 );

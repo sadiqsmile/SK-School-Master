@@ -2,6 +2,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:go_router/go_router.dart';
@@ -91,6 +92,39 @@ class _LoginScreenState extends State<LoginScreen>
       }
 
       if (mode == _LoginMode.parent) {
+        // IMPORTANT: If the school disabled the Parents module, parents must not login.
+        final selectedSchoolId = (await SchoolStorage.getSchoolId())?.trim();
+        if (selectedSchoolId == null || selectedSchoolId.isEmpty) {
+          setState(() {
+            _errorMessage =
+                'Select your School ID first (tap “Change School”), then try again.';
+            _isLoading = false;
+          });
+          return;
+        }
+
+        try {
+          final modulesSnap = await FirebaseFirestore.instance
+              .collection('schools')
+              .doc(selectedSchoolId)
+              .collection('settings')
+              .doc('modules')
+              .get();
+
+          final parentsEnabled = (modulesSnap.data()?['parents'] ?? true) == true;
+          if (!parentsEnabled) {
+            setState(() {
+              _errorMessage =
+                  'Parent access is disabled by your school admin.';
+              _isLoading = false;
+            });
+            return;
+          }
+        } catch (_) {
+          // Fail-open here to avoid blocking login if settings doc doesn't exist
+          // yet (defaults are enabled). AuthGate will re-check after login.
+        }
+
         if (!_isPinLike(secret)) {
           setState(() {
             _errorMessage = 'Enter a valid PIN (4-12 digits)';
@@ -104,17 +138,12 @@ class _LoginScreenState extends State<LoginScreen>
           pin: secret,
         );
 
-        final credential = await FirebaseAuth.instance.signInWithCustomToken(
-          token,
-        );
-        debugPrint('PARENT LOGIN SUCCESS UID: ${credential.user?.uid}');
+        await FirebaseAuth.instance.signInWithCustomToken(token);
       } else {
-        final credential =
-            await FirebaseAuth.instance.signInWithEmailAndPassword(
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: identifier,
           password: secret,
         );
-        debugPrint("STAFF LOGIN SUCCESS UID: ${credential.user?.uid}");
       }
 
       final signedInUser = FirebaseAuth.instance.currentUser;
@@ -139,15 +168,19 @@ class _LoginScreenState extends State<LoginScreen>
         _isLoading = false;
       });
     } on FirebaseFunctionsException catch (e) {
-      debugPrint(
-        'FUNCTIONS LOGIN ERROR: code=${e.code} message=${e.message} details=${e.details}',
-      );
+      if (kDebugMode) {
+        debugPrint(
+          'FUNCTIONS LOGIN ERROR: code=${e.code} message=${e.message} details=${e.details}',
+        );
+      }
       setState(() {
         _errorMessage = _friendlyFunctionsError(e);
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('LOGIN ERROR: $e');
+      if (kDebugMode) {
+        debugPrint('LOGIN ERROR: $e');
+      }
       setState(() {
         _errorMessage = 'An error occurred. Please try again.';
         _isLoading = false;
@@ -156,13 +189,6 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<bool> _ensureSelectedSchoolMatchesAccount(User user) async {
-    // Super admin should not be constrained by stored school id.
-    const hardcodedSuperAdminEmails = <String>{'sadiq.smile@gmail.com'};
-    final email = user.email?.trim().toLowerCase();
-    if (email != null && hardcodedSuperAdminEmails.contains(email)) {
-      return true;
-    }
-
     final selected = (await SchoolStorage.getSchoolId())?.trim();
     if (selected == null || selected.isEmpty) {
       // No selection saved (legacy flow) — don't block login.
@@ -178,6 +204,10 @@ class _LoginScreenState extends State<LoginScreen>
 
       // If there's no user profile, let AuthGate handle it.
       if (data == null) return true;
+
+      // Super admin should not be constrained by stored school id.
+      final role = (data['role'] ?? '').toString().trim();
+      if (role == 'superAdmin') return true;
 
       final accountSchoolId = (data['schoolId'] ?? '').toString().trim();
       if (accountSchoolId.isEmpty) return true;

@@ -38,6 +38,9 @@ final parentUnreadNotificationsCountProvider = StreamProvider.autoDispose<int>((
       .doc(user.uid)
       .collection('notifications')
       .where('readAt', isNull: true)
+      // Keep this query cheap: we only need a badge, not an exact count.
+      // UI already shows 99+ when count >= 99.
+      .limit(99)
       .snapshots()
       .map((snap) => snap.size);
 });

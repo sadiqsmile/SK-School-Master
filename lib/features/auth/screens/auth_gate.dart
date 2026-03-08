@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:school_app/models/user_role.dart';
 import 'package:school_app/providers/auth_provider.dart';
 import 'package:school_app/core/widgets/app_loader.dart';
+import 'package:school_app/providers/school_modules_provider.dart';
+import 'package:school_app/providers/core_providers.dart';
 
 import 'login_screen.dart';
 
@@ -40,7 +42,8 @@ class AuthGate extends ConsumerWidget {
           error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
 
           data: (role) {
-            debugPrint('CURRENT USER ROLE = $role');
+            // Avoid logging roles in production (PII/security). If needed, wrap
+            // a log here in kDebugMode.
 
             if (role == UserRole.superAdmin) {
               return const SuperAdminDashboard();
@@ -51,6 +54,24 @@ class AuthGate extends ConsumerWidget {
             }
 
             if (role == UserRole.parent) {
+              final modulesAsync = ref.watch(schoolModulesProvider);
+              return modulesAsync.when(
+                loading: () => const Scaffold(body: AppLoader()),
+                error: (e, _) => _ModuleBlockedScreen(
+                  title: 'Parent Access',
+                  message: 'Failed to load school modules: $e',
+                  onLogout: () => ref.read(authServiceProvider).signOut(),
+                ),
+                data: (modules) {
+                  if (!modules.parents) {
+                    return _ModuleBlockedScreen(
+                      title: 'Parent Access Disabled',
+                      message:
+                          'Parent access is disabled by your school admin. Please contact the school office.',
+                      onLogout: () => ref.read(authServiceProvider).signOut(),
+                    );
+                  }
+
               final mustChangeAsync = ref.watch(mustChangePasswordProvider);
               return mustChangeAsync.when(
                 loading: () => const Scaffold(body: AppLoader()),
@@ -62,9 +83,29 @@ class AuthGate extends ConsumerWidget {
                   return const ParentShell();
                 },
               );
+                },
+              );
             }
 
             if (role == UserRole.teacher) {
+              final modulesAsync = ref.watch(schoolModulesProvider);
+              return modulesAsync.when(
+                loading: () => const Scaffold(body: AppLoader()),
+                error: (e, _) => _ModuleBlockedScreen(
+                  title: 'Teacher Access',
+                  message: 'Failed to load school modules: $e',
+                  onLogout: () => ref.read(authServiceProvider).signOut(),
+                ),
+                data: (modules) {
+                  if (!modules.teachers) {
+                    return _ModuleBlockedScreen(
+                      title: 'Teacher Access Disabled',
+                      message:
+                          'Teacher access is disabled by your school admin. Please contact the school office.',
+                      onLogout: () => ref.read(authServiceProvider).signOut(),
+                    );
+                  }
+
               final mustChangeAsync = ref.watch(mustChangePasswordProvider);
               return mustChangeAsync.when(
                 loading: () => const Scaffold(body: AppLoader()),
@@ -76,12 +117,72 @@ class AuthGate extends ConsumerWidget {
                   return const TeacherDashboard();
                 },
               );
+                },
+              );
             }
 
             return const LoginScreen();
           },
         );
       },
+    );
+  }
+}
+
+class _ModuleBlockedScreen extends StatelessWidget {
+  const _ModuleBlockedScreen({
+    required this.title,
+    required this.message,
+    required this.onLogout,
+  });
+
+  final String title;
+  final String message;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.block_rounded, size: 44),
+                    const SizedBox(height: 10),
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      message,
+                      style: const TextStyle(color: Colors.black54, height: 1.4),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: onLogout,
+                      icon: const Icon(Icons.logout_rounded),
+                      label: const Text('Logout'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

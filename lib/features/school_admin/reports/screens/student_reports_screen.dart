@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
+import 'package:school_app/core/utils/marks_calc.dart';
 import 'package:school_app/models/exam.dart';
 import 'package:school_app/models/exam_marks.dart';
+import 'package:school_app/providers/grading_system_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 
 class StudentReportsScreen extends ConsumerStatefulWidget {
@@ -168,36 +170,6 @@ class _StudentReportDetailScreenState
     return 'class_${_sanitizeId(classId)}_${_sanitizeId(sectionId)}';
   }
 
-  ({int total, int outOf, double percent}) _calcTotals({
-    required Map<String, int> subjectMarks,
-    required Map<String, int> subjectMaxMarks,
-  }) {
-    int total = 0;
-    int outOf = 0;
-
-    for (final e in subjectMarks.entries) {
-      final subj = e.key;
-      final mark = e.value;
-      final max = subjectMaxMarks[subj] ?? 50;
-      total += mark;
-      outOf += max;
-    }
-
-    final percent = outOf <= 0 ? 0.0 : (total / outOf) * 100;
-
-    return (total: total, outOf: outOf, percent: percent);
-  }
-
-  String _grade(double percent) {
-    if (percent >= 90) return 'A+';
-    if (percent >= 80) return 'A';
-    if (percent >= 70) return 'B+';
-    if (percent >= 60) return 'B';
-    if (percent >= 50) return 'C';
-    if (percent >= 40) return 'D';
-    return 'F';
-  }
-
   num _readNum(dynamic v) {
     if (v is num) return v;
     if (v is String) return num.tryParse(v) ?? 0;
@@ -207,6 +179,8 @@ class _StudentReportDetailScreenState
   Future<_StudentReport> _load() async {
     final schoolDoc = await ref.read(currentSchoolProvider.future);
     final schoolId = schoolDoc.id;
+
+    final grading = await ref.read(gradingSystemProvider.future);
 
     final db = FirebaseFirestore.instance;
 
@@ -359,14 +333,11 @@ class _StudentReportDetailScreenState
       if (!marksDoc.exists) continue;
 
       final marks = ExamMarks.fromDoc(marksDoc);
-      final calc = _calcTotals(
-        subjectMarks: marks.subjectMarks,
-        subjectMaxMarks: e.subjectMaxMarks,
-      );
+      final calc = calcTotals(exam: e, marks: marks);
 
       final t = e.examType.trim();
       latestExamTitle = t.isEmpty ? e.examName : '$t • ${e.examName}';
-      latestExamGrade = _grade(calc.percent);
+      latestExamGrade = gradeForPercent(calc.percent, system: grading);
       break;
     }
 
