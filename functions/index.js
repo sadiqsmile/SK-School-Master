@@ -221,6 +221,26 @@ async function incrementDoc(ref, delta) {
 // Aggregated / indexed counters
 // ----------------------------
 
+// Track number of schools on the platform dashboard.
+// Note: this counts school root documents (not subcollections).
+exports.onSchoolCreated = onDocumentCreated(
+  { document: "schools/{schoolId}", region: FIRESTORE_REGION },
+  async (_event) => {
+    await incrementDoc(admin.firestore().collection("platform").doc("config"), {
+      totalSchools: 1,
+    });
+  }
+);
+
+exports.onSchoolDeleted = onDocumentDeleted(
+  { document: "schools/{schoolId}", region: FIRESTORE_REGION },
+  async (_event) => {
+    await incrementDoc(admin.firestore().collection("platform").doc("config"), {
+      totalSchools: -1,
+    });
+  }
+);
+
 exports.onStudentCreated = onDocumentCreated(
   { document: "schools/{schoolId}/students/{studentId}", region: FIRESTORE_REGION },
   async (event) => {

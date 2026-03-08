@@ -25,15 +25,6 @@ class _SchoolLoaderScreenState extends State<SchoolLoaderScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user != null) {
-      // Keep super admin unblocked (super admin may not have a user doc).
-      const hardcodedSuperAdminEmails = <String>{'sadiq.smile@gmail.com'};
-      final email = user.email?.trim().toLowerCase();
-      if (email != null && hardcodedSuperAdminEmails.contains(email)) {
-        if (!mounted) return;
-        context.go('/');
-        return;
-      }
-
       try {
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
