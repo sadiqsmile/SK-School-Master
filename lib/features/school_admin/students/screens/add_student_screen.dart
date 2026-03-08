@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:school_app/features/school_admin/classes/providers/classes_provider.dart';
 import 'package:school_app/features/school_admin/classes/providers/sections_provider.dart';
+import 'package:school_app/features/school_admin/academic/providers/academic_years_provider.dart';
 import 'package:school_app/features/school_admin/students/services/student_service.dart';
 import 'package:school_app/providers/current_school_provider.dart';
+import 'package:school_app/providers/school_modules_provider.dart';
 import 'package:school_app/services/parent_account_service.dart';
 import 'package:school_app/core/utils/text_formatters.dart';
 
@@ -47,6 +49,9 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
     final parentService = ParentAccountService();
     final phoneDigits = parentService.normalizePhone(parentPhone);
 
+    final modules = await ref.read(schoolModulesProvider.future);
+    final parentsEnabled = modules.parents;
+
     if (name.isEmpty || admissionNo.isEmpty) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Enter student name and admission no')),
@@ -59,23 +64,26 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
       );
       return;
     }
-    if (parentName.isEmpty || parentPhone.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Enter parent name and phone')),
-      );
-      return;
-    }
+    if (parentsEnabled) {
+      if (parentName.isEmpty || parentPhone.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Enter parent name and phone')),
+        );
+        return;
+      }
 
-    if (phoneDigits.length < 10) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Enter a valid parent phone number')),
-      );
-      return;
+      if (phoneDigits.length < 10) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Enter a valid parent phone number')),
+        );
+        return;
+      }
     }
 
     setState(() => _isSaving = true);
     try {
       final school = await ref.read(currentSchoolProvider.future);
+      final academicYear = ref.read(currentAcademicYearIdProvider);
 
       final studentRef = await StudentService().addStudent(
         schoolId: school.id,
@@ -84,34 +92,40 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
           'admissionNo': admissionNo,
           'classId': selectedClassId,
           'section': selectedSection,
-          'parentName': parentName,
-          'parentPhone': parentPhone,
+          'academicYear': academicYear,
+          if (parentName.isNotEmpty) 'parentName': parentName,
+          if (parentPhone.isNotEmpty) 'parentPhone': parentPhone,
         },
       );
 
       // Create parent login (default password = last 4 digits) and link it.
       String? parentUid;
-      try {
-        parentUid = await parentService.createParentLogin(
-          schoolId: school.id,
-          phone: parentPhone,
-          parentName: parentName,
-          studentId: studentRef.id,
-        );
-      } catch (e) {
-        // Don't block student creation if functions aren't deployed yet.
-        messenger.showSnackBar(
-          SnackBar(content: Text('Student saved, but parent login failed: $e')),
-        );
-      }
+      String? initialPin;
+      if (parentsEnabled && parentName.isNotEmpty && parentPhone.isNotEmpty) {
+        try {
+          final result = await parentService.createParentLogin(
+            schoolId: school.id,
+            phone: parentPhone,
+            parentName: parentName,
+            studentId: studentRef.id,
+          );
+          parentUid = result.uid;
 
-      final defaultPassword = parentService.last4OfPhone(phoneDigits);
+          // Prefer server-generated PIN; fall back to legacy last-4 for older deployments.
+          initialPin = result.initialPin ?? parentService.last4OfPhone(phoneDigits);
+        } catch (e) {
+          // Don't block student creation if functions aren't deployed yet.
+          messenger.showSnackBar(
+            SnackBar(content: Text('Student saved, but parent login failed: $e')),
+          );
+        }
+      }
 
       messenger.showSnackBar(
         SnackBar(content: Text('Student "$name" added')),
       );
 
-      if (parentUid != null && mounted) {
+      if (parentUid != null && initialPin != null && mounted) {
         await showDialog<void>(
           context: context,
           builder: (context) {
@@ -119,7 +133,7 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
               title: const Text('Parent login created'),
               content: SelectableText(
                 'Phone: $phoneDigits\n'
-                'Default password: $defaultPassword',
+                'Initial PIN: $initialPin',
               ),
               actions: [
                 FilledButton(

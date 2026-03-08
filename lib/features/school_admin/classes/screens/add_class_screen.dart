@@ -36,7 +36,7 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
         child: Column(
           children: [
             DropdownButtonFormField<String>(
-              value: selectedSection,
+              initialValue: selectedSection,
               items: sectionClasses.keys.map((section) {
                 return DropdownMenuItem(
                   value: section,
@@ -56,7 +56,7 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
             ),
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
-              value: selectedClass,
+              initialValue: selectedClass,
               items: classes.map((c) {
                 return DropdownMenuItem(
                   value: c,
@@ -78,6 +78,9 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
               onPressed: _isSaving
                   ? null
                   : () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(context);
+
                       setState(() => _isSaving = true);
                       try {
                         final school = await ref.read(
@@ -93,14 +96,14 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
                         );
 
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           const SnackBar(content: Text('Class created!')),
                         );
 
-                        Navigator.pop(context);
+                        navigator.pop();
                       } catch (e) {
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           SnackBar(content: Text('Failed to create class: $e')),
                         );
                       } finally {

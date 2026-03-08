@@ -49,13 +49,13 @@ class _AttendanceBody extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: accent.withOpacity(0.28)),
+                border: Border.all(color: accent.withAlpha(71)),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: accent.withOpacity(0.16),
+                    backgroundColor: accent.withAlpha(41),
                     child: Icon(Icons.fact_check_rounded, color: accent),
                   ),
                   const SizedBox(width: 12),
@@ -188,7 +188,7 @@ class _AttendanceBody extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: accent.withOpacity(0.08),
+          color: accent.withAlpha(20),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(

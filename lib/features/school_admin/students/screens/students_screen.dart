@@ -18,15 +18,12 @@ class StudentsScreen extends ConsumerWidget {
     required String parentPhone,
     required String studentId,
   }) async {
-    final phoneDigits = ParentAccountService().normalizePhone(parentPhone);
-    final defaultPassword = ParentAccountService().last4OfPhone(phoneDigits);
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reset parent password?'),
         content: Text(
-          'Reset password to last 4 digits ($defaultPassword) and force change on next login?',
+          'This will generate a new PIN for the parent and force change on next login.',
         ),
         actions: [
           TextButton(
@@ -44,7 +41,7 @@ class StudentsScreen extends ConsumerWidget {
 
     try {
       final school = await ref.read(currentSchoolProvider.future);
-      await ParentAccountService().resetParentPassword(
+      final result = await ParentAccountService().resetParentPassword(
         schoolId: school.id,
         phone: parentPhone,
         parentName: parentName,
@@ -55,7 +52,9 @@ class StudentsScreen extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Parent password reset. Default password: $defaultPassword',
+            result.initialPin == null
+                ? 'Parent PIN reset.'
+                : 'Parent PIN reset. New PIN: ${result.initialPin}',
           ),
         ),
       );
@@ -87,13 +86,17 @@ class StudentsScreen extends ConsumerWidget {
               final name = (data['name'] ?? '').toString();
               final classId = (data['classId'] ?? '').toString();
               final section = (data['section'] ?? '').toString();
+              final academicYear = (data['academicYear'] ?? '').toString();
+              final status = (data['status'] ?? '').toString();
               final parentName = (data['parentName'] ?? '').toString();
               final parentPhone = (data['parentPhone'] ?? '').toString();
 
               return ListTile(
                 title: Text(name.isEmpty ? 'Student' : name),
                 subtitle: Text(
-                  '${classId.isEmpty ? 'Class N/A' : classId}${section.isEmpty ? '' : ' - Section $section'}',
+                  '${classId.isEmpty ? 'Class N/A' : classId}${section.isEmpty ? '' : ' - Section $section'}'
+                  '${academicYear.isEmpty ? '' : '  •  $academicYear'}'
+                  '${status.toLowerCase() == 'graduated' ? '  •  Graduated' : ''}',
                 ),
                 trailing: parentPhone.trim().isEmpty
                     ? null

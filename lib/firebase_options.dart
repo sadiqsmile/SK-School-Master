@@ -61,7 +61,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyADFBhWXoGky6dBvppRGkd3_kimI8CNCLI',
-    appId: '1:836702428678:android:9fee2feeaa97e2bc1bad87',
+    appId: '1:836702428678:android:cc3657204e1a1ff51bad87',
     messagingSenderId: '836702428678',
     projectId: 'sk-school-master',
     storageBucket: 'sk-school-master.firebasestorage.app',

@@ -1,6 +1,11 @@
 const admin = require("firebase-admin");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const {
+  onDocumentCreated,
+  onDocumentDeleted,
+  onDocumentWritten,
+} = require("firebase-functions/v2/firestore");
 const crypto = require("crypto");
 
 setGlobalOptions({
@@ -11,7 +16,1288 @@ setGlobalOptions({
   serviceAccount: "sk-school-master@appspot.gserviceaccount.com",
 });
 
+// IMPORTANT:
+// Firestore triggers (Gen2/Eventarc) must be deployed in the same region as the
+// Firestore database location. Your project is using a Firestore location in
+// `asia-south1` (see deploy errors mentioning Eventarc triggers in asia-south1).
+const FIRESTORE_REGION = "asia-south1";
+
 admin.initializeApp();
+
+function safeInt(input) {
+  const n = Number(input);
+  if (!Number.isFinite(n)) return 0;
+  return Math.trunc(n);
+}
+
+function readAttendanceCounts(docData) {
+  const empty = { present: 0, absent: 0, late: 0, leave: 0, total: 0 };
+  if (!docData || typeof docData !== "object") return empty;
+  const counts = docData.counts;
+  if (!counts || typeof counts !== "object") return empty;
+  return {
+    present: safeInt(counts.present),
+    absent: safeInt(counts.absent),
+    late: safeInt(counts.late),
+    leave: safeInt(counts.leave),
+    total: safeInt(counts.total),
+  };
+}
+
+function diffCounts(before, after) {
+  return {
+    present: safeInt(after.present) - safeInt(before.present),
+    absent: safeInt(after.absent) - safeInt(before.absent),
+    late: safeInt(after.late) - safeInt(before.late),
+    leave: safeInt(after.leave) - safeInt(before.leave),
+    total: safeInt(after.total) - safeInt(before.total),
+  };
+}
+
+function todayKeyUtc() {
+  const d = new Date();
+  const y = String(d.getUTCFullYear()).padStart(4, "0");
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function dateKeyDaysAgoUtc(daysAgo) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - safeInt(daysAgo));
+  const y = String(d.getUTCFullYear()).padStart(4, "0");
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function sanitizeFirestoreId(input) {
+  const trimmed = String(input || "").trim();
+  if (!trimmed) return "";
+  const safe = trimmed.replace(/[^a-zA-Z0-9]+/g, "_");
+  return safe.replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function classKeyFrom(classId, sectionId) {
+  const c = sanitizeFirestoreId(classId);
+  const s = sanitizeFirestoreId(sectionId);
+  return `class_${c}_${s}`;
+}
+
+function readNum(v) {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function prettyDateKey(dateKey) {
+  // dateKey expected: YYYY-MM-DD
+  const s = String(dateKey || "").trim();
+  return s || "";
+}
+
+async function upsertParentNotification({
+  parentUid,
+  notificationId,
+  payload,
+  markUnread,
+}) {
+  const uid = String(parentUid || "").trim();
+  const id = String(notificationId || "").trim();
+  if (!uid || !id) return;
+
+  const db = admin.firestore();
+  const ref = db.collection("users").doc(uid).collection("notifications").doc(id);
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+
+    if (!snap.exists) {
+      const base = {
+        ...(payload || {}),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        readAt: null,
+      };
+      tx.set(ref, base, { merge: true });
+      return;
+    }
+
+    const update = {
+      ...(payload || {}),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      ...(markUnread === true ? { readAt: null } : null),
+    };
+    tx.set(ref, update, { merge: true });
+  });
+}
+
+function computeStudentRiskV1({
+  attendancePercent30d,
+  marksPercentLatest,
+  feesPendingAmount,
+}) {
+  const attendance = readNum(attendancePercent30d);
+  const marks = readNum(marksPercentLatest);
+  const pending = readNum(feesPendingAmount);
+
+  // Conditions
+  const lowAttendance = attendance > 0 && attendance < 75;
+  const lowMarks = marks > 0 && marks < 40;
+  const feePending = pending > 0;
+
+  const reasons = [];
+  if (lowAttendance) reasons.push("low_attendance");
+  if (lowMarks) reasons.push("low_marks");
+  if (feePending) reasons.push("fee_pending");
+
+  const conditions = reasons.length;
+
+  // As requested: if 2–3 conditions are true → HIGH.
+  const riskLevel = conditions >= 2 ? "HIGH" : conditions === 1 ? "MEDIUM" : "LOW";
+
+  // Simple risk score (0–100) used for sorting.
+  // (Not ML; deterministic heuristic.)
+  let riskScore = 0;
+  if (lowAttendance) riskScore += 40 + Math.min(30, Math.max(0, 75 - attendance));
+  if (lowMarks) riskScore += 40 + Math.min(30, Math.max(0, 40 - marks));
+  if (feePending) riskScore += 30;
+  riskScore = Math.max(0, Math.min(100, Math.round(riskScore)));
+
+  const topPerformer = marks >= 80 && attendance >= 90;
+
+  return {
+    riskLevel,
+    riskScore,
+    reasons,
+    lowAttendance,
+    lowMarks,
+    feePending,
+    topPerformer,
+  };
+}
+
+async function authorizeSchoolAdminOrSuperAdmin({ request, schoolId }) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+
+  const callerUid = request.auth.uid;
+  const callerDoc = await admin.firestore().collection("users").doc(callerUid).get();
+  const callerRole = String((callerDoc.data() || {}).role || "");
+  const callerSchoolId = String((callerDoc.data() || {}).schoolId || "");
+
+  const isSuperAdmin = callerRole === "superAdmin" || (request.auth.token && request.auth.token.superAdmin === true);
+
+  if (!isSuperAdmin && callerRole !== "admin") {
+    throw new HttpsError("permission-denied", "Only admin/superAdmin can run analytics");
+  }
+  if (!isSuperAdmin && callerSchoolId !== schoolId) {
+    throw new HttpsError("permission-denied", "Admin can only run analytics for their own school");
+  }
+
+  return { callerUid, callerRole, isSuperAdmin };
+}
+
+async function incrementDoc(ref, delta) {
+  // Helper for compact increment updates.
+  const inc = admin.firestore.FieldValue.increment;
+  const payload = {
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  for (const [k, v] of Object.entries(delta || {})) {
+    if (!v) continue;
+    payload[k] = inc(v);
+  }
+
+  await ref.set(payload, { merge: true });
+}
+
+// ----------------------------
+// Aggregated / indexed counters
+// ----------------------------
+
+exports.onStudentCreated = onDocumentCreated(
+  { document: "schools/{schoolId}/students/{studentId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+
+    await Promise.all([
+      incrementDoc(schoolRef, { totalStudents: 1 }),
+      incrementDoc(admin.firestore().collection("platform").doc("config"), {
+        totalStudents: 1,
+      }),
+    ]);
+  }
+);
+
+exports.onStudentDeleted = onDocumentDeleted(
+  { document: "schools/{schoolId}/students/{studentId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+
+    await Promise.all([
+      incrementDoc(schoolRef, { totalStudents: -1 }),
+      incrementDoc(admin.firestore().collection("platform").doc("config"), {
+        totalStudents: -1,
+      }),
+    ]);
+  }
+);
+
+exports.onTeacherCreated = onDocumentCreated(
+  { document: "schools/{schoolId}/teachers/{teacherId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+    await incrementDoc(schoolRef, { totalTeachers: 1 });
+  }
+);
+
+exports.onTeacherDeleted = onDocumentDeleted(
+  { document: "schools/{schoolId}/teachers/{teacherId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+    await incrementDoc(schoolRef, { totalTeachers: -1 });
+  }
+);
+
+exports.onClassCreated = onDocumentCreated(
+  { document: "schools/{schoolId}/classes/{classId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+    await incrementDoc(schoolRef, { totalClasses: 1 });
+  }
+);
+
+exports.onClassDeleted = onDocumentDeleted(
+  { document: "schools/{schoolId}/classes/{classId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+    await incrementDoc(schoolRef, { totalClasses: -1 });
+  }
+);
+
+// ----------------------------
+// Attendance summary index
+// ----------------------------
+
+// Updates a school-level "latest attendance summary" whenever a class meta lock
+// is written under:
+// schools/{schoolId}/attendance/{dateKey}/meta/{classKey}
+//
+// We index the totals onto the school doc so dashboards can load quickly.
+exports.onAttendanceMetaWritten = onDocumentWritten(
+  { document: "schools/{schoolId}/attendance/{dateKey}/meta/{classKey}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId, dateKey, classKey } = event.params;
+
+    const beforeExists = event.data.before.exists;
+    const afterExists = event.data.after.exists;
+
+    const beforeCounts = beforeExists
+      ? readAttendanceCounts(event.data.before.data())
+      : { present: 0, absent: 0, late: 0, leave: 0, total: 0 };
+    const afterCounts = afterExists
+      ? readAttendanceCounts(event.data.after.data())
+      : { present: 0, absent: 0, late: 0, leave: 0, total: 0 };
+
+    const delta = diffCounts(beforeCounts, afterCounts);
+    const classDelta = !beforeExists && afterExists ? 1 : beforeExists && !afterExists ? -1 : 0;
+
+    // If nothing changed, do nothing.
+    if (
+      !delta.present &&
+      !delta.absent &&
+      !delta.late &&
+      !delta.leave &&
+      !delta.total &&
+      !classDelta
+    ) {
+      return;
+    }
+
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+
+    // Keep the "latest" attendance summary on the school doc.
+    // We only mutate the school doc for:
+    // - the same dateKey as currently stored
+    // - OR a newer dateKey (lexicographic compare works for YYYY-MM-DD)
+    await admin.firestore().runTransaction(async (tx) => {
+      const snap = await tx.get(schoolRef);
+      const data = snap.data() || {};
+
+      const currentKey = String(data.attendanceLatestDateKey || "");
+      const hasKey = currentKey.length === 10;
+
+      const shouldStartNew = !hasKey || dateKey > currentKey;
+      const shouldUpdateSame = hasKey && dateKey === currentKey;
+
+      if (!shouldStartNew && !shouldUpdateSame) {
+        // Older date update; ignore to keep dashboard focused on the latest day.
+        return;
+      }
+
+      if (shouldStartNew) {
+        // Initialize with this class' counts (and then future writes for same date will add deltas).
+        if (!afterExists) {
+          // Newer date but deletion event (shouldn't happen in normal flow); ignore.
+          return;
+        }
+
+        tx.set(
+          schoolRef,
+          {
+            attendanceLatestDateKey: dateKey,
+            attendanceLatest: {
+              dateKey,
+              present: afterCounts.present,
+              absent: afterCounts.absent,
+              late: afterCounts.late,
+              leave: afterCounts.leave,
+              total: afterCounts.total,
+              classesMarked: 1,
+            },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+        return;
+      }
+
+      // Same dateKey: apply deltas with atomic increments.
+      const inc = admin.firestore.FieldValue.increment;
+      tx.set(
+        schoolRef,
+        {
+          attendanceLatest: {
+            dateKey,
+            present: inc(delta.present),
+            absent: inc(delta.absent),
+            late: inc(delta.late),
+            leave: inc(delta.leave),
+            total: inc(delta.total),
+            classesMarked: inc(classDelta),
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+
+    // Optional: persist per-day totals doc for historical reporting.
+    // This is safe and cheap: 1 doc per day per school.
+    const dailyRef = admin
+      .firestore()
+      .collection("schools")
+      .doc(schoolId)
+      .collection("analytics")
+      .doc("attendance_daily")
+      .collection("days")
+      .doc(dateKey);
+
+    const dailyDelta = {
+      present: delta.present,
+      absent: delta.absent,
+      late: delta.late,
+      leave: delta.leave,
+      total: delta.total,
+      classesMarked: classDelta,
+    };
+
+    await dailyRef.set(
+      {
+        dateKey,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...Object.fromEntries(
+          Object.entries(dailyDelta).map(([k, v]) => [k, admin.firestore.FieldValue.increment(v)])
+        ),
+      },
+      { merge: true }
+    );
+
+    // If the day is "today" in UTC, also write a convenient pointer doc.
+    // This can be used by clients who want a stable path.
+    const todayKey = todayKeyUtc();
+    if (dateKey === todayKey) {
+      const todayRef = admin
+        .firestore()
+        .collection("schools")
+        .doc(schoolId)
+        .collection("analytics")
+        .doc("attendance_today");
+
+      await todayRef.set(
+        {
+          dateKey,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    // Emit an in-app notification when attendance is first marked for a class.
+    // We intentionally only notify on CREATE (not on updates) to avoid spamming.
+    if (!beforeExists && afterExists) {
+      const afterData = event.data.after.data() || {};
+      const markedBy = String(afterData.markedBy || "");
+
+      const notifId = `attendance_${dateKey}_${classKey}`;
+      const notifRef = admin
+        .firestore()
+        .collection("schools")
+        .doc(schoolId)
+        .collection("notifications")
+        .doc(notifId);
+
+      const bodyParts = [];
+      if (afterCounts.present) bodyParts.push(`${afterCounts.present} present`);
+      if (afterCounts.absent) bodyParts.push(`${afterCounts.absent} absent`);
+      if (afterCounts.late) bodyParts.push(`${afterCounts.late} late`);
+      if (afterCounts.leave) bodyParts.push(`${afterCounts.leave} leave`);
+      const body = bodyParts.length ? bodyParts.join(", ") : "Attendance submitted";
+
+      await notifRef.set(
+        {
+          type: "attendance_marked",
+          title: "Attendance marked",
+          body,
+          schoolId,
+          dateKey,
+          classKey,
+          markedBy: markedBy || null,
+          counts: {
+            present: afterCounts.present,
+            absent: afterCounts.absent,
+            late: afterCounts.late,
+            leave: afterCounts.leave,
+            total: afterCounts.total,
+          },
+          audience: {
+            roles: ["admin", "teacher"],
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  }
+);
+
+// --------------------------------------------
+// Student Risk / Performance analytics (v1)
+// --------------------------------------------
+
+async function upsertRiskAndSummary({
+  schoolId,
+  studentId,
+  studentData,
+  attendance,
+  marks,
+  fees,
+}) {
+  const db = admin.firestore();
+
+  const studentName = String((studentData || {}).name || "");
+  const classId = String((studentData || {}).classId || "");
+  const sectionId = String((studentData || {}).section || "");
+  const classKey = classKeyFrom(classId, sectionId);
+
+  const attendancePercent30d = readNum(attendance.attendancePercent30d);
+  const attendanceMarkedDays30d = safeInt(attendance.attendanceMarkedDays30d);
+  const marksPercentLatest = marks.hasMarks ? readNum(marks.percent) : 0;
+  const feesPendingAmount = readNum(fees.pendingAmount);
+
+  const computed = computeStudentRiskV1({
+    attendancePercent30d,
+    marksPercentLatest,
+    feesPendingAmount,
+  });
+
+  const riskDocRef = db
+    .collection("schools")
+    .doc(schoolId)
+    .collection("analytics")
+    .doc("student_risk")
+    .collection("students")
+    .doc(studentId);
+
+  const summaryRef = db
+    .collection("schools")
+    .doc(schoolId)
+    .collection("analytics")
+    .doc("risk_summary");
+
+  await db.runTransaction(async (tx) => {
+    const prevSnap = await tx.get(riskDocRef);
+    const prev = prevSnap.exists ? prevSnap.data() || {} : {};
+
+    const prevLevel = String(prev.riskLevel || "");
+    const prevFee = prev.feePending === true;
+    const prevLowAttendance = prev.lowAttendance === true;
+    const prevTop = prev.topPerformer === true;
+
+    const newLevel = computed.riskLevel;
+    const newFee = computed.feePending;
+    const newLowAttendance = computed.lowAttendance;
+    const newTop = computed.topPerformer;
+
+    // Update per-student index.
+    tx.set(
+      riskDocRef,
+      {
+        studentId,
+        studentName,
+        classId,
+        sectionId,
+        classKey,
+
+        attendancePercent30d,
+        attendanceMarkedDays30d,
+        marksPercentLatest,
+        feesPendingAmount,
+
+        lowAttendance: newLowAttendance,
+        lowMarks: computed.lowMarks,
+        feePending: newFee,
+        topPerformer: newTop,
+
+        riskLevel: newLevel,
+        riskScore: computed.riskScore,
+        reasons: computed.reasons,
+
+        createdAt: prevSnap.exists ? prev.createdAt || admin.firestore.FieldValue.serverTimestamp() : admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    // Update school summary counts (delta-based).
+    const inc = admin.firestore.FieldValue.increment;
+    const summaryDelta = {};
+
+    function bump(field, delta) {
+      if (!delta) return;
+      summaryDelta[field] = inc(delta);
+    }
+
+    function levelDelta(from, to, level, field) {
+      const d = (from === level ? -1 : 0) + (to === level ? 1 : 0);
+      bump(field, d);
+    }
+
+    levelDelta(prevLevel, newLevel, "HIGH", "studentsHighRisk");
+    levelDelta(prevLevel, newLevel, "MEDIUM", "studentsMediumRisk");
+    levelDelta(prevLevel, newLevel, "LOW", "studentsLowRisk");
+
+    bump("feeDefaulters", (prevFee ? -1 : 0) + (newFee ? 1 : 0));
+    bump("lowAttendance", (prevLowAttendance ? -1 : 0) + (newLowAttendance ? 1 : 0));
+    bump("topPerformers", (prevTop ? -1 : 0) + (newTop ? 1 : 0));
+
+    summaryDelta.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    tx.set(summaryRef, summaryDelta, { merge: true });
+  });
+
+  return computed;
+}
+
+exports.onAttendanceRecordCreated = onDocumentCreated(
+  {
+    document: "schools/{schoolId}/attendance/{dateKey}/{classKey}/{studentId}",
+    region: FIRESTORE_REGION,
+  },
+  async (event) => {
+    const { schoolId, dateKey, studentId } = event.params;
+    const after = event.data.data() || {};
+
+    const status = String(after.status || "").trim();
+    if (!status) return;
+
+    const db = admin.firestore();
+
+    const studentRef = db.collection("schools").doc(schoolId).collection("students").doc(studentId);
+    const attendanceRef = studentRef.collection("analytics").doc("attendance_30d");
+
+    const windowDays = 30;
+    const cutoffKey = dateKeyDaysAgoUtc(windowDays - 1);
+
+    // Maintain a compact rolling map of days -> status.
+    let mergedDays = {};
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(attendanceRef);
+      const data = snap.data() || {};
+      const days = (data.days && typeof data.days === "object") ? data.days : {};
+
+      // Merge existing days into a plain object.
+      mergedDays = { ...days };
+      mergedDays[dateKey] = status;
+
+      // Prune older than cutoff (lexicographic works for YYYY-MM-DD).
+      for (const k of Object.keys(mergedDays)) {
+        if (k.length === 10 && k < cutoffKey) {
+          delete mergedDays[k];
+        }
+      }
+
+      tx.set(
+        attendanceRef,
+        {
+          windowDays,
+          days: mergedDays,
+          lastDateKey: dateKey,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+
+    // Compute attendance percent from the rolling map.
+    const values = Object.values(mergedDays);
+    let presentEq = 0;
+    let marked = 0;
+    for (const v of values) {
+      const s = String(v || "");
+      if (!s) continue;
+      marked += 1;
+      if (s === "present" || s === "late" || s === "leave") {
+        presentEq += 1;
+      }
+    }
+    const attendancePercent30d = marked > 0 ? (presentEq / marked) * 100 : 0;
+
+    // Read marks + fees snapshots (best-effort).
+    const [studentSnap, marksSnap, feesSnap] = await Promise.all([
+      studentRef.get(),
+      studentRef.collection("analytics").doc("marks_latest").get(),
+      studentRef.collection("analytics").doc("fees_latest").get(),
+    ]);
+
+    const studentData = studentSnap.data() || {};
+    const marksData = marksSnap.data() || {};
+    const feesData = feesSnap.data() || {};
+
+    const marks = {
+      hasMarks: marksSnap.exists && typeof marksData.percent === "number",
+      percent: readNum(marksData.percent),
+    };
+    const fees = {
+      pendingAmount: readNum(feesData.pendingAmount),
+    };
+
+    const computed = await upsertRiskAndSummary({
+      schoolId,
+      studentId,
+      studentData,
+      attendance: {
+        attendancePercent30d,
+        attendanceMarkedDays30d: marked,
+      },
+      marks,
+      fees,
+    });
+
+    // If a student becomes HIGH risk, emit a lightweight staff notification.
+    // (Parent alerts require a dedicated per-parent feed and are designed separately.)
+    if (computed.riskLevel === "HIGH") {
+      const notifRef = db
+        .collection("schools")
+        .doc(schoolId)
+        .collection("notifications")
+        .doc(`risk_high_${studentId}`);
+
+      await notifRef.set(
+        {
+          type: "student_high_risk",
+          title: "Student at high risk",
+          body: `Student ${String(studentData.name || studentId)} needs attention`,
+          schoolId,
+          studentId,
+          classId: String(studentData.classId || ""),
+          sectionId: String(studentData.section || ""),
+          riskScore: computed.riskScore,
+          audience: { roles: ["admin", "teacher"] },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  }
+);
+
+exports.onExamMarksWritten = onDocumentWritten(
+  {
+    document: "schools/{schoolId}/exams/{examId}/marks/{studentId}",
+    region: FIRESTORE_REGION,
+  },
+  async (event) => {
+    const { schoolId, examId, studentId } = event.params;
+
+    if (!event.data.after.exists) {
+      return;
+    }
+
+    const db = admin.firestore();
+    const examRef = db.collection("schools").doc(schoolId).collection("exams").doc(examId);
+    const marksData = event.data.after.data() || {};
+
+    const [examSnap, studentSnap, attendanceSnap, feesSnap] = await Promise.all([
+      examRef.get(),
+      db.collection("schools").doc(schoolId).collection("students").doc(studentId).get(),
+      db
+        .collection("schools")
+        .doc(schoolId)
+        .collection("students")
+        .doc(studentId)
+        .collection("analytics")
+        .doc("attendance_30d")
+        .get(),
+      db
+        .collection("schools")
+        .doc(schoolId)
+        .collection("students")
+        .doc(studentId)
+        .collection("analytics")
+        .doc("fees_latest")
+        .get(),
+    ]);
+
+    const exam = examSnap.data() || {};
+    const subjectMarks = (marksData.subjectMarks && typeof marksData.subjectMarks === "object")
+      ? marksData.subjectMarks
+      : {};
+    const subjectMaxMarks = (exam.subjectMaxMarks && typeof exam.subjectMaxMarks === "object")
+      ? exam.subjectMaxMarks
+      : {};
+
+    let total = 0;
+    let maxTotal = 0;
+    for (const [subj, mark] of Object.entries(subjectMarks)) {
+      const m = safeInt(mark);
+      const mx = safeInt(subjectMaxMarks[subj]);
+      if (mx <= 0) continue;
+      total += Math.max(0, Math.min(m, mx));
+      maxTotal += mx;
+    }
+
+    const percent = maxTotal > 0 ? (total / maxTotal) * 100 : 0;
+    const titleParts = [];
+    if (exam.examType) titleParts.push(String(exam.examType).trim());
+    if (exam.examName) titleParts.push(String(exam.examName).trim());
+    const examTitle = titleParts.filter(Boolean).join(" • ") || String(exam.name || examId);
+
+    const studentRef = db.collection("schools").doc(schoolId).collection("students").doc(studentId);
+    await studentRef
+      .collection("analytics")
+      .doc("marks_latest")
+      .set(
+        {
+          examId,
+          examTitle,
+          percent,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+    // Attendance percent from rolling map.
+    const a = attendanceSnap.data() || {};
+    const days = (a.days && typeof a.days === "object") ? a.days : {};
+    const values = Object.values(days);
+    let presentEq = 0;
+    let marked = 0;
+    for (const v of values) {
+      const s = String(v || "");
+      if (!s) continue;
+      marked += 1;
+      if (s === "present" || s === "late" || s === "leave") presentEq += 1;
+    }
+    const attendancePercent30d = marked > 0 ? (presentEq / marked) * 100 : 0;
+
+    const feesData = feesSnap.data() || {};
+
+    // Parent in-app notification (per-student).
+    const studentData = studentSnap.data() || {};
+    const parentUid = String(studentData.parentUid || "").trim();
+    if (parentUid) {
+      const studentName = String(studentData.name || studentId).trim() || studentId;
+      const p = Math.round(percent);
+
+      await upsertParentNotification({
+        parentUid,
+        notificationId: `exam_${examId}_${studentId}`,
+        markUnread: true,
+        payload: {
+          type: "exam_marks_updated",
+          title: "Exam result updated",
+          body: `${studentName}: ${p}% (${examTitle})`,
+          schoolId,
+          studentId,
+          examId,
+          examTitle,
+          percent: p,
+        },
+      });
+    }
+
+    await upsertRiskAndSummary({
+      schoolId,
+      studentId,
+      studentData,
+      attendance: { attendancePercent30d, attendanceMarkedDays30d: marked },
+      marks: { hasMarks: true, percent },
+      fees: { pendingAmount: readNum(feesData.pendingAmount) },
+    });
+  }
+);
+
+exports.onStudentFeesWritten = onDocumentWritten(
+  {
+    document: "schools/{schoolId}/studentFees/{feeDocId}",
+    region: FIRESTORE_REGION,
+  },
+  async (event) => {
+    const { schoolId } = event.params;
+    const afterExists = event.data.after.exists;
+    const data = afterExists ? (event.data.after.data() || {}) : {};
+    const studentId = String(data.studentId || "");
+    if (!studentId) return;
+
+    const beforeExists = event.data.before.exists;
+    const beforeData = beforeExists ? (event.data.before.data() || {}) : {};
+
+    // Interpret fee doc (supports multiple shapes).
+    const bal = data.balance ?? data.pendingAmount;
+    let pending = readNum(bal);
+    if (pending <= 0) {
+      const status = String(data.status || "").toLowerCase().trim();
+      const amount = readNum(data.amount);
+      if (status === "pending" || status === "due") pending += amount;
+    }
+
+    // Compute previous pending (best-effort) to detect transitions.
+    const beforeBal = beforeData.balance ?? beforeData.pendingAmount;
+    let beforePending = readNum(beforeBal);
+    if (beforePending <= 0) {
+      const status = String(beforeData.status || "").toLowerCase().trim();
+      const amount = readNum(beforeData.amount);
+      if (status === "pending" || status === "due") beforePending += amount;
+    }
+
+    const db = admin.firestore();
+    const studentRef = db.collection("schools").doc(schoolId).collection("students").doc(studentId);
+    await studentRef
+      .collection("analytics")
+      .doc("fees_latest")
+      .set(
+        {
+          pendingAmount: pending,
+          isPending: pending > 0,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+    const [studentSnap, attendanceSnap, marksSnap] = await Promise.all([
+      studentRef.get(),
+      studentRef.collection("analytics").doc("attendance_30d").get(),
+      studentRef.collection("analytics").doc("marks_latest").get(),
+    ]);
+
+    // Parent notification: only when the student becomes a fee defaulter.
+    if (beforePending <= 0 && pending > 0) {
+      const studentData = studentSnap.data() || {};
+      const parentUid = String(studentData.parentUid || "").trim();
+      if (parentUid) {
+        const studentName = String(studentData.name || studentId).trim() || studentId;
+        const amt = Math.round(pending);
+
+        await upsertParentNotification({
+          parentUid,
+          notificationId: `fee_pending_${studentId}`,
+          markUnread: true,
+          payload: {
+            type: "fee_pending",
+            title: "Fees pending",
+            body: `${studentName}: ₹${amt} pending`,
+            schoolId,
+            studentId,
+            pendingAmount: pending,
+          },
+        });
+      }
+    }
+
+    const a = attendanceSnap.data() || {};
+    const days = (a.days && typeof a.days === "object") ? a.days : {};
+    const values = Object.values(days);
+    let presentEq = 0;
+    let marked = 0;
+    for (const v of values) {
+      const s = String(v || "");
+      if (!s) continue;
+      marked += 1;
+      if (s === "present" || s === "late" || s === "leave") presentEq += 1;
+    }
+    const attendancePercent30d = marked > 0 ? (presentEq / marked) * 100 : 0;
+
+    const m = marksSnap.data() || {};
+    const marksPercentLatest = readNum(m.percent);
+
+    await upsertRiskAndSummary({
+      schoolId,
+      studentId,
+      studentData: studentSnap.data() || {},
+      attendance: { attendancePercent30d, attendanceMarkedDays30d: marked },
+      marks: { hasMarks: marksSnap.exists, percent: marksPercentLatest },
+      fees: { pendingAmount: pending },
+    });
+  }
+);
+
+// --------------------------------------------
+// Parent in-app notifications (v1)
+// --------------------------------------------
+
+exports.onHomeworkCreated = onDocumentCreated(
+  {
+    document: "schools/{schoolId}/homework/{homeworkId}",
+    region: FIRESTORE_REGION,
+  },
+  async (event) => {
+    const { schoolId, homeworkId } = event.params;
+    const data = event.data?.data() || {};
+
+    const classId = String(data.classId || "").trim();
+    const section = String(data.section || "").trim();
+    const classKey = String(data.classKey || "").trim() || classKeyFrom(classId, section);
+    const subject = String(data.subject || "").trim();
+
+    let dueDateLabel = "";
+    const dueRaw = data.dueDate;
+    if (dueRaw && typeof dueRaw.toDate === "function") {
+      const d = dueRaw.toDate();
+      dueDateLabel = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    const db = admin.firestore();
+    if (!classKey) return;
+
+    const studentsSnap = await db
+      .collection("schools")
+      .doc(schoolId)
+      .collection("students")
+      .where("classKey", "==", classKey)
+      .get();
+
+    const bw = db.bulkWriter();
+
+    for (const s of studentsSnap.docs) {
+      const sd = s.data() || {};
+      const parentUid = String(sd.parentUid || "").trim();
+      if (!parentUid) continue;
+
+      const studentName = String(sd.name || s.id).trim() || s.id;
+
+      const id = `homework_${homeworkId}_${s.id}`;
+      const ref = db
+        .collection("users")
+        .doc(parentUid)
+        .collection("notifications")
+        .doc(id);
+
+      bw.set(
+        ref,
+        {
+          type: "homework_created",
+          title: "New homework",
+          body: `${studentName}: ${subject || "Homework"}${dueDateLabel ? ` (due ${dueDateLabel})` : ""}`,
+          schoolId,
+          studentId: s.id,
+          homeworkId,
+          classId,
+          section,
+          classKey,
+          dueDate: data.dueDate || null,
+          readAt: null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    await bw.close();
+  }
+);
+
+exports.onAnnouncementCreated = onDocumentCreated(
+  {
+    document: "schools/{schoolId}/announcements/{announcementId}",
+    region: FIRESTORE_REGION,
+  },
+  async (event) => {
+    const { schoolId, announcementId } = event.params;
+    const data = event.data?.data() || {};
+
+    const title = String(data.title || "").trim();
+    const message = String(data.message || "").trim();
+    const target = String(data.target || "").trim();
+
+    // Only notify parents for targets that include parents.
+    const shouldNotifyParents = target === "all" || target === "parents" || target.startsWith("class_");
+    if (!shouldNotifyParents) return;
+
+    const db = admin.firestore();
+    const parentUids = new Set();
+
+    if (target.startsWith("class_")) {
+      // target format: class_{classId}_{section}
+      const parts = target.split("_");
+      if (parts.length >= 3) {
+        const classId = String(parts[1] || "").trim();
+        const section = String(parts.slice(2).join("_") || "").trim();
+        const classKey = classKeyFrom(classId, section);
+
+        const studentsSnap = await db
+          .collection("schools")
+          .doc(schoolId)
+          .collection("students")
+          .where("classKey", "==", classKey)
+          .get();
+
+        for (const s of studentsSnap.docs) {
+          const sd = s.data() || {};
+          const parentUid = String(sd.parentUid || "").trim();
+          if (parentUid) parentUids.add(parentUid);
+        }
+      }
+    } else {
+      // Broadcast: notify all parent users in this school.
+      const usersSnap = await db
+        .collection("users")
+        .where("schoolId", "==", schoolId)
+        .get();
+
+      for (const u of usersSnap.docs) {
+        const ud = u.data() || {};
+        if (String(ud.role || "") !== "parent") continue;
+        parentUids.add(u.id);
+      }
+    }
+
+    if (parentUids.size === 0) return;
+
+    const bw = db.bulkWriter();
+    const notifId = `announcement_${announcementId}`;
+    for (const uid of parentUids) {
+      const ref = db
+        .collection("users")
+        .doc(uid)
+        .collection("notifications")
+        .doc(notifId);
+
+      bw.set(
+        ref,
+        {
+          type: "announcement",
+          title: title || "New announcement",
+          body: message,
+          schoolId,
+          announcementId,
+          target,
+          readAt: null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    await bw.close();
+  }
+);
+
+exports.onAttendanceRecordCreated = onDocumentCreated(
+  {
+    document: "schools/{schoolId}/attendance/{dateKey}/{classKey}/{studentId}",
+    region: FIRESTORE_REGION,
+  },
+  async (event) => {
+    const { schoolId, dateKey, classKey, studentId } = event.params;
+    const data = event.data?.data() || {};
+    const status = String(data.status || data.studentStatus || "").trim().toLowerCase();
+
+    // Smart alerts: only for non-present statuses.
+    if (status !== "absent" && status !== "late" && status !== "leave") return;
+
+    const db = admin.firestore();
+    const studentSnap = await db
+      .collection("schools")
+      .doc(schoolId)
+      .collection("students")
+      .doc(studentId)
+      .get();
+
+    const student = studentSnap.data() || {};
+    const parentUid = String(student.parentUid || "").trim();
+    if (!parentUid) return;
+
+    const studentName = String(student.name || studentId).trim() || studentId;
+    const prettyDate = prettyDateKey(dateKey);
+
+    await upsertParentNotification({
+      parentUid,
+      notificationId: `attendance_${dateKey}_${studentId}`,
+      markUnread: true,
+      payload: {
+        type: "attendance_alert",
+        title: `Attendance: ${status.toUpperCase()}`,
+        body: `${studentName} marked ${status} on ${prettyDate}`,
+        schoolId,
+        studentId,
+        dateKey,
+        classKey,
+        status,
+      },
+    });
+  }
+);
+
+exports.recomputeStudentRisk = onCall(async (request) => {
+  const data = request.data || {};
+  const schoolId = String(data.schoolId || "").trim();
+  const classId = String(data.classId || "").trim();
+  const sectionId = String(data.sectionId || "").trim();
+
+  if (!schoolId) {
+    throw new HttpsError("invalid-argument", "schoolId is required");
+  }
+
+  await authorizeSchoolAdminOrSuperAdmin({ request, schoolId });
+
+  const db = admin.firestore();
+
+  // Load fee docs once (best-effort) and map to studentId -> pendingAmount.
+  const feeSnap = await db.collection("schools").doc(schoolId).collection("studentFees").get();
+  const feeByStudent = new Map();
+  for (const doc of feeSnap.docs) {
+    const d = doc.data() || {};
+    const sid = String(d.studentId || doc.id);
+    if (!sid) continue;
+    const bal = d.balance ?? d.pendingAmount;
+    let pending = readNum(bal);
+    if (pending <= 0) {
+      const status = String(d.status || "").toLowerCase().trim();
+      const amount = readNum(d.amount);
+      if (status === "pending" || status === "due") pending += amount;
+    }
+    if (!pending) continue;
+    feeByStudent.set(sid, (feeByStudent.get(sid) || 0) + pending);
+  }
+
+  let studentsQuery = db.collection("schools").doc(schoolId).collection("students");
+  if (classId && sectionId) {
+    studentsQuery = studentsQuery.where("classId", "==", classId).where("section", "==", sectionId);
+  }
+
+  const studentsSnap = await studentsQuery.get();
+
+  // Recompute risk for each student.
+  const summary = {
+    studentsHighRisk: 0,
+    studentsMediumRisk: 0,
+    studentsLowRisk: 0,
+    feeDefaulters: 0,
+    lowAttendance: 0,
+    topPerformers: 0,
+  };
+
+  for (const s of studentsSnap.docs) {
+    const studentId = s.id;
+    const studentData = s.data() || {};
+
+    const attendanceSnap = await s.ref.collection("analytics").doc("attendance_30d").get();
+    const a = attendanceSnap.data() || {};
+    const days = (a.days && typeof a.days === "object") ? a.days : {};
+    const values = Object.values(days);
+    let presentEq = 0;
+    let marked = 0;
+    for (const v of values) {
+      const st = String(v || "");
+      if (!st) continue;
+      marked += 1;
+      if (st === "present" || st === "late" || st === "leave") presentEq += 1;
+    }
+    const attendancePercent30d = marked > 0 ? (presentEq / marked) * 100 : 0;
+
+    const marksSnap = await s.ref.collection("analytics").doc("marks_latest").get();
+    const marksData = marksSnap.data() || {};
+    const marksPercentLatest = readNum(marksData.percent);
+
+    const pending = readNum(feeByStudent.get(studentId) || 0);
+    await s.ref
+      .collection("analytics")
+      .doc("fees_latest")
+      .set(
+        {
+          pendingAmount: pending,
+          isPending: pending > 0,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+    const computed = await upsertRiskAndSummary({
+      schoolId,
+      studentId,
+      studentData,
+      attendance: { attendancePercent30d, attendanceMarkedDays30d: marked },
+      marks: { hasMarks: marksSnap.exists, percent: marksPercentLatest },
+      fees: { pendingAmount: pending },
+    });
+
+    // Track totals locally too.
+    if (computed.riskLevel === "HIGH") summary.studentsHighRisk += 1;
+    else if (computed.riskLevel === "MEDIUM") summary.studentsMediumRisk += 1;
+    else summary.studentsLowRisk += 1;
+    if (computed.feePending) summary.feeDefaulters += 1;
+    if (computed.lowAttendance) summary.lowAttendance += 1;
+    if (computed.topPerformer) summary.topPerformers += 1;
+  }
+
+  // Set the summary doc to the computed values (authoritative after recompute).
+  await db
+    .collection("schools")
+    .doc(schoolId)
+    .collection("analytics")
+    .doc("risk_summary")
+    .set(
+      {
+        ...summary,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+  return {
+    ok: true,
+    schoolId,
+    filter: classId && sectionId ? { classId, sectionId } : null,
+    studentsScanned: studentsSnap.size,
+    ...summary,
+  };
+});
 
 function normalizePhone(input) {
   const digits = String(input || "").replace(/[^0-9]/g, "");
@@ -38,6 +1324,20 @@ function normalizePin(input) {
     throw new HttpsError("invalid-argument", "PIN must be 4 to 12 digits");
   }
   return pin;
+}
+
+function generateNumericPin(length = 6) {
+  const n = crypto.randomInt(0, Math.pow(10, length));
+  return String(n).padStart(length, "0");
+}
+
+function normalizeEmail(input) {
+  const email = String(input || "").trim().toLowerCase();
+  // Simple sanity check (Auth will validate further).
+  if (!email.includes("@") || email.length < 6) {
+    throw new HttpsError("invalid-argument", "Invalid email");
+  }
+  return email;
 }
 
 function hashPin(pin, salt) {
@@ -75,9 +1375,9 @@ exports.createOrResetParentAccount = onCall(async (request) => {
   }
 
   const email = parentEmailFromPhoneDigits(phoneDigits);
-  const defaultPin = phoneDigits.slice(-4);
+  const initialPin = generateNumericPin(6);
   const pinSalt = crypto.randomBytes(16).toString("hex");
-  const pinHash = hashPin(defaultPin, pinSalt);
+  const pinHash = hashPin(initialPin, pinSalt);
 
   // Create or reset the Auth user.
   let userRecord;
@@ -159,7 +1459,8 @@ exports.createOrResetParentAccount = onCall(async (request) => {
   return {
     uid: userRecord.uid,
     email,
-    defaultPasswordHint: "last4",
+    initialPin,
+    defaultPasswordHint: "random",
     mustChangePassword: true,
   };
 });
@@ -181,10 +1482,21 @@ exports.parentLogin = onCall(async (request) => {
     throw new HttpsError("not-found", "Parent account not found");
   }
 
-  const userDoc = await admin.firestore().collection("users").doc(uid).get();
+  const mappingSchoolId = String(mapping.schoolId || "");
+
+  const userDocRef = admin.firestore().collection("users").doc(uid);
+  const userDoc = await userDocRef.get();
   const userData = userDoc.data() || {};
   if (String(userData.role || "") !== "parent") {
     throw new HttpsError("permission-denied", "Not a parent account");
+  }
+
+  const userSchoolId = String(userData.schoolId || "");
+  if (mappingSchoolId && userSchoolId && mappingSchoolId !== userSchoolId) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Parent login mapping is inconsistent. Contact school admin."
+    );
   }
 
   const salt = String(userData.pinSalt || "");
@@ -193,13 +1505,55 @@ exports.parentLogin = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Parent PIN not initialized");
   }
 
+  // Basic rate limiting / lockout (prevents brute force).
+  const nowMs = Date.now();
+  const lockUntil = userData.pinLockedUntil;
+  if (lockUntil && typeof lockUntil.toMillis === "function" && lockUntil.toMillis() > nowMs) {
+    throw new HttpsError("resource-exhausted", "Too many failed attempts. Try again later.");
+  }
+
+  const lastFailAt = userData.pinLastFailAt;
+  const lastFailMs = lastFailAt && typeof lastFailAt.toMillis === "function" ? lastFailAt.toMillis() : 0;
+  const windowMs = 10 * 60 * 1000;
+  const baseFailCount = Number(userData.pinFailCount || 0);
+  const failCount = lastFailMs > 0 && nowMs - lastFailMs <= windowMs ? baseFailCount : 0;
+
   const actual = hashPin(pin, salt);
   if (actual !== expected) {
+    const newCount = failCount + 1;
+    const maxAttempts = 8;
+    const lockMs = 15 * 60 * 1000;
+
+    const update = {
+      pinFailCount: newCount,
+      pinLastFailAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (newCount >= maxAttempts) {
+      update.pinLockedUntil = admin.firestore.Timestamp.fromMillis(nowMs + lockMs);
+    }
+
+    await userDocRef.set(update, { merge: true });
     throw new HttpsError("permission-denied", "Invalid PIN");
   }
 
-  const schoolId = String(userData.schoolId || "");
+  const schoolId = userSchoolId;
   const mustChangePassword = (userData.mustChangePassword || false) === true;
+
+  // Clear any previous lockout counters on success.
+  if (failCount > 0 || (lockUntil && typeof lockUntil.toMillis === "function")) {
+    await userDocRef.set(
+      {
+        pinFailCount: 0,
+        pinLastFailAt: admin.firestore.FieldValue.delete(),
+        pinLockedUntil: admin.firestore.FieldValue.delete(),
+        lastParentLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
 
   let token;
   try {
@@ -222,6 +1576,72 @@ exports.parentLogin = onCall(async (request) => {
   return {
     token,
     mustChangePassword,
+  };
+});
+
+// ----------------------------
+// Maintenance: recompute counters
+// ----------------------------
+
+exports.recomputeSchoolCounters = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+
+  const data = request.data || {};
+  const schoolId = String(data.schoolId || "").trim();
+  if (!schoolId) {
+    throw new HttpsError("invalid-argument", "schoolId is required");
+  }
+
+  // Authorize caller: superAdmin only.
+  const callerUid = request.auth.uid;
+  const callerDoc = await admin.firestore().collection("users").doc(callerUid).get();
+  const callerRole = String((callerDoc.data() || {}).role || "");
+
+  const isSuper = callerRole === "superAdmin" || (request.auth.token && request.auth.token.superAdmin === true);
+  if (!isSuper) {
+    throw new HttpsError("permission-denied", "Only superAdmin can run maintenance");
+  }
+
+  const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+  const studentsCol = schoolRef.collection("students");
+  const teachersCol = schoolRef.collection("teachers");
+  const classesCol = schoolRef.collection("classes");
+
+  async function countCol(colRef) {
+    // Prefer server-side count aggregation when available.
+    try {
+      const agg = await colRef.count().get();
+      return safeInt(agg.data().count);
+    } catch (_) {
+      const snap = await colRef.get();
+      return safeInt(snap.size);
+    }
+  }
+
+  const [students, teachers, classes] = await Promise.all([
+    countCol(studentsCol),
+    countCol(teachersCol),
+    countCol(classesCol),
+  ]);
+
+  await schoolRef.set(
+    {
+      totalStudents: students,
+      totalTeachers: teachers,
+      totalClasses: classes,
+      countersRecomputedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return {
+    schoolId,
+    totalStudents: students,
+    totalTeachers: teachers,
+    totalClasses: classes,
   };
 });
 
@@ -257,4 +1677,120 @@ exports.changeParentPin = onCall(async (request) => {
   );
 
   return { ok: true };
+});
+
+// ---------------------------------------------------------------------------
+// Teacher Accounts (email/password)
+// ---------------------------------------------------------------------------
+
+exports.createOrResetTeacherAccount = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+
+  const data = request.data || {};
+  const schoolId = String(data.schoolId || "").trim();
+  const action = String(data.action || "create").trim(); // create | reset
+  const teacherName = String(data.teacherName || "").trim();
+  const email = normalizeEmail(data.email);
+  const phoneDigits = normalizePhone(data.phone);
+  const teacherId = data.teacherId ? String(data.teacherId) : "";
+
+  if (!schoolId) {
+    throw new HttpsError("invalid-argument", "schoolId is required");
+  }
+
+  // Authorize caller.
+  const callerUid = request.auth.uid;
+  const callerDoc = await admin.firestore().collection("users").doc(callerUid).get();
+  const callerRole = String((callerDoc.data() || {}).role || "");
+  const callerSchoolId = String((callerDoc.data() || {}).schoolId || "");
+
+  if (callerRole !== "admin" && callerRole !== "superAdmin") {
+    throw new HttpsError(
+      "permission-denied",
+      "Only admin/superAdmin can manage teacher accounts"
+    );
+  }
+
+  if (callerRole === "admin" && callerSchoolId !== schoolId) {
+    throw new HttpsError(
+      "permission-denied",
+      "Admin can only manage teachers for their own school"
+    );
+  }
+
+  // Temporary password rule: first 6 characters of the email.
+  // Example: skschool@gmail.com -> skscho
+  // Firebase Auth requires >= 6 chars.
+  const emailSeed = (email || "") + "000000";
+  const temporaryPassword = emailSeed.slice(0, 6);
+
+  // Create or reset the Auth user.
+  let userRecord;
+  try {
+    userRecord = await admin.auth().getUserByEmail(email);
+    if (action === "reset" || action === "create") {
+      await admin.auth().updateUser(userRecord.uid, {
+        password: temporaryPassword,
+        displayName: teacherName || userRecord.displayName || undefined,
+      });
+    }
+  } catch (err) {
+    if (err && err.code === "auth/user-not-found") {
+      userRecord = await admin.auth().createUser({
+        email,
+        password: temporaryPassword,
+        displayName: teacherName || undefined,
+      });
+    } else {
+      throw err;
+    }
+  }
+
+  // Claims + user doc.
+  await admin.auth().setCustomUserClaims(userRecord.uid, {
+    role: "teacher",
+    schoolId,
+  });
+
+  await admin.firestore().collection("users").doc(userRecord.uid).set(
+    {
+      role: "teacher",
+      schoolId,
+      phone: phoneDigits,
+      email,
+      name: teacherName,
+      mustChangePassword: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  // Optionally link to teacher profile doc.
+  if (teacherId) {
+    await admin
+      .firestore()
+      .collection("schools")
+      .doc(schoolId)
+      .collection("teachers")
+      .doc(teacherId)
+      .set(
+        {
+          teacherUid: userRecord.uid,
+          name: teacherName,
+          email,
+          phone: phoneDigits,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+  }
+
+  return {
+    uid: userRecord.uid,
+    mustChangePassword: true,
+    temporaryPassword,
+  };
 });

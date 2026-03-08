@@ -7,6 +7,13 @@ class ParentAccountService {
 
   final FirebaseFunctions _functions;
 
+  Map<String, dynamic> _asMap(dynamic raw) {
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    throw const FormatException('Invalid Cloud Function response');
+  }
+
   String normalizePhone(String input) {
     return input.replaceAll(RegExp(r'[^0-9]'), '');
   }
@@ -16,7 +23,7 @@ class ParentAccountService {
     return phoneDigits.substring(phoneDigits.length - 4);
   }
 
-  Future<String> createParentLogin({
+  Future<({String uid, String? initialPin})> createParentLogin({
     required String schoolId,
     required String phone,
     required String parentName,
@@ -30,11 +37,14 @@ class ParentAccountService {
       'parentName': parentName.trim().toUpperCase(),
       'studentId': studentId,
     });
-    final data = Map<String, dynamic>.from(result.data as Map);
-    return (data['uid'] ?? '').toString();
+    final data = _asMap(result.data);
+
+    final uid = (data['uid'] ?? '').toString();
+    final rawPin = (data['initialPin'] ?? '').toString().trim();
+    return (uid: uid, initialPin: rawPin.isEmpty ? null : rawPin);
   }
 
-  Future<String> resetParentPassword({
+  Future<({String uid, String? initialPin})> resetParentPassword({
     required String schoolId,
     required String phone,
     required String parentName,
@@ -48,8 +58,11 @@ class ParentAccountService {
       'parentName': parentName.trim().toUpperCase(),
       'studentId': studentId,
     });
-    final data = Map<String, dynamic>.from(result.data as Map);
-    return (data['uid'] ?? '').toString();
+    final data = _asMap(result.data);
+
+    final uid = (data['uid'] ?? '').toString();
+    final rawPin = (data['initialPin'] ?? '').toString().trim();
+    return (uid: uid, initialPin: rawPin.isEmpty ? null : rawPin);
   }
 
   Future<String> parentLogin({
@@ -61,7 +74,7 @@ class ParentAccountService {
       'phone': phone,
       'pin': pin,
     });
-    final data = Map<String, dynamic>.from(result.data as Map);
+    final data = _asMap(result.data);
     return (data['token'] ?? '').toString();
   }
 

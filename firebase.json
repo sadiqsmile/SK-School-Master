@@ -4,7 +4,7 @@
 			"android": {
 				"default": {
 					"projectId": "sk-school-master",
-					"appId": "1:836702428678:android:9fee2feeaa97e2bc1bad87",
+					"appId": "1:836702428678:android:cc3657204e1a1ff51bad87",
 					"fileOutput": "android/app/google-services.json"
 				}
 			},
@@ -12,7 +12,7 @@
 				"lib/firebase_options.dart": {
 					"projectId": "sk-school-master",
 					"configurations": {
-						"android": "1:836702428678:android:9fee2feeaa97e2bc1bad87",
+						"android": "1:836702428678:android:cc3657204e1a1ff51bad87",
 						"web": "1:836702428678:web:0744a0e5276096fd1bad87"
 					}
 				}
@@ -24,5 +24,26 @@
 	},
 	"functions": {
 		"source": "functions"
+	},
+	"hosting": {
+		"public": "build/web",
+		"ignore": [
+			"firebase.json",
+			"**/.*",
+			"**/node_modules/**"
+		],
+		"redirects": [
+			{
+				"source": "/privacy",
+				"destination": "/privacy.html",
+				"type": 301
+			}
+		],
+		"rewrites": [
+			{
+				"source": "**",
+				"destination": "/index.html"
+			}
+		]
 	}
 }

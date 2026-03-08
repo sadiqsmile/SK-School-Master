@@ -5,6 +5,8 @@ class Student {
   final String admissionNo;
   final String classId;
   final String section;
+  final String academicYear;
+  final String status;
   final String parentName;
   final String parentPhone;
 
@@ -14,6 +16,8 @@ class Student {
     required this.admissionNo,
     required this.classId,
     required this.section,
+    this.academicYear = '',
+    this.status = '',
     required this.parentName,
     required this.parentPhone,
   });
@@ -24,6 +28,8 @@ class Student {
       'admissionNo': admissionNo,
       'classId': classId,
       'section': section,
+      'academicYear': academicYear,
+      'status': status,
       'parentName': parentName,
       'parentPhone': parentPhone,
     };
@@ -36,6 +42,8 @@ class Student {
       admissionNo: (data['admissionNo'] ?? '').toString(),
       classId: (data['classId'] ?? '').toString(),
       section: (data['section'] ?? '').toString(),
+      academicYear: (data['academicYear'] ?? '').toString(),
+      status: (data['status'] ?? '').toString(),
       parentName: (data['parentName'] ?? '').toString(),
       parentPhone: (data['parentPhone'] ?? '').toString(),
     );

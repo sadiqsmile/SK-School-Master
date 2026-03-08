@@ -78,6 +78,56 @@ class Sidebar extends StatelessWidget {
             title: const Text('Fees'),
             onTap: () => context.go('/school-admin/fees'),
           ),
+          ListTile(
+            leading: const Icon(
+              Icons.campaign_rounded,
+              color: Color(0xFF1E40AF),
+            ),
+            title: const Text('Announcements'),
+            onTap: () => context.go('/school-admin/announcements'),
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.category_rounded,
+              color: Color(0xFF1E40AF),
+            ),
+            title: const Text('Exam Types'),
+            onTap: () => context.go('/school-admin/exam-types'),
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.bar_chart_rounded,
+              color: Color(0xFF1E40AF),
+            ),
+            title: const Text('Reports'),
+            onTap: () => context.go('/school-admin/reports'),
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.analytics_rounded,
+              color: Color(0xFF1E40AF),
+            ),
+            title: const Text('Analytics'),
+            onTap: () => context.go('/school-admin/analytics'),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+            child: Text(
+              'Academic Management',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.trending_up_rounded,
+              color: Color(0xFF1E40AF),
+            ),
+            title: const Text('Promote Students'),
+            onTap: () => context.go('/school-admin/academic/promote'),
+          ),
         ],
       ),
     );

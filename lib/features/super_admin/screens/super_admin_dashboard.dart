@@ -31,7 +31,7 @@ class SuperAdminDashboard extends ConsumerWidget {
             padding: const EdgeInsets.only(right: 8),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withAlpha(51),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: IconButton(
@@ -75,10 +75,10 @@ class SuperAdminDashboard extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.17),
+                        color: Colors.white.withAlpha(43),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.32),
+                          color: Colors.white.withAlpha(82),
                         ),
                       ),
                       child: const Row(
@@ -129,31 +129,60 @@ class SuperAdminDashboard extends ConsumerWidget {
                     const SizedBox(height: 16),
                     SizedBox(
                       height: 52,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          showModalBottomSheet<void>(
-                            context: context,
-                            isScrollControlled: true,
-                            builder: (context) =>
-                                const SafeArea(child: CreateSchoolScreen()),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: darkGreen,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                showModalBottomSheet<void>(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  builder: (context) => const SafeArea(
+                                    child: CreateSchoolScreen(),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: darkGreen,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 1,
+                              ),
+                              icon: const Icon(Icons.add_circle_outline_rounded),
+                              label: const Text(
+                                'Add School',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
                           ),
-                          elevation: 1,
-                        ),
-                        icon: const Icon(Icons.add_circle_outline_rounded),
-                        label: const Text(
-                          'Add School',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => context.go('/super-admin/maintenance'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white.withAlpha(230),
+                                foregroundColor: darkGreen,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                elevation: 1,
+                              ),
+                              icon: const Icon(Icons.build_circle_outlined),
+                              label: const Text(
+                                'Maintenance',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 18),
@@ -164,7 +193,7 @@ class SuperAdminDashboard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withAlpha(20),
                             blurRadius: 16,
                             offset: const Offset(0, 8),
                           ),
@@ -228,7 +257,7 @@ class SuperAdminDashboard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withAlpha(18),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),

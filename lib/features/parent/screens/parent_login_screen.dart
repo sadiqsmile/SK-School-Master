@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:school_app/services/parent_account_service.dart';
+import 'package:school_app/core/utils/school_storage.dart';
 
 class ParentLoginScreen extends ConsumerStatefulWidget {
   const ParentLoginScreen({super.key});
@@ -47,6 +49,33 @@ class _ParentLoginScreenState extends ConsumerState<ParentLoginScreen> {
 
     setState(() => _loading = true);
     try {
+      // Enforce school module toggle: Parents must not login when module is OFF.
+      final selectedSchoolId = (await SchoolStorage.getSchoolId())?.trim();
+      if (selectedSchoolId == null || selectedSchoolId.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Select your School ID first.')),
+        );
+        return;
+      }
+
+      final modulesSnap = await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(selectedSchoolId)
+          .collection('settings')
+          .doc('modules')
+          .get();
+      final parentsEnabled = (modulesSnap.data()?['parents'] ?? true) == true;
+      if (!parentsEnabled) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Parent access is disabled by your school admin.'),
+          ),
+        );
+        return;
+      }
+
       final token = await ParentAccountService().parentLogin(
         phone: phoneDigits,
         pin: pin,

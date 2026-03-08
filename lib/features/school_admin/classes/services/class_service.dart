@@ -27,7 +27,9 @@ class ClassService {
 
     batch.set(classRef, {
       'name': className,
+      'nameLower': className.trim().toLowerCase(),
       'sectionType': sectionType,
+      'sectionTypeLower': sectionType.trim().toLowerCase(),
       'createdAt': FieldValue.serverTimestamp(),
     });
 

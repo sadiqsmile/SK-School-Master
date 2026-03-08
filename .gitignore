@@ -33,6 +33,13 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Firebase CLI local cache
+.firebase/
+
+# Local secrets (service account keys, etc.)
+.secrets/
+functions/.secrets/
+
 # Symbolication related
 app.*.symbols
 
