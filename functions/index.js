@@ -1,6 +1,11 @@
 const admin = require("firebase-admin");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const {
+  onDocumentCreated,
+  onDocumentDeleted,
+  onDocumentWritten,
+} = require("firebase-functions/v2/firestore");
 const crypto = require("crypto");
 
 setGlobalOptions({
@@ -11,7 +16,296 @@ setGlobalOptions({
   serviceAccount: "sk-school-master@appspot.gserviceaccount.com",
 });
 
+// IMPORTANT:
+// Firestore triggers (Gen2/Eventarc) must be deployed in the same region as the
+// Firestore database location. Your project is using a Firestore location in
+// `asia-south1` (see deploy errors mentioning Eventarc triggers in asia-south1).
+const FIRESTORE_REGION = "asia-south1";
+
 admin.initializeApp();
+
+function safeInt(input) {
+  const n = Number(input);
+  if (!Number.isFinite(n)) return 0;
+  return Math.trunc(n);
+}
+
+function readAttendanceCounts(docData) {
+  const empty = { present: 0, absent: 0, late: 0, leave: 0, total: 0 };
+  if (!docData || typeof docData !== "object") return empty;
+  const counts = docData.counts;
+  if (!counts || typeof counts !== "object") return empty;
+  return {
+    present: safeInt(counts.present),
+    absent: safeInt(counts.absent),
+    late: safeInt(counts.late),
+    leave: safeInt(counts.leave),
+    total: safeInt(counts.total),
+  };
+}
+
+function diffCounts(before, after) {
+  return {
+    present: safeInt(after.present) - safeInt(before.present),
+    absent: safeInt(after.absent) - safeInt(before.absent),
+    late: safeInt(after.late) - safeInt(before.late),
+    leave: safeInt(after.leave) - safeInt(before.leave),
+    total: safeInt(after.total) - safeInt(before.total),
+  };
+}
+
+function todayKeyUtc() {
+  const d = new Date();
+  const y = String(d.getUTCFullYear()).padStart(4, "0");
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+async function incrementDoc(ref, delta) {
+  // Helper for compact increment updates.
+  const inc = admin.firestore.FieldValue.increment;
+  const payload = {
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  for (const [k, v] of Object.entries(delta || {})) {
+    if (!v) continue;
+    payload[k] = inc(v);
+  }
+
+  await ref.set(payload, { merge: true });
+}
+
+// ----------------------------
+// Aggregated / indexed counters
+// ----------------------------
+
+exports.onStudentCreated = onDocumentCreated(
+  { document: "schools/{schoolId}/students/{studentId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+
+    await Promise.all([
+      incrementDoc(schoolRef, { totalStudents: 1 }),
+      incrementDoc(admin.firestore().collection("platform").doc("config"), {
+        totalStudents: 1,
+      }),
+    ]);
+  }
+);
+
+exports.onStudentDeleted = onDocumentDeleted(
+  { document: "schools/{schoolId}/students/{studentId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+
+    await Promise.all([
+      incrementDoc(schoolRef, { totalStudents: -1 }),
+      incrementDoc(admin.firestore().collection("platform").doc("config"), {
+        totalStudents: -1,
+      }),
+    ]);
+  }
+);
+
+exports.onTeacherCreated = onDocumentCreated(
+  { document: "schools/{schoolId}/teachers/{teacherId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+    await incrementDoc(schoolRef, { totalTeachers: 1 });
+  }
+);
+
+exports.onTeacherDeleted = onDocumentDeleted(
+  { document: "schools/{schoolId}/teachers/{teacherId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+    await incrementDoc(schoolRef, { totalTeachers: -1 });
+  }
+);
+
+exports.onClassCreated = onDocumentCreated(
+  { document: "schools/{schoolId}/classes/{classId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+    await incrementDoc(schoolRef, { totalClasses: 1 });
+  }
+);
+
+exports.onClassDeleted = onDocumentDeleted(
+  { document: "schools/{schoolId}/classes/{classId}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId } = event.params;
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+    await incrementDoc(schoolRef, { totalClasses: -1 });
+  }
+);
+
+// ----------------------------
+// Attendance summary index
+// ----------------------------
+
+// Updates a school-level "latest attendance summary" whenever a class meta lock
+// is written under:
+// schools/{schoolId}/attendance/{dateKey}/meta/{classKey}
+//
+// We index the totals onto the school doc so dashboards can load quickly.
+exports.onAttendanceMetaWritten = onDocumentWritten(
+  { document: "schools/{schoolId}/attendance/{dateKey}/meta/{classKey}", region: FIRESTORE_REGION },
+  async (event) => {
+    const { schoolId, dateKey } = event.params;
+
+    const beforeExists = event.data.before.exists;
+    const afterExists = event.data.after.exists;
+
+    const beforeCounts = beforeExists
+      ? readAttendanceCounts(event.data.before.data())
+      : { present: 0, absent: 0, late: 0, leave: 0, total: 0 };
+    const afterCounts = afterExists
+      ? readAttendanceCounts(event.data.after.data())
+      : { present: 0, absent: 0, late: 0, leave: 0, total: 0 };
+
+    const delta = diffCounts(beforeCounts, afterCounts);
+    const classDelta = !beforeExists && afterExists ? 1 : beforeExists && !afterExists ? -1 : 0;
+
+    // If nothing changed, do nothing.
+    if (
+      !delta.present &&
+      !delta.absent &&
+      !delta.late &&
+      !delta.leave &&
+      !delta.total &&
+      !classDelta
+    ) {
+      return;
+    }
+
+    const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+
+    // Keep the "latest" attendance summary on the school doc.
+    // We only mutate the school doc for:
+    // - the same dateKey as currently stored
+    // - OR a newer dateKey (lexicographic compare works for YYYY-MM-DD)
+    await admin.firestore().runTransaction(async (tx) => {
+      const snap = await tx.get(schoolRef);
+      const data = snap.data() || {};
+
+      const currentKey = String(data.attendanceLatestDateKey || "");
+      const hasKey = currentKey.length === 10;
+
+      const shouldStartNew = !hasKey || dateKey > currentKey;
+      const shouldUpdateSame = hasKey && dateKey === currentKey;
+
+      if (!shouldStartNew && !shouldUpdateSame) {
+        // Older date update; ignore to keep dashboard focused on the latest day.
+        return;
+      }
+
+      if (shouldStartNew) {
+        // Initialize with this class' counts (and then future writes for same date will add deltas).
+        if (!afterExists) {
+          // Newer date but deletion event (shouldn't happen in normal flow); ignore.
+          return;
+        }
+
+        tx.set(
+          schoolRef,
+          {
+            attendanceLatestDateKey: dateKey,
+            attendanceLatest: {
+              dateKey,
+              present: afterCounts.present,
+              absent: afterCounts.absent,
+              late: afterCounts.late,
+              leave: afterCounts.leave,
+              total: afterCounts.total,
+              classesMarked: 1,
+            },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+        return;
+      }
+
+      // Same dateKey: apply deltas with atomic increments.
+      const inc = admin.firestore.FieldValue.increment;
+      tx.set(
+        schoolRef,
+        {
+          attendanceLatest: {
+            dateKey,
+            present: inc(delta.present),
+            absent: inc(delta.absent),
+            late: inc(delta.late),
+            leave: inc(delta.leave),
+            total: inc(delta.total),
+            classesMarked: inc(classDelta),
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+
+    // Optional: persist per-day totals doc for historical reporting.
+    // This is safe and cheap: 1 doc per day per school.
+    const dailyRef = admin
+      .firestore()
+      .collection("schools")
+      .doc(schoolId)
+      .collection("analytics")
+      .doc("attendance_daily")
+      .collection("days")
+      .doc(dateKey);
+
+    const dailyDelta = {
+      present: delta.present,
+      absent: delta.absent,
+      late: delta.late,
+      leave: delta.leave,
+      total: delta.total,
+      classesMarked: classDelta,
+    };
+
+    await dailyRef.set(
+      {
+        dateKey,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...Object.fromEntries(
+          Object.entries(dailyDelta).map(([k, v]) => [k, admin.firestore.FieldValue.increment(v)])
+        ),
+      },
+      { merge: true }
+    );
+
+    // If the day is "today" in UTC, also write a convenient pointer doc.
+    // This can be used by clients who want a stable path.
+    const todayKey = todayKeyUtc();
+    if (dateKey === todayKey) {
+      const todayRef = admin
+        .firestore()
+        .collection("schools")
+        .doc(schoolId)
+        .collection("analytics")
+        .doc("attendance_today");
+
+      await todayRef.set(
+        {
+          dateKey,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  }
+);
 
 function normalizePhone(input) {
   const digits = String(input || "").replace(/[^0-9]/g, "");
@@ -231,6 +525,73 @@ exports.parentLogin = onCall(async (request) => {
   return {
     token,
     mustChangePassword,
+  };
+});
+
+// ----------------------------
+// Maintenance: recompute counters
+// ----------------------------
+
+exports.recomputeSchoolCounters = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+
+  const data = request.data || {};
+  const schoolId = String(data.schoolId || "").trim();
+  if (!schoolId) {
+    throw new HttpsError("invalid-argument", "schoolId is required");
+  }
+
+  // Authorize caller: superAdmin only.
+  const callerUid = request.auth.uid;
+  const callerDoc = await admin.firestore().collection("users").doc(callerUid).get();
+  const callerRole = String((callerDoc.data() || {}).role || "");
+  const callerEmail = String((request.auth.token && request.auth.token.email) || "").toLowerCase();
+
+  const isSuper = callerRole === "superAdmin" || callerEmail === "sadiq.smile@gmail.com";
+  if (!isSuper) {
+    throw new HttpsError("permission-denied", "Only superAdmin can run maintenance");
+  }
+
+  const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+  const studentsCol = schoolRef.collection("students");
+  const teachersCol = schoolRef.collection("teachers");
+  const classesCol = schoolRef.collection("classes");
+
+  async function countCol(colRef) {
+    // Prefer server-side count aggregation when available.
+    try {
+      const agg = await colRef.count().get();
+      return safeInt(agg.data().count);
+    } catch (_) {
+      const snap = await colRef.get();
+      return safeInt(snap.size);
+    }
+  }
+
+  const [students, teachers, classes] = await Promise.all([
+    countCol(studentsCol),
+    countCol(teachersCol),
+    countCol(classesCol),
+  ]);
+
+  await schoolRef.set(
+    {
+      totalStudents: students,
+      totalTeachers: teachers,
+      totalClasses: classes,
+      countersRecomputedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return {
+    schoolId,
+    totalStudents: students,
+    totalTeachers: teachers,
+    totalClasses: classes,
   };
 });
 

@@ -108,3 +108,40 @@ Example fields:
 
 - `totalSchools`
 - `totalStudents`
+
+## Aggregated / indexed data (performance layer)
+
+To keep dashboards fast at scale, we maintain **pre-aggregated counters and summaries**.
+
+### Per-school counters (stored on the school doc)
+
+On: `schools/{schoolId}`
+
+- `totalStudents`: number (maintained by Cloud Functions)
+- `totalTeachers`: number (maintained by Cloud Functions)
+- `totalClasses`: number (maintained by Cloud Functions)
+
+### Latest attendance summary (stored on the school doc)
+
+On: `schools/{schoolId}`
+
+- `attendanceLatestDateKey`: `YYYY-MM-DD`
+- `attendanceLatest`: object
+	- `dateKey`
+	- `present`, `absent`, `late`, `leave`, `total`
+	- `classesMarked`
+
+This is updated whenever an attendance meta-lock is written under:
+
+`schools/{schoolId}/attendance/{dateKey}/meta/{classKey}`
+
+### Historical attendance daily totals (optional)
+
+`schools/{schoolId}/analytics/attendance_daily/days/{dateKey}`
+
+Fields:
+
+- `dateKey`
+- `present`, `absent`, `late`, `leave`, `total`
+- `classesMarked`
+- `updatedAt`
