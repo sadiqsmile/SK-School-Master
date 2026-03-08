@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:school_app/features/announcements/screens/announcement_detail_screen.dart';
 import 'package:school_app/features/parent/providers/parent_children_provider.dart';
 import 'package:school_app/features/parent/providers/parent_dashboard_providers.dart';
+import 'package:school_app/features/parent/providers/parent_notifications_provider.dart';
+import 'package:school_app/features/parent/screens/parent_notifications_screen.dart';
 import 'package:school_app/models/announcement.dart';
 import 'package:school_app/models/student.dart';
 
@@ -82,6 +84,8 @@ class _ParentDashboardState extends ConsumerState<ParentDashboard> {
               },
             ),
             const SizedBox(height: 14),
+            const _NotificationsCard(),
+            const SizedBox(height: 14),
             _AttendanceCard(child: child),
             const SizedBox(height: 14),
             _HomeworkCard(child: child),
@@ -95,6 +99,59 @@ class _ParentDashboardState extends ConsumerState<ParentDashboard> {
           ],
         );
       },
+    );
+  }
+}
+
+class _NotificationsCard extends ConsumerWidget {
+  const _NotificationsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadAsync = ref.watch(parentUnreadNotificationsCountProvider);
+
+    return _DashboardCard(
+      title: 'Notifications',
+      icon: Icons.notifications_rounded,
+      tint: const Color(0xFF0EA5E9),
+      child: unreadAsync.when(
+        loading: () => const _CardLoadingRow(),
+        error: (e, _) => Text('Failed to load notifications: $e'),
+        data: (count) {
+          final c = count.clamp(0, 99);
+
+          final label = c == 0
+              ? 'All caught up'
+              : (c >= 99 ? '99+ unread notifications' : '$c unread notifications');
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: c > 0 ? FontWeight.w900 : FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ParentNotificationsScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                  label: const Text('Open inbox'),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

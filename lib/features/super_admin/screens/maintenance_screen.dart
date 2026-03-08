@@ -27,6 +27,13 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
   bool _recomputing = false;
   Map<String, dynamic>? _counterResult;
 
+  bool _recomputingAll = false;
+  int _recomputeAllDone = 0;
+  int _recomputeAllTotal = 0;
+
+  bool _recomputingRisk = false;
+  Map<String, dynamic>? _riskResult;
+
   void _log(String msg) {
     setState(() {
       _logs.insert(0, msg);
@@ -74,6 +81,118 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       if (mounted) {
         setState(() {
           _recomputing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _recomputeStudentRisk() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final schoolId = _schoolId;
+
+    if (schoolId == null || schoolId.trim().isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Please select a school.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _recomputingRisk = true;
+      _riskResult = null;
+    });
+
+    try {
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      final callable = functions.httpsCallable('recomputeStudentRisk');
+      final resp = await callable.call(<String, dynamic>{'schoolId': schoolId});
+
+      if (!mounted) return;
+      final data = (resp.data is Map)
+          ? Map<String, dynamic>.from(resp.data as Map)
+          : <String, dynamic>{};
+
+      setState(() {
+        _riskResult = data;
+      });
+
+      _log('Student risk recompute completed: scanned ${data['studentsScanned'] ?? '-'}');
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Student risk recomputed.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Risk recompute failed: $e')),
+      );
+      _log('Risk recompute failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _recomputingRisk = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _recomputeCountersForAllSchools(List<({String id, String name})> schools) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (schools.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No schools found.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _recomputingAll = true;
+      _recomputeAllDone = 0;
+      _recomputeAllTotal = schools.length;
+    });
+
+    _log('Starting recompute for ${schools.length} schools…');
+
+    try {
+      // Callable is deployed in us-central1.
+      final functions = FirebaseFunctions.instanceFor(region: 'us-central1');
+      final callable = functions.httpsCallable('recomputeSchoolCounters');
+
+      for (final s in schools) {
+        if (!mounted) return;
+
+        try {
+          final resp = await callable.call(<String, dynamic>{'schoolId': s.id});
+          final data = (resp.data is Map)
+              ? Map<String, dynamic>.from(resp.data as Map)
+              : <String, dynamic>{};
+
+          setState(() {
+            _recomputeAllDone += 1;
+          });
+
+          _log(
+            '✔ ${s.name} (${s.id}) → '
+            'students=${data['totalStudents'] ?? '-'}, '
+            'teachers=${data['totalTeachers'] ?? '-'}, '
+            'classes=${data['totalClasses'] ?? '-'}',
+          );
+        } catch (e) {
+          setState(() {
+            _recomputeAllDone += 1;
+          });
+          _log('✖ ${s.name} (${s.id}) → failed: $e');
+        }
+      }
+
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Recompute (all schools) completed.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _recomputingAll = false;
         });
       }
     }
@@ -248,7 +367,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                         ),
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
-                          onPressed: (_running || _recomputing) ? null : _recomputeCounters,
+                          onPressed: (_running || _recomputing || _recomputingAll) ? null : _recomputeCounters,
                           icon: _recomputing
                               ? const SizedBox(
                                   width: 18,
@@ -258,6 +377,66 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                               : const Icon(Icons.calculate_rounded),
                           label: Text(_recomputing ? 'Recomputing…' : 'Recompute Counters'),
                         ),
+
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: (_running || _recomputing || _recomputingAll)
+                              ? null
+                              : () => _recomputeCountersForAllSchools(schools),
+                          icon: _recomputingAll
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.auto_fix_high_rounded),
+                          label: Text(
+                            _recomputingAll
+                                ? 'Recomputing all… ($_recomputeAllDone/$_recomputeAllTotal)'
+                                : 'Recompute Counters (All Schools)',
+                          ),
+                        ),
+
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: (_running || _recomputing || _recomputingAll || _recomputingRisk)
+                              ? null
+                              : _recomputeStudentRisk,
+                          icon: _recomputingRisk
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.psychology_alt_rounded),
+                          label: Text(_recomputingRisk ? 'Recomputing risk…' : 'Recompute Student Risk'),
+                        ),
+                        if (_riskResult != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Risk summary',
+                                  style: TextStyle(fontWeight: FontWeight.w900),
+                                ),
+                                const SizedBox(height: 8),
+                                Text('Students scanned: ${_riskResult!['studentsScanned'] ?? '-'}'),
+                                Text('High risk: ${_riskResult!['studentsHighRisk'] ?? '-'}'),
+                                Text('Fee defaulters: ${_riskResult!['feeDefaulters'] ?? '-'}'),
+                                Text('Low attendance: ${_riskResult!['lowAttendance'] ?? '-'}'),
+                                Text('Top performers: ${_riskResult!['topPerformers'] ?? '-'}'),
+                              ],
+                            ),
+                          ),
+                        ],
                         if (_counterResult != null) ...[
                           const SizedBox(height: 12),
                           Container(

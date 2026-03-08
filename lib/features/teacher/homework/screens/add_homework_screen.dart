@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:school_app/core/offline/firestore_sync_tracker.dart';
 import 'package:school_app/features/teacher/homework/services/homework_service.dart';
 
 class AddHomeworkScreen extends StatefulWidget {
@@ -79,8 +80,19 @@ class _AddHomeworkScreenState extends State<AddHomeworkScreen> {
         dueDate: _dueDate!,
       );
 
+      FirestoreSyncTracker.instance.notifyWriteQueued();
+      final synced = await FirestoreSyncTracker.instance.waitForServerSync(
+        timeout: const Duration(seconds: 2),
+      );
+
       messenger.showSnackBar(
-        const SnackBar(content: Text('Homework added')),
+        SnackBar(
+          content: Text(
+            synced
+                ? 'Homework added'
+                : 'Homework saved locally — will sync when internet returns',
+          ),
+        ),
       );
 
       navigator.pop();

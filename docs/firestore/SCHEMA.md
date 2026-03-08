@@ -98,6 +98,20 @@ Key fields:
 - `target`: `all | teachers | class_{classId}_{sectionId}`
 - `createdBy`, `createdAt`
 
+### `notifications/{notificationId}` (system-managed)
+
+In-app notification feed for admins/teachers/parents.
+
+Written by Cloud Functions (Admin SDK). Clients can read but cannot write.
+
+Example fields:
+
+- `type`: e.g. `attendance_marked`
+- `title`, `body`
+- `dateKey`, `classKey` (when applicable)
+- `audience`: object (e.g. `{ roles: ['admin','teacher'] }`)
+- `createdAt`, `updatedAt`
+
 ## Platform collection
 
 ### `platform/config`
@@ -145,3 +159,34 @@ Fields:
 - `present`, `absent`, `late`, `leave`, `total`
 - `classesMarked`
 - `updatedAt`
+
+## Student Risk / Performance analytics (v1)
+
+To power the "Student Risk" dashboards, we maintain a system-managed index.
+
+### Per-student rolling inputs (system-managed)
+
+Under: `schools/{schoolId}/students/{studentId}/analytics/*`
+
+- `attendance_30d`: rolling attendance statuses for the last 30 days
+- `marks_latest`: latest exam percent snapshot
+- `fees_latest`: pending fee snapshot (best-effort)
+
+### Risk index (fast dashboards)
+
+`schools/{schoolId}/analytics/student_risk/students/{studentId}`
+
+Contains:
+
+- identity fields (student name/class)
+- metrics (attendance%, marks%, fees)
+- risk flags + `riskLevel` + `riskScore`
+
+### Risk summary (principal cards)
+
+`schools/{schoolId}/analytics/risk_summary`
+
+Contains counts:
+
+- `studentsHighRisk`, `studentsMediumRisk`, `studentsLowRisk`
+- `feeDefaulters`, `lowAttendance`, `topPerformers`

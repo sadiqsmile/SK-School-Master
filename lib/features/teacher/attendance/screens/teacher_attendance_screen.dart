@@ -8,6 +8,8 @@ import 'package:school_app/features/teacher/attendance/services/teacher_attendan
 import 'package:school_app/features/teacher/providers/teacher_profile_provider.dart';
 import 'package:school_app/providers/auth_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
+import 'package:school_app/core/offline/firestore_sync_tracker.dart';
+import 'package:school_app/core/offline/firestore_sync_status_action.dart';
 
 class TeacherAttendanceScreen extends ConsumerStatefulWidget {
   const TeacherAttendanceScreen({
@@ -137,6 +139,9 @@ class _TeacherAttendanceScreenState
         statuses: Map<String, AttendanceStatus>.from(_statuses),
       );
 
+      // Tell the app bar indicator that a write is queued (or syncing).
+      FirestoreSyncTracker.instance.notifyWriteQueued();
+
       int present = 0;
       int absent = 0;
       int late = 0;
@@ -156,16 +161,24 @@ class _TeacherAttendanceScreenState
 
       if (!mounted) return;
 
+      // Best-effort: if online, we can often confirm sync quickly.
+      final synced = await FirestoreSyncTracker.instance.waitForServerSync(
+        timeout: const Duration(seconds: 2),
+      );
+
+      if (!mounted) return;
+
       await showDialog<void>(
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text('Attendance Submitted'),
+            title: Text(synced ? 'Attendance Submitted' : 'Attendance Saved'),
             content: Text(
               'Present: $present\n'
               'Absent: $absent\n'
               'Late: $late\n'
-              'Leave: $leave',
+              'Leave: $leave\n\n'
+              '${synced ? 'Synced to server.' : 'Saved locally. Will sync automatically when internet returns.'}',
             ),
             actions: [
               FilledButton(
@@ -236,6 +249,9 @@ class _TeacherAttendanceScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text("Today's Attendance"),
+        actions: const [
+          FirestoreSyncStatusAction(),
+        ],
       ),
       body: studentsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

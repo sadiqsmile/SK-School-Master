@@ -1,8 +1,6 @@
 // features/school_admin/dashboard/screens/school_admin_dashboard.dart
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/school_provider.dart';
@@ -19,18 +17,6 @@ class SchoolAdminDashboard extends ConsumerWidget {
 
     return AdminLayout(
       title: 'School Admin Dashboard',
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
-          tooltip: 'Logout',
-          onPressed: () async {
-            await FirebaseAuth.instance.signOut();
-            if (context.mounted) {
-              context.go('/');
-            }
-          },
-        ),
-      ],
       body: schoolAsync.when(
         data: (doc) {
           final schoolData = doc.data();
@@ -43,6 +29,49 @@ class SchoolAdminDashboard extends ConsumerWidget {
           final plan = (schoolData['subscriptionPlan'] ?? '').toString();
           final teachers = (schoolData['totalTeachers'] ?? 0).toString();
           final students = (schoolData['totalStudents'] ?? 0).toString();
+
+          final attendanceLatestRaw = schoolData['attendanceLatest'];
+          final attendanceLatest = attendanceLatestRaw is Map
+              ? Map<String, dynamic>.from(attendanceLatestRaw)
+              : <String, dynamic>{};
+          final latestKey =
+              (attendanceLatest['dateKey'] ?? schoolData['attendanceLatestDateKey'] ?? '')
+                  .toString();
+          final present = (attendanceLatest['present'] is num)
+              ? (attendanceLatest['present'] as num).toInt()
+              : 0;
+          final absent = (attendanceLatest['absent'] is num)
+              ? (attendanceLatest['absent'] as num).toInt()
+              : 0;
+          final late = (attendanceLatest['late'] is num)
+              ? (attendanceLatest['late'] as num).toInt()
+              : 0;
+          final leave = (attendanceLatest['leave'] is num)
+              ? (attendanceLatest['leave'] as num).toInt()
+              : 0;
+          final total = (attendanceLatest['total'] is num)
+              ? (attendanceLatest['total'] as num).toInt()
+              : 0;
+          final classesMarked = (attendanceLatest['classesMarked'] is num)
+              ? (attendanceLatest['classesMarked'] as num).toInt()
+              : 0;
+
+          final hasAttendance = latestKey.isNotEmpty && total > 0;
+          final attendanceValue =
+              hasAttendance ? '${((present / total) * 100).toStringAsFixed(0)}%' : '—';
+          final attendanceSubtitle = hasAttendance
+              ? () {
+                  final parts = <String>[
+                    latestKey,
+                    '$present present',
+                    '$absent absent',
+                    if (late > 0) '$late late',
+                    if (leave > 0) '$leave leave',
+                    '$classesMarked classes',
+                  ];
+                  return parts.join(' • ');
+                }()
+              : 'No attendance marked yet';
 
           return Container(
             decoration: const BoxDecoration(
@@ -141,9 +170,10 @@ class SchoolAdminDashboard extends ConsumerWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _buildStatCard(
-                            title: 'Quick Action',
-                            value: 'Manage',
-                            icon: Icons.dashboard_customize_rounded,
+                            title: 'Attendance',
+                            value: attendanceValue,
+                            subtitle: attendanceSubtitle,
+                            icon: Icons.fact_check_rounded,
                             iconColor: primaryBlue,
                           ),
                         ),
@@ -217,6 +247,7 @@ class SchoolAdminDashboard extends ConsumerWidget {
   Widget _buildStatCard({
     required String title,
     required String value,
+    String? subtitle,
     required IconData icon,
     required Color iconColor,
   }) {
@@ -257,6 +288,19 @@ class SchoolAdminDashboard extends ConsumerWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
+          if (subtitle != null && subtitle.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF475569),
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ],
       ),
     );

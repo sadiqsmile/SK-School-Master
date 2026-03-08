@@ -26,6 +26,32 @@ class AcademicYearService {
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
+
+  Future<String?> getActiveAcademicYearId({
+    required String schoolId,
+  }) async {
+    final schoolSnap = await _db.collection('schools').doc(schoolId).get();
+    final raw = (schoolSnap.data()?['activeAcademicYearId'] ?? '').toString().trim();
+    return raw.isEmpty ? null : raw;
+  }
+
+  /// Sets the school's active academic year.
+  ///
+  /// This is a lightweight "pointer" used as the default across the app.
+  /// We keep this on the school doc (instead of deriving from years) so admins
+  /// can switch years intentionally without changing historical records.
+  Future<void> setActiveAcademicYearId({
+    required String schoolId,
+    required String academicYearId,
+  }) async {
+    // Ensure the year doc exists as well (merge-safe).
+    await ensureAcademicYear(schoolId: schoolId, academicYearId: academicYearId);
+
+    await _db.collection('schools').doc(schoolId).set({
+      'activeAcademicYearId': academicYearId,
+      'activeAcademicYearUpdatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
 }
 
 int? _parseStartYear(String academicYearId) {

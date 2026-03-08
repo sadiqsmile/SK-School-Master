@@ -9,6 +9,8 @@ import 'package:school_app/models/student.dart';
 import 'package:school_app/providers/exam_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/services/exam_service.dart';
+import 'package:school_app/core/offline/firestore_sync_tracker.dart';
+import 'package:school_app/core/offline/firestore_sync_status_action.dart';
 
 class EnterMarksScreen extends ConsumerStatefulWidget {
   const EnterMarksScreen({
@@ -55,6 +57,9 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
         title: Text(
           'Enter Marks • ${widget.exam.examName.isEmpty ? 'Exam' : widget.exam.examName}',
         ),
+        actions: const [
+          FirestoreSyncStatusAction(),
+        ],
       ),
       body: schoolIdAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -246,9 +251,20 @@ class _EnterMarksScreenState extends ConsumerState<EnterMarksScreen> {
         marksByStudentId: marksByStudentId,
       );
 
+      FirestoreSyncTracker.instance.notifyWriteQueued();
+      final synced = await FirestoreSyncTracker.instance.waitForServerSync(
+        timeout: const Duration(seconds: 2),
+      );
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Marks saved')),
+          SnackBar(
+            content: Text(
+              synced
+                  ? 'Marks saved'
+                  : 'Marks saved locally — will sync when internet returns',
+            ),
+          ),
         );
       }
 

@@ -19,11 +19,13 @@ class _PromoteStudentsScreenState extends ConsumerState<PromoteStudentsScreen> {
   String? _fromYear;
   String? _toYear;
   bool _running = false;
+  bool _setActiveToYearAfterPromotion = true;
 
   @override
   Widget build(BuildContext context) {
     final yearsAsync = ref.watch(academicYearsProvider);
     final schoolAsync = ref.watch(currentSchoolProvider);
+    final effectiveYear = ref.watch(effectiveAcademicYearIdProvider);
 
     return AdminLayout(
       title: 'Promote Students',
@@ -38,20 +40,18 @@ class _PromoteStudentsScreenState extends ConsumerState<PromoteStudentsScreen> {
               // If years collection is empty (or orderBy failed), fall back
               // to a computed current year.
               if (years.isEmpty) {
-                final fallback = ref.read(currentAcademicYearIdProvider);
-                years.add(fallback);
+                years.add(effectiveYear);
               }
 
               years.sort((a, b) => b.compareTo(a));
 
               if (years.isNotEmpty) {
-                // Pick a sensible default:
-                // - To = newest (years.first)
-                // - From = previous year if available, else newest.
-                final fromDefault = years.length >= 2 ? years[1] : years.first;
-                final toDefault = years.first == fromDefault
-                    ? _nextAcademicYearId(fromDefault)
-                    : years.first;
+                // Prefer the school's active academic year when present.
+                // This keeps promotion aligned with the year used across the app.
+                final fromDefault = years.contains(effectiveYear)
+                    ? effectiveYear
+                    : (years.length >= 2 ? years[1] : years.first);
+                final toDefault = _nextAcademicYearId(fromDefault);
 
                 _fromYear ??= fromDefault;
                 _toYear ??= toDefault;
@@ -59,6 +59,11 @@ class _PromoteStudentsScreenState extends ConsumerState<PromoteStudentsScreen> {
                 // Ensure the computed "next" year exists in the dropdown.
                 if (_toYear != null && !years.contains(_toYear)) {
                   years.insert(0, _toYear!);
+                }
+
+                // Ensure active year is also selectable even if it wasn't saved yet.
+                if (!years.contains(effectiveYear)) {
+                  years.add(effectiveYear);
                 }
               }
 
@@ -109,6 +114,20 @@ class _PromoteStudentsScreenState extends ConsumerState<PromoteStudentsScreen> {
                               }),
                     ),
                     const SizedBox(height: 12),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _setActiveToYearAfterPromotion,
+                      onChanged: _running
+                          ? null
+                          : (v) => setState(() {
+                                _setActiveToYearAfterPromotion = v;
+                              }),
+                      title: const Text('Set active academic year to "To" after promotion'),
+                      subtitle: const Text(
+                        'This becomes the default year for new students and year-scoped flows.',
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     OutlinedButton.icon(
                       onPressed: _running
                           ? null
@@ -136,8 +155,18 @@ class _PromoteStudentsScreenState extends ConsumerState<PromoteStudentsScreen> {
                                   academicYearId: to,
                                 );
 
+                                // Keep the active year in sync with the admin's intent.
+                                await AcademicYearService().setActiveAcademicYearId(
+                                  schoolId: schoolId,
+                                  academicYearId: from,
+                                );
+
                                 messenger.showSnackBar(
-                                  const SnackBar(content: Text('Academic years saved.')),
+                                  SnackBar(
+                                    content: Text(
+                                      'Academic years saved. Active year: $from',
+                                    ),
+                                  ),
                                 );
                               } catch (e) {
                                 messenger.showSnackBar(
@@ -342,6 +371,13 @@ class _PromoteStudentsScreenState extends ConsumerState<PromoteStudentsScreen> {
                                     fromAcademicYear: from,
                                     toAcademicYear: to,
                                   );
+
+                                  if (_setActiveToYearAfterPromotion) {
+                                    await AcademicYearService().setActiveAcademicYearId(
+                                      schoolId: schoolId,
+                                      academicYearId: to,
+                                    );
+                                  }
 
                                   if (!dialogContext.mounted) return;
 

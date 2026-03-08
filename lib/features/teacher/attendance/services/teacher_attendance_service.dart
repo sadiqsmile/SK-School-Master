@@ -67,6 +67,19 @@ class TeacherAttendanceService {
     final lockDoc = dateDoc.collection('meta').doc(classKey);
     final recordsCol = dateDoc.collection(classKey);
 
+    // Quick local duplicate protection:
+    // - Works even offline if the lock doc was created earlier on this device.
+    // - If another device already submitted and we're offline, Firestore rules
+    //   will reject the write when sync happens.
+    try {
+      final cached = await lockDoc.get(const GetOptions(source: Source.cache));
+      if (cached.exists) {
+        throw AttendanceAlreadyMarkedException();
+      }
+    } catch (_) {
+      // Ignore cache read failures.
+    }
+
     int present = 0;
     int absent = 0;
     int late = 0;
@@ -84,38 +97,41 @@ class TeacherAttendanceService {
       }
     }
 
-    // 1) Lock the day (prevents duplicates).
-    await _db.runTransaction((tx) async {
-      final existing = await tx.get(lockDoc);
-      if (existing.exists) {
-        throw AttendanceAlreadyMarkedException();
-      }
+    // Offline-friendly approach:
+    // We create the lock + per-student docs in a single batch.
+    // If the lock already exists, this becomes an update and is denied for
+    // teachers by Firestore rules, preventing duplicates.
+    final batch = _db.batch();
 
-      tx.set(lockDoc, {
-        'date': dateKey,
-        'classId': classId,
-        'sectionId': sectionId,
-        'classKey': classKey,
-        'markedBy': teacherUid,
-        'markedAt': FieldValue.serverTimestamp(),
-        'counts': {
-          'present': present,
-          'absent': absent,
-          'late': late,
-          'leave': leave,
-          'total': statuses.length,
-        },
-      });
-
-      // Helpful for browsing/reporting.
-      tx.set(dateDoc, {
-        'date': dateKey,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+    batch.set(lockDoc, {
+      'date': dateKey,
+      'classId': classId,
+      'sectionId': sectionId,
+      'classKey': classKey,
+      'markedBy': teacherUid,
+      'markedAt': FieldValue.serverTimestamp(),
+      // Local timestamp helps sorting/visibility while offline.
+      'markedAtLocal': Timestamp.now(),
+      'counts': {
+        'present': present,
+        'absent': absent,
+        'late': late,
+        'leave': leave,
+        'total': statuses.length,
+      },
     });
 
-    // 2) Write per-student records in a batch.
-    final batch = _db.batch();
+    // Helpful for browsing/reporting.
+    batch.set(
+      dateDoc,
+      {
+        'date': dateKey,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedAtLocal': Timestamp.now(),
+      },
+      SetOptions(merge: true),
+    );
+
     for (final entry in statuses.entries) {
       final studentId = entry.key;
       final status = entry.value;
@@ -130,18 +146,10 @@ class TeacherAttendanceService {
         'classKey': classKey,
         'markedBy': teacherUid,
         'markedAt': FieldValue.serverTimestamp(),
+        'markedAtLocal': Timestamp.now(),
       });
     }
 
-    try {
-      await batch.commit();
-    } catch (e) {
-      // Best-effort cleanup: if batch fails, unlock so teacher can retry.
-      // If this fails too, it's still safe: teacher/admin can delete the lock doc.
-      try {
-        await lockDoc.delete();
-      } catch (_) {}
-      rethrow;
-    }
+    await batch.commit();
   }
 }

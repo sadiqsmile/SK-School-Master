@@ -75,6 +75,17 @@ class TeacherClassHomeScreen extends StatelessWidget {
               },
             ),
           ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.warning_amber_rounded),
+              title: const Text('Class Risk List'),
+              subtitle: const Text('See students who need attention early'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.push(
+                '/teacher/risk/$encodedClass/$encodedSection',
+              ),
+            ),
+          ),
         ],
       ),
     );

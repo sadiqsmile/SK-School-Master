@@ -27,6 +27,32 @@ final academicYearsProvider = StreamProvider.autoDispose<
   },
 );
 
+/// The explicitly selected active academic year for a school.
+///
+/// Stored on the school doc as: `activeAcademicYearId`.
+///
+/// Returns null if not set.
+final activeAcademicYearIdProvider = Provider.autoDispose<String?>((ref) {
+  final schoolAsync = ref.watch(currentSchoolProvider);
+
+  return schoolAsync.maybeWhen(
+    data: (schoolDoc) {
+      final raw = (schoolDoc.data()?['activeAcademicYearId'] ?? '').toString().trim();
+      return raw.isEmpty ? null : raw;
+    },
+    orElse: () => null,
+  );
+});
+
+/// The academic year id to use across the app.
+///
+/// Preference order:
+/// 1) `schools/{schoolId}.activeAcademicYearId` if set
+/// 2) computed fallback via [currentAcademicYearIdProvider]
+final effectiveAcademicYearIdProvider = Provider.autoDispose<String>((ref) {
+  return ref.watch(activeAcademicYearIdProvider) ?? ref.watch(currentAcademicYearIdProvider);
+});
+
 /// Best-effort "current" academic year.
 ///
 /// - If academicYears exist and include startYear/endYear fields, returns the

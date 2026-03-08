@@ -128,7 +128,9 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
           data: {
             'teacherUid': teacherUid,
             'name': name,
+            'nameLower': name.trim().toLowerCase(),
             'email': email,
+            'emailLower': email.trim().toLowerCase(),
             'phone': phone,
             'subjects': _subjects,
             // New structure: list of {classId, sectionId, className, sectionName}

@@ -9,6 +9,7 @@ import 'package:school_app/features/teacher/exams/screens/exams_screen.dart';
 import 'package:school_app/models/announcement.dart';
 import 'package:school_app/providers/announcement_provider.dart';
 import 'package:school_app/features/announcements/screens/announcement_detail_screen.dart';
+import 'package:school_app/core/offline/firestore_sync_status_action.dart';
 
 class TeacherDashboard extends ConsumerWidget {
   const TeacherDashboard({super.key});
@@ -21,6 +22,9 @@ class TeacherDashboard extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Teacher Dashboard'),
+        actions: const [
+          FirestoreSyncStatusAction(),
+        ],
       ),
       body: teacherData.when(
         data: (doc) {

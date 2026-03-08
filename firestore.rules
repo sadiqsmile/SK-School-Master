@@ -103,6 +103,23 @@ service cloud.firestore {
         && request.resource.data.schoolId == resource.data.schoolId;
 
       allow delete: if false;
+
+      // ---- Per-user in-app notifications (system-managed) ----
+      // Path: users/{uid}/notifications/{notificationId}
+      // Written by Cloud Functions (Admin SDK bypasses rules).
+      // Users may read their own notifications and mark them as read.
+      match /notifications/{notificationId} {
+        allow read: if signedIn() && uid == request.auth.uid;
+
+        // Clients cannot create/delete notifications.
+        allow create, delete: if false;
+
+        // Allow marking read by updating only `readAt`.
+        allow update: if signedIn()
+          && uid == request.auth.uid
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly(['readAt'])
+          && request.resource.data.readAt is timestamp;
+      }
     }
 
     match /schools/{schoolId} {
@@ -110,6 +127,17 @@ service cloud.firestore {
       allow read: if isSchoolMember(schoolId) || isSuperAdmin();
       allow create, delete: if isSuperAdmin();
       allow update: if isSuperAdmin() || isSchoolAdmin(schoolId);
+
+      // ---- Notifications (system-managed) ----
+      // Written by Cloud Functions (Admin SDK bypasses rules).
+      // Clients may read for in-app notification feeds.
+      match /notifications/{notificationId} {
+        // Staff feed only (avoid leaking student-related alerts to parents).
+        allow read: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || (isTeacher() && isSchoolMember(schoolId));
+        allow write: if false;
+      }
 
       // ---- Analytics / indexed summaries (system-managed) ----
       // These documents are written by Cloud Functions (Admin SDK bypasses rules).

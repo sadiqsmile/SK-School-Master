@@ -102,6 +102,14 @@ class Sidebar extends StatelessWidget {
             title: const Text('Reports'),
             onTap: () => context.go('/school-admin/reports'),
           ),
+          ListTile(
+            leading: const Icon(
+              Icons.analytics_rounded,
+              color: Color(0xFF1E40AF),
+            ),
+            title: const Text('Analytics'),
+            onTap: () => context.go('/school-admin/analytics'),
+          ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 6),
             child: Text(

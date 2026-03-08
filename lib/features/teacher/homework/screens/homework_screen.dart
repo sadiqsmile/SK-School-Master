@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:school_app/features/teacher/homework/providers/homework_provider.dart';
 import 'package:school_app/features/teacher/homework/screens/add_homework_screen.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
+import 'package:school_app/core/offline/firestore_sync_status_action.dart';
 
 class TeacherHomeworkScreen extends ConsumerWidget {
   const TeacherHomeworkScreen({
@@ -35,7 +36,12 @@ class TeacherHomeworkScreen extends ConsumerWidget {
         );
 
         return Scaffold(
-          appBar: AppBar(title: Text('Homework $classId-$sectionId')),
+          appBar: AppBar(
+            title: Text('Homework $classId-$sectionId'),
+            actions: const [
+              FirestoreSyncStatusAction(),
+            ],
+          ),
           body: homeworkAsync.when(
             data: (snapshot) {
               if (snapshot.docs.isEmpty) {

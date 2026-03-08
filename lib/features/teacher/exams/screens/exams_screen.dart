@@ -8,6 +8,7 @@ import 'package:school_app/models/student.dart';
 import 'package:school_app/providers/exam_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/services/exam_service.dart';
+import 'package:school_app/core/offline/firestore_sync_status_action.dart';
 
 import 'enter_marks_screen.dart';
 import 'create_exam_screen.dart';
@@ -40,7 +41,12 @@ class TeacherExamsScreen extends ConsumerWidget {
         );
 
         return Scaffold(
-          appBar: AppBar(title: Text('Exams $classId-$sectionId')),
+          appBar: AppBar(
+            title: Text('Exams $classId-$sectionId'),
+            actions: const [
+              FirestoreSyncStatusAction(),
+            ],
+          ),
           body: examsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Failed to load exams: $e')),
@@ -232,6 +238,9 @@ class ExamResultsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(exam.examName.trim().isEmpty ? 'Results' : exam.examName.trim()),
+        actions: const [
+          FirestoreSyncStatusAction(),
+        ],
       ),
       body: studentsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

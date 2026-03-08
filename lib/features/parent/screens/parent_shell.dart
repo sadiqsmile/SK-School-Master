@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:school_app/features/announcements/screens/announcement_detail_screen.dart';
 import 'package:school_app/features/parent/providers/parent_children_provider.dart';
+import 'package:school_app/features/parent/providers/parent_notifications_provider.dart';
 import 'package:school_app/features/parent/screens/parent_dashboard.dart';
+import 'package:school_app/features/parent/screens/parent_notifications_screen.dart';
 import 'package:school_app/features/parent/screens/parent_result_screen.dart';
 import 'package:school_app/models/announcement.dart';
 import 'package:school_app/models/student.dart';
@@ -41,10 +43,77 @@ class _ParentShellState extends ConsumerState<ParentShell> {
 
   @override
   Widget build(BuildContext context) {
+    final unreadAsync = ref.watch(parentUnreadNotificationsCountProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_title),
         actions: [
+          unreadAsync.when(
+            loading: () => IconButton(
+              tooltip: 'Notifications',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ParentNotificationsScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.notifications_rounded),
+            ),
+            error: (e, _) => IconButton(
+              tooltip: 'Notifications',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ParentNotificationsScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.notifications_rounded),
+            ),
+            data: (count) {
+              final c = count.clamp(0, 99);
+              return IconButton(
+                tooltip: 'Notifications',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ParentNotificationsScreen(),
+                    ),
+                  );
+                },
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.notifications_rounded),
+                    if (c > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 16),
+                          child: Text(
+                            c >= 99 ? '99+' : '$c',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Logout',
             onPressed: () => ref.read(authServiceProvider).signOut(),
