@@ -145,6 +145,9 @@ class _SectionsScreenState extends ConsumerState<SectionsScreen> {
       return;
     }
 
+    // We're about to use `context` in a dialog after an await.
+    if (!mounted) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {

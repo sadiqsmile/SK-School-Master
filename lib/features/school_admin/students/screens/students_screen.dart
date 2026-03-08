@@ -87,13 +87,17 @@ class StudentsScreen extends ConsumerWidget {
               final name = (data['name'] ?? '').toString();
               final classId = (data['classId'] ?? '').toString();
               final section = (data['section'] ?? '').toString();
+              final academicYear = (data['academicYear'] ?? '').toString();
+              final status = (data['status'] ?? '').toString();
               final parentName = (data['parentName'] ?? '').toString();
               final parentPhone = (data['parentPhone'] ?? '').toString();
 
               return ListTile(
                 title: Text(name.isEmpty ? 'Student' : name),
                 subtitle: Text(
-                  '${classId.isEmpty ? 'Class N/A' : classId}${section.isEmpty ? '' : ' - Section $section'}',
+                  '${classId.isEmpty ? 'Class N/A' : classId}${section.isEmpty ? '' : ' - Section $section'}'
+                  '${academicYear.isEmpty ? '' : '  •  $academicYear'}'
+                  '${status.toLowerCase() == 'graduated' ? '  •  Graduated' : ''}',
                 ),
                 trailing: parentPhone.trim().isEmpty
                     ? null

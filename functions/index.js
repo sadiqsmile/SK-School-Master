@@ -40,6 +40,15 @@ function normalizePin(input) {
   return pin;
 }
 
+function normalizeEmail(input) {
+  const email = String(input || "").trim().toLowerCase();
+  // Simple sanity check (Auth will validate further).
+  if (!email.includes("@") || email.length < 6) {
+    throw new HttpsError("invalid-argument", "Invalid email");
+  }
+  return email;
+}
+
 function hashPin(pin, salt) {
   return crypto.createHash("sha256").update(`${salt}:${pin}`).digest("hex");
 }
@@ -257,4 +266,120 @@ exports.changeParentPin = onCall(async (request) => {
   );
 
   return { ok: true };
+});
+
+// ---------------------------------------------------------------------------
+// Teacher Accounts (email/password)
+// ---------------------------------------------------------------------------
+
+exports.createOrResetTeacherAccount = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+
+  const data = request.data || {};
+  const schoolId = String(data.schoolId || "").trim();
+  const action = String(data.action || "create").trim(); // create | reset
+  const teacherName = String(data.teacherName || "").trim();
+  const email = normalizeEmail(data.email);
+  const phoneDigits = normalizePhone(data.phone);
+  const teacherId = data.teacherId ? String(data.teacherId) : "";
+
+  if (!schoolId) {
+    throw new HttpsError("invalid-argument", "schoolId is required");
+  }
+
+  // Authorize caller.
+  const callerUid = request.auth.uid;
+  const callerDoc = await admin.firestore().collection("users").doc(callerUid).get();
+  const callerRole = String((callerDoc.data() || {}).role || "");
+  const callerSchoolId = String((callerDoc.data() || {}).schoolId || "");
+
+  if (callerRole !== "admin" && callerRole !== "superAdmin") {
+    throw new HttpsError(
+      "permission-denied",
+      "Only admin/superAdmin can manage teacher accounts"
+    );
+  }
+
+  if (callerRole === "admin" && callerSchoolId !== schoolId) {
+    throw new HttpsError(
+      "permission-denied",
+      "Admin can only manage teachers for their own school"
+    );
+  }
+
+  // Temporary password rule: first 6 characters of the email.
+  // Example: skschool@gmail.com -> skscho
+  // Firebase Auth requires >= 6 chars.
+  const emailSeed = (email || "") + "000000";
+  const temporaryPassword = emailSeed.slice(0, 6);
+
+  // Create or reset the Auth user.
+  let userRecord;
+  try {
+    userRecord = await admin.auth().getUserByEmail(email);
+    if (action === "reset" || action === "create") {
+      await admin.auth().updateUser(userRecord.uid, {
+        password: temporaryPassword,
+        displayName: teacherName || userRecord.displayName || undefined,
+      });
+    }
+  } catch (err) {
+    if (err && err.code === "auth/user-not-found") {
+      userRecord = await admin.auth().createUser({
+        email,
+        password: temporaryPassword,
+        displayName: teacherName || undefined,
+      });
+    } else {
+      throw err;
+    }
+  }
+
+  // Claims + user doc.
+  await admin.auth().setCustomUserClaims(userRecord.uid, {
+    role: "teacher",
+    schoolId,
+  });
+
+  await admin.firestore().collection("users").doc(userRecord.uid).set(
+    {
+      role: "teacher",
+      schoolId,
+      phone: phoneDigits,
+      email,
+      name: teacherName,
+      mustChangePassword: true,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  // Optionally link to teacher profile doc.
+  if (teacherId) {
+    await admin
+      .firestore()
+      .collection("schools")
+      .doc(schoolId)
+      .collection("teachers")
+      .doc(teacherId)
+      .set(
+        {
+          teacherUid: userRecord.uid,
+          name: teacherName,
+          email,
+          phone: phoneDigits,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+  }
+
+  return {
+    uid: userRecord.uid,
+    mustChangePassword: true,
+    temporaryPassword,
+  };
 });

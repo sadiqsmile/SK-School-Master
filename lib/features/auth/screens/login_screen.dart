@@ -2,12 +2,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:school_app/services/parent_account_service.dart';
- 
+import 'package:school_app/core/utils/school_storage.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -116,6 +117,19 @@ class _LoginScreenState extends State<LoginScreen>
         debugPrint("STAFF LOGIN SUCCESS UID: ${credential.user?.uid}");
       }
 
+      final signedInUser = FirebaseAuth.instance.currentUser;
+      if (signedInUser != null) {
+        final ok = await _ensureSelectedSchoolMatchesAccount(signedInUser);
+        if (!ok) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+      }
+
       if (mounted) {
         context.go("/");
       }
@@ -138,6 +152,54 @@ class _LoginScreenState extends State<LoginScreen>
         _errorMessage = 'An error occurred. Please try again.';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<bool> _ensureSelectedSchoolMatchesAccount(User user) async {
+    // Super admin should not be constrained by stored school id.
+    const hardcodedSuperAdminEmails = <String>{'sadiq.smile@gmail.com'};
+    final email = user.email?.trim().toLowerCase();
+    if (email != null && hardcodedSuperAdminEmails.contains(email)) {
+      return true;
+    }
+
+    final selected = (await SchoolStorage.getSchoolId())?.trim();
+    if (selected == null || selected.isEmpty) {
+      // No selection saved (legacy flow) — don't block login.
+      return true;
+    }
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final data = userDoc.data();
+
+      // If there's no user profile, let AuthGate handle it.
+      if (data == null) return true;
+
+      final accountSchoolId = (data['schoolId'] ?? '').toString().trim();
+      if (accountSchoolId.isEmpty) return true;
+
+      // Keep local storage in sync.
+      if (selected != accountSchoolId) {
+        await FirebaseAuth.instance.signOut();
+        await SchoolStorage.clearSchool();
+        if (mounted) {
+          setState(() {
+            _errorMessage =
+                'This account belongs to a different school. Tap “Change School” and try again.';
+          });
+        }
+        return false;
+      }
+
+      // Selected matches; ensure it's saved (no-op if already).
+      await SchoolStorage.saveSchoolId(accountSchoolId);
+      return true;
+    } catch (_) {
+      return true;
     }
   }
 
@@ -578,6 +640,46 @@ class _LoginScreenState extends State<LoginScreen>
                                           ),
                                         ),
                                         const SizedBox(height: 24),
+                                        FutureBuilder<String?>(
+                                          future: SchoolStorage.getSchoolId(),
+                                          builder: (context, snapshot) {
+                                            final stored =
+                                                (snapshot.data ?? '').trim();
+                                            if (stored.isEmpty) {
+                                              return const SizedBox.shrink();
+                                            }
+
+                                            return Column(
+                                              children: [
+                                                Text(
+                                                  'Selected School: $stored',
+                                                  style: TextStyle(
+                                                    color: Colors.grey[700],
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                TextButton.icon(
+                                                  onPressed: _isLoading
+                                                      ? null
+                                                      : () async {
+                                                          final router =
+                                                              GoRouter.of(context);
+                                                          await SchoolStorage
+                                                              .clearSchool();
+                                                          if (!mounted) return;
+                                                          router.go('/enter-school');
+                                                        },
+                                                  icon: const Icon(
+                                                    Icons.swap_horiz_rounded,
+                                                  ),
+                                                  label:
+                                                      const Text('Change School'),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ),
                                         const SizedBox(height: 30),
                                         Row(
                                           mainAxisAlignment:
@@ -633,10 +735,10 @@ class _LoginScreenState extends State<LoginScreen>
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.1),
+            color: primaryColor.withAlpha(26),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: primaryColor.withOpacity(0.2),
+              color: primaryColor.withAlpha(51),
               width: 1.5,
             ),
           ),

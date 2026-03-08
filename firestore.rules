@@ -21,6 +21,18 @@ service cloud.firestore {
       return hasUserDoc() ? userDoc().data.schoolId : null;
     }
 
+    function isAdmin() {
+      return signedIn() && userRole() == 'admin';
+    }
+
+    function isTeacher() {
+      return signedIn() && userRole() == 'teacher';
+    }
+
+    function isParent() {
+      return signedIn() && userRole() == 'parent';
+    }
+
     function isSuperAdmin() {
       // Primary: role stored in `/users/{uid}`.
       // Fallback: allow a known super admin email (matches app's hardcoded fallback).
@@ -34,20 +46,253 @@ service cloud.firestore {
       return signedIn() && userSchoolId() == schoolId;
     }
 
-    // Users: user can read/write their own profile. Super admin can manage all.
-    match /users/{uid} {
-      allow read, write: if signedIn() && uid == request.auth.uid;
-      allow read, write: if isSuperAdmin();
+    function isSchoolAdmin(schoolId) {
+      return isSchoolMember(schoolId) && isAdmin();
     }
 
-    // Schools: admins can read their own school doc and its subcollections.
-    // Super admin can manage everything.
-    match /schools/{schoolId} {
-      allow read: if isSchoolMember(schoolId) || isSuperAdmin();
-      allow create, update, delete: if isSuperAdmin();
+    function teacherProfileExists(schoolId) {
+      return exists(/databases/$(database)/documents/schools/$(schoolId)/teachers/$(request.auth.uid));
+    }
 
+    function teacherProfile(schoolId) {
+      return get(/databases/$(database)/documents/schools/$(schoolId)/teachers/$(request.auth.uid));
+    }
+
+    function teacherAssignmentKeys(schoolId) {
+      // Stored on teacher profile as: ['class_5_A', 'class_6_B', ...]
+      // If missing (legacy teacher records), return an empty list.
+      return teacherProfileExists(schoolId) && teacherProfile(schoolId).data.assignmentKeys is list
+        ? teacherProfile(schoolId).data.assignmentKeys
+        : [];
+    }
+
+    function isTeacherAssignedToClassKey(schoolId, classKey) {
+      // Preferred: enforce by `assignmentKeys` on the teacher profile.
+      // Backward-compat: if a legacy teacher profile exists but doesn't yet
+      // have `assignmentKeys`, allow access (until a backfill is run).
+      return isSchoolMember(schoolId)
+        && isTeacher()
+        && teacherProfileExists(schoolId)
+        && (
+          teacherAssignmentKeys(schoolId).hasAny([classKey])
+          || !(teacherProfile(schoolId).data.assignmentKeys is list)
+        );
+    }
+
+    function isParentOfStudent(schoolId, studentId) {
+      return isSchoolMember(schoolId)
+        && isParent()
+        && exists(/databases/$(database)/documents/schools/$(schoolId)/students/$(studentId))
+        && get(/databases/$(database)/documents/schools/$(schoolId)/students/$(studentId)).data.parentUid == request.auth.uid;
+    }
+
+    // Users:
+    // - Super admin can manage all.
+    // - Other users can read their own profile.
+    // - Other users can update their own profile BUT cannot change `role` or `schoolId`.
+    //   This prevents "school switching" and privilege escalation.
+    match /users/{uid} {
+      allow read: if signedIn() && uid == request.auth.uid;
+      allow read, write: if isSuperAdmin();
+
+      allow create: if false;
+
+      allow update: if signedIn()
+        && uid == request.auth.uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.schoolId == resource.data.schoolId;
+
+      allow delete: if false;
+    }
+
+    match /schools/{schoolId} {
+      // School doc
+      allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || isSchoolAdmin(schoolId);
+
+      // ---- Core reference data (admin-managed) ----
+      match /classes/{classId} {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      match /sections/{sectionId} {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      match /academicYears/{yearId} {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      // ---- Teachers ----
+      match /teachers/{teacherId} {
+        allow read: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || (isTeacher() && isSchoolMember(schoolId) && teacherId == request.auth.uid);
+
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      // ---- Students ----
+      match /students/{studentId} {
+        allow read: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || (isTeacher() && isSchoolMember(schoolId)
+              && resource.data.classKey is string
+              && isTeacherAssignedToClassKey(schoolId, resource.data.classKey))
+          // Backward-compat: older student docs may not have `classKey` yet.
+          // We allow teacher reads in that case to avoid breaking existing schools.
+          // Run a backfill to add `classKey` everywhere, then this can be tightened.
+          || (isTeacher() && isSchoolMember(schoolId) && !(resource.data.classKey is string))
+          || isParentOfStudent(schoolId, studentId);
+
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+
+        // Student history should remain admin-only.
+        match /{subDoc=**} {
+          allow read, write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+        }
+      }
+
+      // ---- Attendance ----
+      match /attendance/{dateKey} {
+        allow read: if isSuperAdmin() || isSchoolAdmin(schoolId);
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+
+        // Meta docs (counts/locks) are OK for all school members to read.
+        match /meta/{classKey} {
+          allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+
+          allow create: if isSuperAdmin()
+            || isSchoolAdmin(schoolId)
+            || (isTeacherAssignedToClassKey(schoolId, classKey)
+                && request.resource.data.classKey == classKey
+                && request.resource.data.markedBy == request.auth.uid);
+
+          allow update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+        }
+
+        // Per-class attendance records: /attendance/{dateKey}/{classKey}/{studentId}
+        match /{classKey}/{studentId} {
+          allow read: if isSuperAdmin()
+            || isSchoolAdmin(schoolId)
+            || (isTeacherAssignedToClassKey(schoolId, classKey))
+            || isParentOfStudent(schoolId, studentId);
+
+          allow create: if isSuperAdmin()
+            || isSchoolAdmin(schoolId)
+            || (isTeacherAssignedToClassKey(schoolId, classKey)
+                && request.resource.data.classKey == classKey
+                && request.resource.data.studentId == studentId
+                && request.resource.data.markedBy == request.auth.uid);
+
+          allow update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+        }
+      }
+
+      // ---- Homework ----
+      match /homework/{homeworkId} {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+
+        allow create: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || (request.resource.data.classKey is string
+              && isTeacherAssignedToClassKey(schoolId, request.resource.data.classKey)
+              && request.resource.data.teacherId == request.auth.uid);
+
+        allow update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      // ---- Announcements ----
+      match /announcements/{announcementId} {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      // ---- Fees ----
+      match /feeTypes/{feeTypeId} {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      match /fees/{feeId} {
+        allow read: if isSuperAdmin() || isSchoolAdmin(schoolId);
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      // Parent dashboard summary collection (per-student)
+      match /studentFees/{docId} {
+        allow read: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || (isParent() && isSchoolMember(schoolId)
+              && resource.data.studentId is string
+              && isParentOfStudent(schoolId, resource.data.studentId));
+
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      // ---- Exams & Marks ----
+      match /examTypes/{examTypeId} {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
+      match /exams/{examId} {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+
+        allow create: if isSuperAdmin()
+          || isSchoolAdmin(schoolId)
+          || (request.resource.data.classKey is string
+              && isTeacherAssignedToClassKey(schoolId, request.resource.data.classKey));
+
+        allow update, delete: if isSuperAdmin() || isSchoolAdmin(schoolId);
+
+        match /marks/{studentId} {
+          allow read: if isSuperAdmin()
+            || isSchoolAdmin(schoolId)
+            || isParentOfStudent(schoolId, studentId)
+            || (
+              isTeacher()
+              && isSchoolMember(schoolId)
+              && (
+                // Preferred: enforce by stored exam.classKey.
+                (
+                  get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey is string
+                  && isTeacherAssignedToClassKey(
+                    schoolId,
+                    get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey
+                  )
+                )
+                // Backward-compat: older exams may not have classKey yet.
+                || !(get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey is string)
+              )
+            );
+
+          allow write: if isSuperAdmin()
+            || isSchoolAdmin(schoolId)
+            || (
+              isTeacher()
+              && isSchoolMember(schoolId)
+              && (
+                (
+                  get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey is string
+                  && isTeacherAssignedToClassKey(
+                    schoolId,
+                    get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey
+                  )
+                )
+                || !(get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey is string)
+              )
+            );
+        }
+      }
+
+      // Anything not explicitly allowed is denied.
       match /{document=**} {
-        allow read, write: if isSchoolMember(schoolId) || isSuperAdmin();
+        allow read, write: if false;
       }
     }
 

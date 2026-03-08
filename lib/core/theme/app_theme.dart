@@ -88,18 +88,18 @@ class AppTheme {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.3)),
+          borderSide: BorderSide(color: primaryColor.withAlpha(77)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primaryColor.withOpacity(0.2)),
+          borderSide: BorderSide(color: primaryColor.withAlpha(51)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: primaryColor, width: 2),
         ),
         prefixIconColor: primaryColor,
-        labelStyle: TextStyle(color: primaryColor.withOpacity(0.7)),
+        labelStyle: TextStyle(color: primaryColor.withAlpha(179)),
         hintStyle: TextStyle(color: Colors.grey[400]),
         filled: true,
         fillColor: Colors.white,

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:school_app/features/school_admin/classes/providers/classes_provider.dart';
 import 'package:school_app/features/school_admin/classes/providers/sections_provider.dart';
+import 'package:school_app/features/school_admin/academic/providers/academic_years_provider.dart';
 import 'package:school_app/features/school_admin/students/services/student_service.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 import 'package:school_app/services/parent_account_service.dart';
@@ -76,6 +77,7 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
     setState(() => _isSaving = true);
     try {
       final school = await ref.read(currentSchoolProvider.future);
+      final academicYear = ref.read(currentAcademicYearIdProvider);
 
       final studentRef = await StudentService().addStudent(
         schoolId: school.id,
@@ -84,6 +86,7 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
           'admissionNo': admissionNo,
           'classId': selectedClassId,
           'section': selectedSection,
+          'academicYear': academicYear,
           'parentName': parentName,
           'parentPhone': parentPhone,
         },

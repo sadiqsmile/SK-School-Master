@@ -61,10 +61,10 @@ class SchoolAdminDashboard extends ConsumerWidget {
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
+                        color: Colors.white.withAlpha(46),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.35),
+                          color: Colors.white.withAlpha(89),
                         ),
                       ),
                       child: Row(
@@ -157,7 +157,7 @@ class SchoolAdminDashboard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withAlpha(20),
                             blurRadius: 14,
                             offset: const Offset(0, 7),
                           ),
@@ -227,7 +227,7 @@ class SchoolAdminDashboard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withAlpha(18),
             blurRadius: 12,
             offset: const Offset(0, 5),
           ),

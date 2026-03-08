@@ -1,6 +1,8 @@
 // features/school_admin/students/services/student_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:school_app/core/utils/firestore_keys.dart';
+
 class DuplicateAdmissionNumberException implements Exception {
   DuplicateAdmissionNumberException(this.admissionNo);
 
@@ -47,6 +49,14 @@ class StudentService {
         ...data,
         'admissionNo': admissionKey,
       };
+
+      // Derived key used across attendance + rules.
+      final classId = (normalized['classId'] ?? '').toString();
+      final sectionId = (normalized['section'] ?? '').toString();
+      final ck = classKeyFrom(classId, sectionId);
+      if (ck != 'class__') {
+        normalized['classKey'] = ck;
+      }
 
       // Normalize names (ALL CAPS) at write-time to cover imports too.
       if (normalized['name'] != null) {

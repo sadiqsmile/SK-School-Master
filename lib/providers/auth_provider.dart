@@ -32,6 +32,7 @@ final userRoleProvider = FutureProvider.autoDispose<UserRole>((ref) async {
   final role = (data['role'] ?? '').toString();
   if (role == 'superAdmin') return UserRole.superAdmin;
   if (role == 'admin') return UserRole.admin;
+  if (role == 'teacher') return UserRole.teacher;
   if (role == 'parent') return UserRole.parent;
   return UserRole.unknown;
 });
