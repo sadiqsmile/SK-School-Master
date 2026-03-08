@@ -66,6 +66,10 @@ class FirestoreService {
       'subscriptionStatus': 'active',
       'subscriptionPlan': 'pro',
       'adminUid': adminUid,
+      // Aggregated / indexed counters (kept in sync by Cloud Functions)
+      'totalStudents': 0,
+      'totalTeachers': 0,
+      'totalClasses': 0,
       'createdAt': FieldValue.serverTimestamp(),
     });
 

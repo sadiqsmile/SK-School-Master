@@ -111,6 +111,19 @@ service cloud.firestore {
       allow create, delete: if isSuperAdmin();
       allow update: if isSuperAdmin() || isSchoolAdmin(schoolId);
 
+      // ---- Analytics / indexed summaries (system-managed) ----
+      // These documents are written by Cloud Functions (Admin SDK bypasses rules).
+      // Clients may read for fast dashboards/reports.
+      match /analytics/{docId} {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+        allow write: if false;
+
+        match /{subDoc=**} {
+          allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+          allow write: if false;
+        }
+      }
+
       // ---- Core reference data (admin-managed) ----
       match /classes/{classId} {
         allow read: if isSchoolMember(schoolId) || isSuperAdmin();
