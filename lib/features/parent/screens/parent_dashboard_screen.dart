@@ -1,4 +1,3 @@
-// features/parent/screens/parent_dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,7 +9,6 @@ import 'package:school_app/features/parent/providers/parent_children_provider.da
 import 'package:school_app/models/announcement.dart';
 import 'package:school_app/providers/announcement_provider.dart';
 import 'package:school_app/features/announcements/screens/announcement_detail_screen.dart';
-import 'package:school_app/core/widgets/web_dashboard_footer.dart';
 
 class ParentDashboardScreen extends ConsumerStatefulWidget {
   const ParentDashboardScreen({super.key});
@@ -165,7 +163,6 @@ class _ParentDashboardScreenState extends ConsumerState<ParentDashboardScreen> {
                 title: Text('Fees'),
                 subtitle: Text('Read-only view (to be implemented)'),
               ),
-              const WebDashboardFooter(),
             ],
           );
         },
@@ -242,9 +239,7 @@ class _AnnouncementsPreviewCard extends StatelessWidget {
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.campaign_rounded),
                         title: Text(
-                          a.title.trim().isEmpty
-                              ? '(Untitled)'
-                              : a.title.trim(),
+                          a.title.trim().isEmpty ? '(Untitled)' : a.title.trim(),
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         subtitle: Text(
@@ -257,8 +252,9 @@ class _AnnouncementsPreviewCard extends StatelessWidget {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  AnnouncementDetailScreen(announcement: a),
+                              builder: (_) => AnnouncementDetailScreen(
+                                announcement: a,
+                              ),
                             ),
                           );
                         },

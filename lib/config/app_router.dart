@@ -242,8 +242,7 @@ final appRouter = GoRouter(
       path: '/school-admin/analytics/:filter',
       builder: (context, state) {
         final key = (state.pathParameters['filter'] ?? '').trim();
-        final filter =
-            RiskListFilterX.fromRouteKey(key) ?? RiskListFilter.highRisk;
+        final filter = RiskListFilterX.fromRouteKey(key) ?? RiskListFilter.highRisk;
         return RoleGuard(
           title: 'Analytics',
           allowedRoles: const [UserRole.admin],
@@ -408,3 +407,4 @@ final appRouter = GoRouter(
     ),
   ],
 );
+

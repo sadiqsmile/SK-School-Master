@@ -1,6 +1,4 @@
 // main.dart
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -32,33 +30,7 @@ class SchoolApp extends StatelessWidget {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme(),
-      scrollBehavior: const _AdaptiveScrollBehavior(),
-      builder: (context, child) {
-        final media = MediaQuery.of(context);
-        final clampedTextScaler = media.textScaler.clamp(
-          minScaleFactor: 0.9,
-          maxScaleFactor: 1.15,
-        );
-
-        return MediaQuery(
-          data: media.copyWith(textScaler: clampedTextScaler),
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
       routerConfig: appRouter,
     );
   }
-}
-
-class _AdaptiveScrollBehavior extends MaterialScrollBehavior {
-  const _AdaptiveScrollBehavior();
-
-  @override
-  Set<PointerDeviceKind> get dragDevices => {
-    PointerDeviceKind.touch,
-    PointerDeviceKind.mouse,
-    PointerDeviceKind.trackpad,
-    PointerDeviceKind.stylus,
-    PointerDeviceKind.unknown,
-  };
 }
