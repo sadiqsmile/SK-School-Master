@@ -3,16 +3,44 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
+import 'package:school_app/core/widgets/web_dashboard_footer.dart';
 import 'package:school_app/providers/school_provider.dart';
 
 class SchoolAdminDashboard extends ConsumerWidget {
   const SchoolAdminDashboard({super.key});
 
+  Color _hexToColor(String hex) {
+    final normalized = hex.replaceAll('#', '');
+    final value = int.tryParse('FF$normalized', radix: 16) ?? 0xFF3B82F6;
+    return Color(value);
+  }
+
+  List<Color> _getGradientColors(List<dynamic>? colorList) {
+    if (colorList == null || colorList.isEmpty) {
+      return [const Color(0xFF3B82F6), const Color(0xFF22C5E8)];
+    }
+    return colorList.map((c) => _hexToColor(c.toString())).toList();
+  }
+
+  List<String>? _readCurrentThemeHex(Map<String, dynamic> data) {
+    final primary = (data['themeColorPrimary'] ?? '').toString().trim();
+    final secondary = (data['themeColorSecondary'] ?? '').toString().trim();
+    final tertiary = (data['themeColorTertiary'] ?? '').toString().trim();
+
+    if (primary.isNotEmpty && secondary.isNotEmpty && tertiary.isNotEmpty) {
+      return [primary, secondary, tertiary];
+    }
+
+    final legacy = data['gradientColors'];
+    if (legacy is List) {
+      return legacy.map((c) => c.toString()).toList();
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const primaryBlue = Color(0xFF2563EB);
-    const accentCyan = Color(0xFF06B6D4);
-    const deepBlue = Color(0xFF1E40AF);
+    const textPrimary = Color(0xFF1F2937);
     final schoolAsync = ref.watch(schoolProvider);
 
     return AdminLayout(
@@ -30,12 +58,20 @@ class SchoolAdminDashboard extends ConsumerWidget {
           final teachers = (schoolData['totalTeachers'] ?? 0).toString();
           final students = (schoolData['totalStudents'] ?? 0).toString();
 
+          final gradientColors = _readCurrentThemeHex(schoolData);
+          final applyToAll = (schoolData['applyToAll'] ?? false) as bool;
+          final colors = _getGradientColors(gradientColors);
+          final primaryColor = colors.first;
+          final accentColor = colors.length > 1 ? colors[1] : colors.first;
+
           final attendanceLatestRaw = schoolData['attendanceLatest'];
           final attendanceLatest = attendanceLatestRaw is Map
               ? Map<String, dynamic>.from(attendanceLatestRaw)
               : <String, dynamic>{};
           final latestKey =
-              (attendanceLatest['dateKey'] ?? schoolData['attendanceLatestDateKey'] ?? '')
+              (attendanceLatest['dateKey'] ??
+                      schoolData['attendanceLatestDateKey'] ??
+                      '')
                   .toString();
           final present = (attendanceLatest['present'] is num)
               ? (attendanceLatest['present'] as num).toInt()
@@ -57,8 +93,9 @@ class SchoolAdminDashboard extends ConsumerWidget {
               : 0;
 
           final hasAttendance = latestKey.isNotEmpty && total > 0;
-          final attendanceValue =
-              hasAttendance ? '${((present / total) * 100).toStringAsFixed(0)}%' : '—';
+          final attendanceValue = hasAttendance
+              ? '${((present / total) * 100).toStringAsFixed(0)}%'
+              : '—';
           final attendanceSubtitle = hasAttendance
               ? () {
                   final parts = <String>[
@@ -74,149 +111,195 @@ class SchoolAdminDashboard extends ConsumerWidget {
               : 'No attendance marked yet';
 
           return Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [primaryBlue, accentCyan],
+                colors: colors,
               ),
             ),
             child: SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(46),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: Colors.white.withAlpha(89),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const CircleAvatar(
-                            radius: 24,
-                            backgroundColor: Colors.white,
-                            child: Icon(
-                              Icons.apartment_rounded,
-                              color: deepBlue,
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'School ID: $schoolId',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 720;
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            title: 'Plan',
-                            value: plan.isEmpty ? 'Standard' : plan,
-                            icon: Icons.workspace_premium_rounded,
-                            iconColor: primaryBlue,
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(46),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white.withAlpha(89),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.white,
+                                child: Icon(
+                                  Icons.apartment_rounded,
+                                  color: primaryColor,
+                                  size: 28,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'School ID: $schoolId',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            title: 'Teachers',
-                            value: teachers,
-                            icon: Icons.school_rounded,
-                            iconColor: primaryBlue,
+                        const SizedBox(height: 14),
+                        isCompact
+                            ? Column(
+                                children: [
+                                  _buildStatCard(
+                                    title: 'Plan',
+                                    value: plan.isEmpty ? 'Standard' : plan,
+                                    icon: Icons.workspace_premium_rounded,
+                                    iconColor: primaryColor,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildStatCard(
+                                    title: 'Teachers',
+                                    value: teachers,
+                                    icon: Icons.school_rounded,
+                                    iconColor: primaryColor,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildStatCard(
+                                    title: 'Students',
+                                    value: students,
+                                    icon: Icons.groups_rounded,
+                                    iconColor: primaryColor,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildStatCard(
+                                    title: 'Attendance',
+                                    value: attendanceValue,
+                                    subtitle: attendanceSubtitle,
+                                    icon: Icons.fact_check_rounded,
+                                    iconColor: primaryColor,
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildStatCard(
+                                          title: 'Plan',
+                                          value: plan.isEmpty
+                                              ? 'Standard'
+                                              : plan,
+                                          icon: Icons.workspace_premium_rounded,
+                                          iconColor: primaryColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _buildStatCard(
+                                          title: 'Teachers',
+                                          value: teachers,
+                                          icon: Icons.school_rounded,
+                                          iconColor: primaryColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _buildStatCard(
+                                          title: 'Students',
+                                          value: students,
+                                          icon: Icons.groups_rounded,
+                                          iconColor: primaryColor,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _buildStatCard(
+                                          title: 'Attendance',
+                                          value: attendanceValue,
+                                          subtitle: attendanceSubtitle,
+                                          icon: Icons.fact_check_rounded,
+                                          iconColor: primaryColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                        const SizedBox(height: 18),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(20),
+                                blurRadius: 14,
+                                offset: const Offset(0, 7),
+                              ),
+                            ],
+                          ),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Overview',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1F2937),
+                                ),
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                'Use the drawer to manage teachers, students, classes, attendance, homework, and fees. This dashboard gives you quick access to your school administration tools.',
+                                style: TextStyle(
+                                  height: 1.45,
+                                  color: Color(0xFF4B5563),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                        const WebDashboardFooter(),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            title: 'Students',
-                            value: students,
-                            icon: Icons.groups_rounded,
-                            iconColor: primaryBlue,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            title: 'Attendance',
-                            value: attendanceValue,
-                            subtitle: attendanceSubtitle,
-                            icon: Icons.fact_check_rounded,
-                            iconColor: primaryBlue,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(20),
-                            blurRadius: 14,
-                            offset: const Offset(0, 7),
-                          ),
-                        ],
-                      ),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Overview',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1F2937),
-                            ),
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            'Use the drawer to manage teachers, students, classes, attendance, homework, and fees. This dashboard gives you quick access to your school administration tools.',
-                            style: TextStyle(
-                              height: 1.45,
-                              color: Color(0xFF4B5563),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           );
