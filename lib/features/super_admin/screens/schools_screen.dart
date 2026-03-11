@@ -402,6 +402,40 @@ class SchoolsScreen extends ConsumerWidget {
                         color: Color(0xFF00A876),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    // Archive/Unarchive button
+                    Builder(
+                      builder: (context) {
+                        final archived = (data['archived'] ?? false) as bool;
+                        return archived
+                            ? IconButton(
+                                tooltip: 'Unarchive school',
+                                icon: const Icon(Icons.unarchive_rounded, color: Colors.orange),
+                                onPressed: () async {
+                                  await FirebaseFirestore.instance
+                                      .collection('schools')
+                                      .doc(docs[index].id)
+                                      .update({'archived': false});
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('School unarchived')),
+                                  );
+                                },
+                              )
+                            : IconButton(
+                                tooltip: 'Archive school',
+                                icon: const Icon(Icons.archive_rounded, color: Colors.red),
+                                onPressed: () async {
+                                  await FirebaseFirestore.instance
+                                      .collection('schools')
+                                      .doc(docs[index].id)
+                                      .update({'archived': true});
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('School archived')),
+                                  );
+                                },
+                              );
+                      },
+                    ),
                   ],
                 ),
               ),
