@@ -1,3 +1,4 @@
+// features/auth/screens/school_loader_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,14 @@ class SchoolLoaderScreen extends StatefulWidget {
 }
 
 class _SchoolLoaderScreenState extends State<SchoolLoaderScreen> {
+  void _goHome() {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.go('/');
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -29,8 +38,7 @@ class _SchoolLoaderScreenState extends State<SchoolLoaderScreen> {
       const hardcodedSuperAdminEmails = <String>{'sadiq.smile@gmail.com'};
       final email = user.email?.trim().toLowerCase();
       if (email != null && hardcodedSuperAdminEmails.contains(email)) {
-        if (!mounted) return;
-        context.go('/');
+        _goHome();
         return;
       }
 
@@ -48,25 +56,17 @@ class _SchoolLoaderScreenState extends State<SchoolLoaderScreen> {
         // Ignore and let AuthGate handle any unknown state.
       }
 
-      if (!mounted) return;
-      context.go('/');
+      _goHome();
       return;
     }
 
-    final schoolId = await SchoolStorage.getSchoolId();
-    if (!mounted) return;
-
-    if (schoolId == null || schoolId.trim().isEmpty) {
-      context.go('/enter-school');
-    } else {
-      context.go('/');
-    }
+    await SchoolStorage.getSchoolId();
+    // Login-first flow: do not block users with School ID entry before auth.
+    _goHome();
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

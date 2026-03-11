@@ -1,0 +1,9 @@
+Every time you make changes:
+Step 1: Build the web version
+
+flutter build web
+
+Step 2: Deploy to Firebase
+
+firebase deploy --only hosting
+
