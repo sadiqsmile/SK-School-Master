@@ -15,6 +15,18 @@ final userRoleProvider = FutureProvider.autoDispose<UserRole>((ref) async {
 
   if (user == null) return UserRole.unknown;
 
+  // Prefer custom claims for super admin so we don't rely on any hardcoded
+  // email allowlists or require a Firestore profile doc to route the UI.
+  try {
+    final token = await user.getIdTokenResult();
+    final claims = token.claims ?? const <String, dynamic>{};
+    if (claims['superAdmin'] == true) {
+      return UserRole.superAdmin;
+    }
+  } catch (_) {
+    // Ignore claim lookup errors and fall back to Firestore.
+  }
+
   final userDoc = await ref
       .watch(firestoreServiceProvider)
       .getUserDoc(user.uid);

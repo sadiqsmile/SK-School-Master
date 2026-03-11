@@ -11,6 +11,10 @@
     $env:GOOGLE_APPLICATION_CREDENTIALS = "functions/.secrets/serviceAccountKey.json"
     node functions/scripts/create_teacher.js --schoolId hong7xk2 --name "Ali" --email "ali@gmail.com" --phone "+91 9xxxx" --assign "5:A,6:B"
 
+  Security note:
+    By default this script does NOT print the generated temporary password.
+    Add --show-password if you explicitly want to display it.
+
   Notes on assignments:
     --assign is optional.
     Format: "<classId>:<sectionId>,<classId>:<sectionId>"
@@ -20,6 +24,8 @@
 const fs = require("fs");
 const path = require("path");
 const admin = require("firebase-admin");
+
+const SHOW_PASSWORD = process.argv.includes("--show-password");
 
 function getArg(name) {
   const argv = process.argv.slice(2);
@@ -223,7 +229,7 @@ async function main() {
   console.log("Teacher created/updated:");
   console.log("- uid:", uid);
   console.log("- email:", email);
-  console.log("- temporaryPassword:", temporaryPassword);
+  console.log("- temporaryPassword:", SHOW_PASSWORD ? temporaryPassword : "<hidden>");
   console.log("- teacherDoc:", teacherRef.path);
   console.log("- assignmentKeys:", assignmentKeys);
 }

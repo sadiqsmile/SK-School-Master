@@ -1,12 +1,24 @@
 const admin = require("firebase-admin");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const {
   onDocumentCreated,
   onDocumentDeleted,
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const crypto = require("crypto");
+const zlib = require("zlib");
+const readline = require("readline");
+const { once } = require("events");
+const { finished } = require("stream/promises");
+const {
+  asCell,
+  safeJson,
+  getSheetsClient,
+  ensureSheetTabs,
+  writeTabValues,
+} = require("./google_sheets_sync");
 
 setGlobalOptions({
   region: "us-central1",
@@ -220,6 +232,26 @@ async function incrementDoc(ref, delta) {
 // ----------------------------
 // Aggregated / indexed counters
 // ----------------------------
+
+// Track number of schools on the platform dashboard.
+// Note: this counts school root documents (not subcollections).
+exports.onSchoolCreated = onDocumentCreated(
+  { document: "schools/{schoolId}", region: FIRESTORE_REGION },
+  async (_event) => {
+    await incrementDoc(admin.firestore().collection("platform").doc("config"), {
+      totalSchools: 1,
+    });
+  }
+);
+
+exports.onSchoolDeleted = onDocumentDeleted(
+  { document: "schools/{schoolId}", region: FIRESTORE_REGION },
+  async (_event) => {
+    await incrementDoc(admin.firestore().collection("platform").doc("config"), {
+      totalSchools: -1,
+    });
+  }
+);
 
 exports.onStudentCreated = onDocumentCreated(
   { document: "schools/{schoolId}/students/{studentId}", region: FIRESTORE_REGION },
@@ -1174,7 +1206,7 @@ exports.onAttendanceRecordCreated = onDocumentCreated(
   }
 );
 
-exports.recomputeStudentRisk = onCall(async (request) => {
+exports.recomputeStudentRisk = onCall({ enforceAppCheck: true }, async (request) => {
   const data = request.data || {};
   const schoolId = String(data.schoolId || "").trim();
   const classId = String(data.classId || "").trim();
@@ -1344,7 +1376,7 @@ function hashPin(pin, salt) {
   return crypto.createHash("sha256").update(`${salt}:${pin}`).digest("hex");
 }
 
-exports.createOrResetParentAccount = onCall(async (request) => {
+exports.createOrResetParentAccount = onCall({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in required");
   }
@@ -1465,7 +1497,7 @@ exports.createOrResetParentAccount = onCall(async (request) => {
   };
 });
 
-exports.parentLogin = onCall(async (request) => {
+exports.parentLogin = onCall({ enforceAppCheck: true }, async (request) => {
   const data = request.data || {};
   const phoneDigits = normalizePhone(data.phone);
   const pin = normalizePin(data.pin);
@@ -1583,7 +1615,7 @@ exports.parentLogin = onCall(async (request) => {
 // Maintenance: recompute counters
 // ----------------------------
 
-exports.recomputeSchoolCounters = onCall(async (request) => {
+exports.recomputeSchoolCounters = onCall({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in required");
   }
@@ -1645,7 +1677,1654 @@ exports.recomputeSchoolCounters = onCall(async (request) => {
   };
 });
 
-exports.changeParentPin = onCall(async (request) => {
+// ---------------------------------------------------------------------------
+// Google Sheets sync/export (Super Admin only)
+// ---------------------------------------------------------------------------
+
+function clampInt(v, min, max) {
+  const n = safeInt(v);
+  if (n < min) return min;
+  if (n > max) return max;
+  return n;
+}
+
+async function getSheetsSyncConfig({ db, schoolId }) {
+  const ref = db.collection("platformGoogleSheetsSync").doc(schoolId);
+  const snap = await ref.get();
+  if (!snap.exists) return { ref, config: null };
+  return { ref, config: snap.data() || {} };
+}
+
+async function syncSchoolToGoogleSheetsInternal({
+  db,
+  schoolId,
+  spreadsheetId,
+  daysBack,
+  maxRowsPerTab,
+  actorUid,
+  trigger,
+}) {
+  const cfgRef = db.collection("platformGoogleSheetsSync").doc(schoolId);
+  const schoolRef = db.collection("schools").doc(schoolId);
+
+  // Load core collections.
+  const [studentsSnap, teachersSnap, feesSnap, examsSnap] = await Promise.all([
+    schoolRef.collection("students").get(),
+    schoolRef.collection("teachers").get(),
+    schoolRef.collection("studentFees").get(),
+    schoolRef.collection("exams").get(),
+  ]);
+
+  // Parents derived from students (safer than exporting /users which contains auth/PIN fields).
+  const parentsByUid = new Map();
+
+  const studentsRows = [
+    [
+      "studentId",
+      "name",
+      "admissionNo",
+      "classId",
+      "section",
+      "classKey",
+      "parentUid",
+      "parentName",
+      "parentPhone",
+      "status",
+      "createdAt",
+      "updatedAt",
+      "json",
+    ],
+  ];
+
+  for (const doc of studentsSnap.docs.slice(0, maxRowsPerTab)) {
+    const d = doc.data() || {};
+    const parentUid = String(d.parentUid || "").trim();
+    const parentPhone = String(d.parentPhone || "").trim();
+    const parentName = String(d.parentName || "").trim();
+
+    if (parentUid) {
+      const entry = parentsByUid.get(parentUid) || {
+        parentUid,
+        parentName,
+        parentPhone,
+        studentIds: [],
+        studentNames: [],
+      };
+      entry.parentName = entry.parentName || parentName;
+      entry.parentPhone = entry.parentPhone || parentPhone;
+      entry.studentIds.push(doc.id);
+      entry.studentNames.push(String(d.name || "").trim());
+      parentsByUid.set(parentUid, entry);
+    }
+
+    studentsRows.push([
+      doc.id,
+      asCell(d.name),
+      asCell(d.admissionNo),
+      asCell(d.classId),
+      asCell(d.section),
+      asCell(d.classKey),
+      parentUid,
+      parentName,
+      parentPhone,
+      asCell(d.status),
+      asCell(d.createdAt),
+      asCell(d.updatedAt),
+      safeJson(d),
+    ]);
+  }
+
+  const teachersRows = [
+    [
+      "teacherId",
+      "name",
+      "email",
+      "phone",
+      "assignmentKeys",
+      "createdAt",
+      "updatedAt",
+      "json",
+    ],
+  ];
+
+  for (const doc of teachersSnap.docs.slice(0, maxRowsPerTab)) {
+    const d = doc.data() || {};
+    const keys = Array.isArray(d.assignmentKeys) ? d.assignmentKeys.map(String) : [];
+    teachersRows.push([
+      doc.id,
+      asCell(d.name),
+      asCell(d.email),
+      asCell(d.phone),
+      keys.join("|"),
+      asCell(d.createdAt),
+      asCell(d.updatedAt),
+      safeJson(d),
+    ]);
+  }
+
+  const parentsRows = [
+    [
+      "parentUid",
+      "parentName",
+      "parentPhone",
+      "childrenStudentIds",
+      "childrenStudentNames",
+    ],
+  ];
+  for (const p of parentsByUid.values()) {
+    parentsRows.push([
+      asCell(p.parentUid),
+      asCell(p.parentName),
+      asCell(p.parentPhone),
+      asCell(p.studentIds.join(",")),
+      asCell(p.studentNames.filter(Boolean).join(", ")),
+    ]);
+  }
+
+  const feesRows = [
+    [
+      "feeDocId",
+      "studentId",
+      "amount",
+      "balance",
+      "status",
+      "createdAt",
+      "updatedAt",
+      "json",
+    ],
+  ];
+  for (const doc of feesSnap.docs.slice(0, maxRowsPerTab)) {
+    const d = doc.data() || {};
+    feesRows.push([
+      doc.id,
+      asCell(d.studentId || doc.id),
+      asCell(d.amount),
+      asCell(d.balance ?? d.pendingAmount),
+      asCell(d.status),
+      asCell(d.createdAt),
+      asCell(d.updatedAt),
+      safeJson(d),
+    ]);
+  }
+
+  // Marks: flatten exams/*/marks/*
+  const marksRows = [
+    [
+      "examId",
+      "examName",
+      "classKey",
+      "studentId",
+      "score",
+      "total",
+      "grade",
+      "updatedAt",
+      "json",
+    ],
+  ];
+  let marksCount = 0;
+  for (const examDoc of examsSnap.docs) {
+    if (marksCount >= maxRowsPerTab) break;
+    const exam = examDoc.data() || {};
+    const examName = exam.title || exam.name || examDoc.id;
+    const classKey = exam.classKey || "";
+
+    const marksSnap = await examDoc.ref.collection("marks").get();
+    for (const markDoc of marksSnap.docs) {
+      if (marksCount >= maxRowsPerTab) break;
+      const m = markDoc.data() || {};
+      marksRows.push([
+        examDoc.id,
+        asCell(examName),
+        asCell(classKey),
+        markDoc.id,
+        asCell(m.score ?? m.marks ?? m.value),
+        asCell(m.total ?? m.max ?? m.outOf),
+        asCell(m.grade),
+        asCell(m.updatedAt),
+        safeJson(m),
+      ]);
+      marksCount += 1;
+    }
+  }
+
+  // Attendance: export recent per-student attendance rows from last N days.
+  // NOTE: Attendance can be large; we cap rows to maxRowsPerTab.
+  const attendanceRows = [
+    [
+      "dateKey",
+      "classKey",
+      "studentId",
+      "status",
+      "markedBy",
+      "updatedAt",
+      "json",
+    ],
+  ];
+  let attendanceCount = 0;
+  for (let i = 0; i < daysBack; i++) {
+    if (attendanceCount >= maxRowsPerTab) break;
+    const dateKey = dateKeyDaysAgoUtc(daysBack - 1 - i);
+    const dateDocRef = schoolRef.collection("attendance").doc(dateKey);
+    let cols = [];
+    try {
+      cols = await dateDocRef.listCollections();
+    } catch (_) {
+      cols = [];
+    }
+
+    for (const col of cols) {
+      if (attendanceCount >= maxRowsPerTab) break;
+      const classKey = String(col.id || "");
+      if (!classKey || classKey === "meta") continue;
+
+      const snap = await col.get();
+      for (const aDoc of snap.docs) {
+        if (attendanceCount >= maxRowsPerTab) break;
+        const a = aDoc.data() || {};
+        attendanceRows.push([
+          dateKey,
+          classKey,
+          aDoc.id,
+          asCell(a.status ?? a.studentStatus ?? (a.present === true ? "present" : "")),
+          asCell(a.markedBy),
+          asCell(a.updatedAt),
+          safeJson(a),
+        ]);
+        attendanceCount += 1;
+      }
+    }
+  }
+
+  // Build sync info.
+  const syncedAtIso = new Date().toISOString();
+  const syncInfoRows = [
+    ["key", "value"],
+    ["schoolId", schoolId],
+    ["spreadsheetId", spreadsheetId],
+    ["daysBack", String(daysBack)],
+    ["maxRowsPerTab", String(maxRowsPerTab)],
+    ["syncTrigger", String(trigger || "manual")],
+    ["syncedByUid", actorUid ? String(actorUid) : "system"],
+    ["syncedAtUtc", syncedAtIso],
+    ["studentsExported", String(studentsRows.length - 1)],
+    ["teachersExported", String(teachersRows.length - 1)],
+    ["parentsExported", String(parentsRows.length - 1)],
+    ["feesExported", String(feesRows.length - 1)],
+    ["marksExported", String(marksRows.length - 1)],
+    ["attendanceExported", String(attendanceRows.length - 1)],
+  ];
+
+  const sheets = await getSheetsClient();
+  const titles = [
+    "sync_info",
+    "students",
+    "teachers",
+    "parents",
+    "fees",
+    "marks",
+    "attendance",
+  ];
+  await ensureSheetTabs({ sheets, spreadsheetId, titles });
+
+  await writeTabValues({ sheets, spreadsheetId, title: "sync_info", values: syncInfoRows });
+  await writeTabValues({ sheets, spreadsheetId, title: "students", values: studentsRows });
+  await writeTabValues({ sheets, spreadsheetId, title: "teachers", values: teachersRows });
+  await writeTabValues({ sheets, spreadsheetId, title: "parents", values: parentsRows });
+  await writeTabValues({ sheets, spreadsheetId, title: "fees", values: feesRows });
+  await writeTabValues({ sheets, spreadsheetId, title: "marks", values: marksRows });
+  await writeTabValues({ sheets, spreadsheetId, title: "attendance", values: attendanceRows });
+
+  const counts = {
+    students: studentsRows.length - 1,
+    teachers: teachersRows.length - 1,
+    parents: parentsRows.length - 1,
+    fees: feesRows.length - 1,
+    marks: marksRows.length - 1,
+    attendance: attendanceRows.length - 1,
+  };
+
+  // Persist last sync result.
+  await cfgRef.set(
+    {
+      lastSyncAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastSyncByUid: actorUid ? String(actorUid) : "system",
+      lastSyncTrigger: String(trigger || "manual"),
+      lastSyncCounts: counts,
+      lastSyncError: admin.firestore.FieldValue.delete(),
+    },
+    { merge: true }
+  );
+
+  // Audit log (server-side only; clients can't read it via rules).
+  await db.collection("platformSyncLogs").add({
+    type: "google_sheets_sync",
+    trigger: String(trigger || "manual"),
+    schoolId,
+    spreadsheetId,
+    daysBack,
+    maxRowsPerTab,
+    counts,
+    actorUid: actorUid ? String(actorUid) : "system",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return {
+    schoolId,
+    spreadsheetId,
+    daysBack,
+    maxRowsPerTab,
+    counts,
+  };
+}
+
+exports.setGoogleSheetsSyncConfig = onCall({ enforceAppCheck: true }, async (request) => {
+  await requireSuperAdminCaller(request);
+
+  const db = admin.firestore();
+  const data = request.data || {};
+  const schoolId = String(data.schoolId || "").trim();
+  const spreadsheetId = String(data.spreadsheetId || "").trim();
+  const enabled = normalizeBool(data.enabled);
+
+  if (!schoolId) {
+    throw new HttpsError("invalid-argument", "schoolId is required");
+  }
+
+  // spreadsheetId is required only when enabling.
+  if (enabled && !spreadsheetId) {
+    throw new HttpsError("invalid-argument", "spreadsheetId is required when enabled=true");
+  }
+
+  const daysBack = clampInt(data.daysBack ?? 30, 1, 120);
+  const maxRowsPerTab = clampInt(data.maxRowsPerTab ?? 20000, 1000, 100000);
+
+  const ref = db.collection("platformGoogleSheetsSync").doc(schoolId);
+  await ref.set(
+    {
+      schoolId,
+      enabled,
+      spreadsheetId: spreadsheetId || admin.firestore.FieldValue.delete(),
+      daysBack,
+      maxRowsPerTab,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return { ok: true, schoolId, enabled, daysBack, maxRowsPerTab };
+});
+
+exports.getGoogleSheetsSyncConfig = onCall({ enforceAppCheck: true }, async (request) => {
+  await requireSuperAdminCaller(request);
+
+  const db = admin.firestore();
+  const data = request.data || {};
+  const schoolId = String(data.schoolId || "").trim();
+  if (!schoolId) {
+    throw new HttpsError("invalid-argument", "schoolId is required");
+  }
+
+  const { config } = await getSheetsSyncConfig({ db, schoolId });
+  return { ok: true, schoolId, config: config || null };
+});
+
+exports.syncSchoolToGoogleSheets = onCall(
+  {
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    enforceAppCheck: true,
+  },
+  async (request) => {
+    const { callerUid } = await requireSuperAdminCaller(request);
+
+    const db = admin.firestore();
+    const data = request.data || {};
+    const schoolId = String(data.schoolId || "").trim();
+    if (!schoolId) {
+      throw new HttpsError("invalid-argument", "schoolId is required");
+    }
+
+    const { ref: cfgRef, config } = await getSheetsSyncConfig({ db, schoolId });
+    if (!config || config.enabled !== true) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Google Sheets sync is not enabled for this school. Call setGoogleSheetsSyncConfig first."
+      );
+    }
+
+    const spreadsheetId = String(config.spreadsheetId || "").trim();
+    if (!spreadsheetId) {
+      throw new HttpsError("failed-precondition", "spreadsheetId is missing in config");
+    }
+
+    const daysBack = clampInt(data.daysBack ?? config.daysBack ?? 30, 1, 120);
+    const maxRowsPerTab = clampInt(data.maxRowsPerTab ?? config.maxRowsPerTab ?? 20000, 1000, 100000);
+
+    const result = await syncSchoolToGoogleSheetsInternal({
+      db,
+      schoolId,
+      spreadsheetId,
+      daysBack,
+      maxRowsPerTab,
+      actorUid: callerUid,
+      trigger: "manual",
+    });
+
+    return {
+      ok: true,
+      ...result,
+      note:
+        "Sheets sync is super-admin only and does not export sensitive /users auth fields. Attendance is limited to recent daysBack and capped by maxRowsPerTab.",
+    };
+  }
+);
+
+// Daily auto-sync for all enabled schools.
+// NOTE: This is server-side only and does not require App Check.
+exports.autoSyncAllSchoolsToGoogleSheets = onSchedule(
+  {
+    schedule: "0 2 * * *",
+    timeZone: "UTC",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+  },
+  async (_event) => {
+    const db = admin.firestore();
+    const snap = await db
+      .collection("platformGoogleSheetsSync")
+      .where("enabled", "==", true)
+      .get();
+
+    let okCount = 0;
+    let errorCount = 0;
+
+    // Sequential by default to be kind to Sheets API quotas.
+    for (const doc of snap.docs) {
+      const cfg = doc.data() || {};
+      const schoolId = String(cfg.schoolId || doc.id || "").trim();
+      const spreadsheetId = String(cfg.spreadsheetId || "").trim();
+      if (!schoolId || !spreadsheetId) continue;
+
+      const daysBack = clampInt(cfg.daysBack ?? 30, 1, 120);
+      const maxRowsPerTab = clampInt(cfg.maxRowsPerTab ?? 20000, 1000, 100000);
+
+      try {
+        await syncSchoolToGoogleSheetsInternal({
+          db,
+          schoolId,
+          spreadsheetId,
+          daysBack,
+          maxRowsPerTab,
+          actorUid: null,
+          trigger: "auto",
+        });
+        okCount += 1;
+      } catch (e) {
+        errorCount += 1;
+
+        const msg = e && e.message ? String(e.message) : String(e);
+        await doc.ref.set(
+          {
+            lastSyncAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastSyncByUid: "system",
+            lastSyncTrigger: "auto",
+            lastSyncError: msg.slice(0, 1000),
+          },
+          { merge: true }
+        );
+      }
+    }
+
+    return { ok: true, schoolsSynced: okCount, schoolsFailed: errorCount };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Danger Zone: Reset school data (Super Admin only)
+// ---------------------------------------------------------------------------
+
+async function requireSuperAdminCaller(request) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required");
+  }
+
+  const callerUid = request.auth.uid;
+  const callerDoc = await admin.firestore().collection("users").doc(callerUid).get();
+  const callerRole = String((callerDoc.data() || {}).role || "");
+  const isSuper =
+    callerRole === "superAdmin" ||
+    (request.auth.token && request.auth.token.superAdmin === true);
+
+  if (!isSuper) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only superAdmin can perform data resets"
+    );
+  }
+
+  return { callerUid, callerRole };
+}
+
+async function requireMaintenanceModeEnabled() {
+  const statusSnap = await admin.firestore().collection("platform").doc("status").get();
+  const enabled = (statusSnap.data() || {}).maintenanceMode === true;
+  if (!enabled) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Maintenance Mode must be enabled before running a reset"
+    );
+  }
+}
+
+function normalizeBool(v) {
+  return v === true || v === "true";
+}
+
+function normalizeStringArray(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const v of input) {
+    const s = String(v || "").trim();
+    if (!s) continue;
+    out.push(s);
+  }
+  return Array.from(new Set(out));
+}
+
+function chunkArray(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
+async function resolveTargetSchoolIds({ db, schoolId, schoolIds, allSchools }) {
+  if (allSchools === true) {
+    const snap = await db.collection("schools").get();
+    const ids = snap.docs.map((d) => d.id).filter(Boolean);
+    if (ids.length === 0) {
+      throw new HttpsError("failed-precondition", "No schools found to reset");
+    }
+    return { targetSchoolIds: ids, allSchools: true };
+  }
+
+  const ids = normalizeStringArray(schoolIds);
+  const single = String(schoolId || "").trim();
+  const target = ids.length > 0 ? ids : single ? [single] : [];
+  if (target.length === 0) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Provide schoolId, schoolIds[], or allSchools=true"
+    );
+  }
+  return { targetSchoolIds: target, allSchools: false };
+}
+
+function expectedResetPhrase({ allSchools, targetSchoolIds }) {
+  if (allSchools) return "DELETE ALL";
+  if (targetSchoolIds.length === 1) return `DELETE ${targetSchoolIds[0]}`;
+  return `DELETE ${targetSchoolIds.length} SCHOOLS`;
+}
+
+function expectedRestorePhrase({ restoreAll, targetSchoolIds }) {
+  if (restoreAll) return "RESTORE ALL";
+  if (targetSchoolIds.length === 1) return `RESTORE ${targetSchoolIds[0]}`;
+  return `RESTORE ${targetSchoolIds.length} SCHOOLS`;
+}
+
+async function copyDocTree({ srcDocRef, dstDocRef, bw }) {
+  const snap = await srcDocRef.get();
+  if (!snap.exists) return;
+
+  bw.set(dstDocRef, snap.data() || {}, { merge: false });
+
+  const subcols = await srcDocRef.listCollections();
+  for (const subcol of subcols) {
+    const docsSnap = await subcol.get();
+    for (const doc of docsSnap.docs) {
+      await copyDocTree({
+        srcDocRef: doc.ref,
+        dstDocRef: dstDocRef.collection(subcol.id).doc(doc.id),
+        bw,
+      });
+    }
+  }
+}
+
+async function deleteDocTree({ db, docRef, bw }) {
+  await db.recursiveDelete(docRef, bw);
+}
+
+function newBackupId() {
+  const rand = crypto.randomBytes(8).toString("hex");
+  return `backup_${Date.now()}_${rand}`;
+}
+
+async function requireCompletedBackup({ db, backupId, targetSchoolIds, allSchools }) {
+  const id = String(backupId || "").trim();
+  if (!id) {
+    throw new HttpsError(
+      "failed-precondition",
+      "backupId is required. Create a backup snapshot before executing a reset."
+    );
+  }
+
+  const ref = db.collection("platformBackups").doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new HttpsError("not-found", "backupId not found");
+  }
+
+  const data = snap.data() || {};
+  if (String(data.status || "") !== "COMPLETED") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Backup is not completed yet"
+    );
+  }
+
+  // Safety: ensure backup matches the reset target.
+  const backedUpSchoolIds = normalizeStringArray(data.schoolIds);
+  const backupAll = data.allSchools === true;
+  const targetSet = new Set(targetSchoolIds);
+  const backupSet = new Set(backedUpSchoolIds);
+
+  if (allSchools !== backupAll) {
+    throw new HttpsError(
+      "failed-precondition",
+      "backupId does not match the reset scope (all vs selected)"
+    );
+  }
+
+  for (const id2 of targetSet) {
+    if (!backupSet.has(id2)) {
+      throw new HttpsError(
+        "failed-precondition",
+        "backupId does not include all selected schools"
+      );
+    }
+  }
+
+  // Safety: require that backup is recent (within 6 hours).
+  const createdAt = data.createdAt;
+  const createdMs =
+    createdAt && typeof createdAt.toMillis === "function" ? createdAt.toMillis() : 0;
+  const ageMs = createdMs ? Date.now() - createdMs : Number.POSITIVE_INFINITY;
+  const maxAgeMs = 6 * 60 * 60 * 1000;
+  if (ageMs > maxAgeMs) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Backup is too old. Create a new backup snapshot before resetting."
+    );
+  }
+
+  return { backupRef: ref, backupData: data };
+}
+
+exports.createDataBackup = onCall(
+  {
+    timeoutSeconds: 540,
+    memory: "2GiB",
+    enforceAppCheck: true,
+  },
+  async (request) => {
+    const { callerUid } = await requireSuperAdminCaller(request);
+    await requireMaintenanceModeEnabled();
+
+    const db = admin.firestore();
+    const data = request.data || {};
+    const schoolId = String(data.schoolId || "").trim();
+    const schoolIds = normalizeStringArray(data.schoolIds);
+    const allSchools = normalizeBool(data.allSchools);
+
+    const { targetSchoolIds, allSchools: resolvedAll } = await resolveTargetSchoolIds({
+      db,
+      schoolId,
+      schoolIds,
+      allSchools,
+    });
+
+    // Create a backup record first.
+    const backupId = newBackupId();
+    const backupRef = db.collection("platformBackups").doc(backupId);
+    await backupRef.set(
+      {
+        backupId,
+        status: "RUNNING",
+        schoolIds: targetSchoolIds,
+        allSchools: resolvedAll,
+        createdByUid: callerUid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    const bw = db.bulkWriter();
+    bw.onWriteError((err) => {
+      console.error("BulkWriter error during createDataBackup", err);
+      return err.failedAttempts < 5;
+    });
+
+    // Copy each selected school subtree.
+    for (const sid of targetSchoolIds) {
+      const src = db.collection("schools").doc(sid);
+      const dst = backupRef.collection("schools").doc(sid);
+      await copyDocTree({ srcDocRef: src, dstDocRef: dst, bw });
+    }
+
+    // Copy users (Firestore) for these schools.
+    let totalUsers = 0;
+    for (const chunk of chunkArray(targetSchoolIds, 10)) {
+      const usersSnap = await db.collection("users").where("schoolId", "in", chunk).get();
+      totalUsers += usersSnap.size;
+      for (const userDoc of usersSnap.docs) {
+        const src = userDoc.ref;
+        const dst = backupRef.collection("users").doc(userDoc.id);
+        await copyDocTree({ srcDocRef: src, dstDocRef: dst, bw });
+      }
+    }
+
+    // Copy parent phone mappings.
+    let totalPhones = 0;
+    for (const chunk of chunkArray(targetSchoolIds, 10)) {
+      const phonesSnap = await db.collection("parentPhones").where("schoolId", "in", chunk).get();
+      totalPhones += phonesSnap.size;
+      for (const doc of phonesSnap.docs) {
+        bw.set(backupRef.collection("parentPhones").doc(doc.id), doc.data() || {}, { merge: false });
+      }
+    }
+
+    await bw.close();
+
+    await backupRef.set(
+      {
+        status: "COMPLETED",
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        counts: {
+          schools: targetSchoolIds.length,
+          users: totalUsers,
+          parentPhones: totalPhones,
+        },
+      },
+      { merge: true }
+    );
+
+    return {
+      ok: true,
+      backupId,
+      schoolIds: targetSchoolIds,
+      allSchools: resolvedAll,
+      counts: {
+        schools: targetSchoolIds.length,
+        users: totalUsers,
+        parentPhones: totalPhones,
+      },
+      note:
+        "This is an in-project Firestore snapshot to enable restore. For disaster recovery, also export to Cloud Storage.",
+    };
+  }
+);
+
+exports.listDataBackups = onCall({ enforceAppCheck: true }, async (request) => {
+  await requireSuperAdminCaller(request);
+  const db = admin.firestore();
+
+  const snap = await db
+    .collection("platformBackups")
+    .orderBy("createdAt", "desc")
+    .limit(25)
+    .get();
+
+  const backups = snap.docs.map((d) => {
+    const data = d.data() || {};
+    return {
+      backupId: d.id,
+      status: data.status || null,
+      allSchools: data.allSchools === true,
+      schoolIds: normalizeStringArray(data.schoolIds),
+      counts: data.counts || null,
+      createdByUid: data.createdByUid || null,
+      createdAt: data.createdAt || null,
+      completedAt: data.completedAt || null,
+    };
+  });
+
+  return { ok: true, backups };
+});
+
+exports.restoreDataBackup = onCall(
+  {
+    timeoutSeconds: 540,
+    memory: "2GiB",
+    enforceAppCheck: true,
+  },
+  async (request) => {
+    const { callerUid } = await requireSuperAdminCaller(request);
+    await requireMaintenanceModeEnabled();
+
+    const db = admin.firestore();
+    const data = request.data || {};
+
+    const backupId = String(data.backupId || "").trim();
+    const restoreAll = normalizeBool(data.restoreAll);
+    const schoolIds = normalizeStringArray(data.schoolIds);
+    const confirmPhrase = String(data.confirmPhrase || "").trim();
+    const overwriteConfirmed = normalizeBool(data.overwriteConfirmed);
+
+    if (!backupId) {
+      throw new HttpsError("invalid-argument", "backupId is required");
+    }
+    if (!overwriteConfirmed) {
+      throw new HttpsError(
+        "failed-precondition",
+        "overwriteConfirmed is required"
+      );
+    }
+
+    const backupRef = db.collection("platformBackups").doc(backupId);
+    const backupSnap = await backupRef.get();
+    if (!backupSnap.exists) {
+      throw new HttpsError("not-found", "Backup not found");
+    }
+    const backupData = backupSnap.data() || {};
+    if (String(backupData.status || "") !== "COMPLETED") {
+      throw new HttpsError("failed-precondition", "Backup is not completed");
+    }
+
+    const backupSchoolIds = normalizeStringArray(backupData.schoolIds);
+    const targetSchoolIds = restoreAll ? backupSchoolIds : schoolIds;
+    if (targetSchoolIds.length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Provide schoolIds[] or restoreAll=true"
+      );
+    }
+
+    const expected = expectedRestorePhrase({ restoreAll, targetSchoolIds }).toUpperCase();
+    if (confirmPhrase.toUpperCase() !== expected) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Type the exact confirmation phrase: ${expected}`
+      );
+    }
+
+    await db.collection("platformResetLogs").add({
+      type: "restoreDataBackup",
+      backupId,
+      restoreAll,
+      schoolIds: targetSchoolIds,
+      requestedByUid: callerUid,
+      requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const bw = db.bulkWriter();
+    bw.onWriteError((err) => {
+      console.error("BulkWriter error during restoreDataBackup", err);
+      return err.failedAttempts < 5;
+    });
+
+    // Restore schools.
+    for (const sid of targetSchoolIds) {
+      const src = backupRef.collection("schools").doc(sid);
+      const dst = db.collection("schools").doc(sid);
+
+      // Replace existing data.
+      await deleteDocTree({ db, docRef: dst, bw });
+      await copyDocTree({ srcDocRef: src, dstDocRef: dst, bw });
+    }
+
+    // Restore users + parentPhones.
+    // Delete then restore users per school to avoid stale data.
+    for (const sid of targetSchoolIds) {
+      const existingUsersSnap = await db.collection("users").where("schoolId", "==", sid).get();
+      for (const doc of existingUsersSnap.docs) {
+        const role = String((doc.data() || {}).role || "");
+        if (role === "superAdmin") continue;
+        await deleteDocTree({ db, docRef: doc.ref, bw });
+      }
+
+      const backupUsersSnap = await backupRef.collection("users").where("schoolId", "==", sid).get();
+      for (const doc of backupUsersSnap.docs) {
+        const role = String((doc.data() || {}).role || "");
+        if (role === "superAdmin") continue;
+        const src = doc.ref;
+        const dst = db.collection("users").doc(doc.id);
+        await copyDocTree({ srcDocRef: src, dstDocRef: dst, bw });
+      }
+
+      const existingPhonesSnap = await db.collection("parentPhones").where("schoolId", "==", sid).get();
+      for (const doc of existingPhonesSnap.docs) {
+        bw.delete(doc.ref);
+      }
+      const backupPhonesSnap = await backupRef.collection("parentPhones").where("schoolId", "==", sid).get();
+      for (const doc of backupPhonesSnap.docs) {
+        bw.set(db.collection("parentPhones").doc(doc.id), doc.data() || {}, { merge: false });
+      }
+    }
+
+    await bw.close();
+
+    return {
+      ok: true,
+      backupId,
+      restored: {
+        schools: targetSchoolIds.length,
+      },
+      warning:
+        "Restore copies Firestore data only. Firebase Auth users/passwords are not restored automatically.",
+    };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Super Admin: Single-file backups (Cloud Storage) + restore
+// ---------------------------------------------------------------------------
+
+function newFileBackupId() {
+  const rand = crypto.randomBytes(8).toString("hex");
+  return `filebackup_${Date.now()}_${rand}`;
+}
+
+function isPlainObject(v) {
+  return v && typeof v === "object" && v.constructor === Object;
+}
+
+function encodeFirestoreValue(v) {
+  if (v == null) return v;
+
+  // Timestamp
+  if (v instanceof admin.firestore.Timestamp) {
+    return {
+      __skType: "timestamp",
+      seconds: v.seconds,
+      nanoseconds: v.nanoseconds,
+    };
+  }
+
+  // GeoPoint
+  if (v instanceof admin.firestore.GeoPoint) {
+    return {
+      __skType: "geopoint",
+      latitude: v.latitude,
+      longitude: v.longitude,
+    };
+  }
+
+  // Bytes (Buffer)
+  if (Buffer.isBuffer(v)) {
+    return {
+      __skType: "bytes",
+      base64: v.toString("base64"),
+    };
+  }
+
+  if (Array.isArray(v)) {
+    return v.map(encodeFirestoreValue);
+  }
+
+  if (isPlainObject(v)) {
+    const out = {};
+    for (const [k, vv] of Object.entries(v)) {
+      out[k] = encodeFirestoreValue(vv);
+    }
+    return out;
+  }
+
+  return v;
+}
+
+function decodeFirestoreValue(db, v) {
+  if (v == null) return v;
+  if (Array.isArray(v)) return v.map((x) => decodeFirestoreValue(db, x));
+
+  if (isPlainObject(v) && typeof v.__skType === "string") {
+    if (v.__skType === "timestamp") {
+      const s = safeInt(v.seconds);
+      const ns = safeInt(v.nanoseconds);
+      return new admin.firestore.Timestamp(s, ns);
+    }
+    if (v.__skType === "geopoint") {
+      return new admin.firestore.GeoPoint(readNum(v.latitude), readNum(v.longitude));
+    }
+    if (v.__skType === "bytes") {
+      const b64 = String(v.base64 || "");
+      return Buffer.from(b64, "base64");
+    }
+  }
+
+  if (isPlainObject(v)) {
+    const out = {};
+    for (const [k, vv] of Object.entries(v)) {
+      out[k] = decodeFirestoreValue(db, vv);
+    }
+    return out;
+  }
+
+  return v;
+}
+
+async function writeJsonLine(stream, obj) {
+  const line = JSON.stringify(obj) + "\n";
+  if (!stream.write(line)) {
+    await once(stream, "drain");
+  }
+}
+
+async function writeDocTreeToStream({ docRef, stream, counts }) {
+  const snap = await docRef.get();
+  if (!snap.exists) return;
+
+  const data = snap.data() || {};
+  await writeJsonLine(stream, {
+    type: "doc",
+    path: docRef.path,
+    data: encodeFirestoreValue(data),
+  });
+  counts.docs++;
+
+  const subcols = await docRef.listCollections();
+  for (const subcol of subcols) {
+    const docsSnap = await subcol.get();
+    for (const doc of docsSnap.docs) {
+      await writeDocTreeToStream({
+        docRef: doc.ref,
+        stream,
+        counts,
+      });
+    }
+  }
+}
+
+exports.createFileBackup = onCall(
+  {
+    timeoutSeconds: 540,
+    memory: "2GiB",
+    enforceAppCheck: true,
+  },
+  async (request) => {
+    const { callerUid } = await requireSuperAdminCaller(request);
+    await requireMaintenanceModeEnabled();
+
+    const db = admin.firestore();
+    const data = request.data || {};
+    const schoolId = String(data.schoolId || "").trim();
+    const schoolIds = normalizeStringArray(data.schoolIds);
+    const allSchools = normalizeBool(data.allSchools);
+
+    const { targetSchoolIds, allSchools: resolvedAll } = await resolveTargetSchoolIds({
+      db,
+      schoolId,
+      schoolIds,
+      allSchools,
+    });
+
+    const backupFileId = newFileBackupId();
+    const objectPath = `platform_backups/${backupFileId}.jsonl.gz`;
+
+    const metaRef = db.collection("platformFileBackups").doc(backupFileId);
+    await metaRef.set(
+      {
+        backupFileId,
+        objectPath,
+        status: "RUNNING",
+        schoolIds: targetSchoolIds,
+        allSchools: resolvedAll,
+        createdByUid: callerUid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(objectPath);
+    const gzip = zlib.createGzip();
+    const writeStream = file.createWriteStream({
+      resumable: false,
+      metadata: {
+        contentType: "application/gzip",
+        cacheControl: "private, max-age=0, no-transform",
+      },
+    });
+
+    gzip.pipe(writeStream);
+
+    const counts = { docs: 0, schools: 0, users: 0, parentPhones: 0 };
+
+    try {
+      await writeJsonLine(gzip, {
+        type: "meta",
+        format: "sk_school_master.jsonl.gz",
+        version: 1,
+        createdAtMs: Date.now(),
+        schoolIds: targetSchoolIds,
+        allSchools: resolvedAll,
+      });
+
+      // Schools tree
+      for (const sid of targetSchoolIds) {
+        await writeDocTreeToStream({
+          docRef: db.collection("schools").doc(sid),
+          stream: gzip,
+          counts,
+        });
+        counts.schools++;
+      }
+
+      // Users + subcollections (Firestore)
+      for (const chunk of chunkArray(targetSchoolIds, 10)) {
+        const usersSnap = await db
+          .collection("users")
+          .where("schoolId", "in", chunk)
+          .get();
+        for (const userDoc of usersSnap.docs) {
+          await writeDocTreeToStream({
+            docRef: userDoc.ref,
+            stream: gzip,
+            counts,
+          });
+          counts.users++;
+        }
+      }
+
+      // Parent phone mappings
+      for (const chunk of chunkArray(targetSchoolIds, 10)) {
+        const phonesSnap = await db
+          .collection("parentPhones")
+          .where("schoolId", "in", chunk)
+          .get();
+        for (const doc of phonesSnap.docs) {
+          await writeJsonLine(gzip, {
+            type: "doc",
+            path: doc.ref.path,
+            data: encodeFirestoreValue(doc.data() || {}),
+          });
+          counts.docs++;
+          counts.parentPhones++;
+        }
+      }
+
+      gzip.end();
+      await finished(writeStream);
+
+      await metaRef.set(
+        {
+          status: "COMPLETED",
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          counts,
+          note:
+            "Single-file Firestore backup (JSONL.GZ). Firebase Auth users/passwords are not included.",
+        },
+        { merge: true }
+      );
+
+      return {
+        ok: true,
+        backupFileId,
+        objectPath,
+        schoolIds: targetSchoolIds,
+        allSchools: resolvedAll,
+        counts,
+      };
+    } catch (e) {
+      console.error("createFileBackup failed", e);
+      try {
+        gzip.destroy();
+        writeStream.destroy();
+      } catch (_) {}
+
+      await metaRef.set(
+        {
+          status: "FAILED",
+          error: String(e && e.message ? e.message : e),
+          failedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      throw e;
+    }
+  }
+);
+
+exports.listFileBackups = onCall({ enforceAppCheck: true }, async (request) => {
+  await requireSuperAdminCaller(request);
+  const db = admin.firestore();
+
+  const snap = await db
+    .collection("platformFileBackups")
+    .orderBy("createdAt", "desc")
+    .limit(25)
+    .get();
+
+  const backups = snap.docs.map((d) => {
+    const data = d.data() || {};
+    const createdAt = data.createdAt;
+    const createdAtIso =
+      createdAt && typeof createdAt.toDate === "function"
+        ? createdAt.toDate().toISOString()
+        : null;
+
+    return {
+      backupFileId: d.id,
+      status: data.status || null,
+      allSchools: data.allSchools === true,
+      schoolIds: normalizeStringArray(data.schoolIds),
+      objectPath: data.objectPath || null,
+      counts: data.counts || null,
+      createdByUid: data.createdByUid || null,
+      createdAtIso,
+      note: data.note || null,
+    };
+  });
+
+  return { ok: true, backups };
+});
+
+exports.getFileBackupDownloadUrl = onCall({ enforceAppCheck: true }, async (request) => {
+  await requireSuperAdminCaller(request);
+  const db = admin.firestore();
+  const data = request.data || {};
+  const backupFileId = String(data.backupFileId || "").trim();
+  if (!backupFileId) {
+    throw new HttpsError("invalid-argument", "backupFileId is required");
+  }
+
+  const metaSnap = await db.collection("platformFileBackups").doc(backupFileId).get();
+  if (!metaSnap.exists) {
+    throw new HttpsError("not-found", "backupFileId not found");
+  }
+  const meta = metaSnap.data() || {};
+  if (String(meta.status || "") !== "COMPLETED") {
+    throw new HttpsError("failed-precondition", "Backup is not completed");
+  }
+
+  const objectPath = String(meta.objectPath || "").trim();
+  if (!objectPath) {
+    throw new HttpsError("failed-precondition", "Backup objectPath missing");
+  }
+
+  const bucket = admin.storage().bucket();
+  const [url] = await bucket.file(objectPath).getSignedUrl({
+    version: "v4",
+    action: "read",
+    expires: Date.now() + 15 * 60 * 1000,
+  });
+
+  return { ok: true, url, expiresInSeconds: 900 };
+});
+
+exports.restoreFileBackup = onCall(
+  {
+    timeoutSeconds: 540,
+    memory: "2GiB",
+    enforceAppCheck: true,
+  },
+  async (request) => {
+    const { callerUid } = await requireSuperAdminCaller(request);
+    await requireMaintenanceModeEnabled();
+
+    const db = admin.firestore();
+    const data = request.data || {};
+
+    const backupFileId = String(data.backupFileId || "").trim();
+    const restoreAll = normalizeBool(data.restoreAll);
+    const schoolIds = normalizeStringArray(data.schoolIds);
+    const confirmPhrase = String(data.confirmPhrase || "").trim();
+    const overwriteConfirmed = normalizeBool(data.overwriteConfirmed);
+
+    if (!backupFileId) {
+      throw new HttpsError("invalid-argument", "backupFileId is required");
+    }
+    if (!overwriteConfirmed) {
+      throw new HttpsError("failed-precondition", "overwriteConfirmed is required");
+    }
+
+    const metaRef = db.collection("platformFileBackups").doc(backupFileId);
+    const metaSnap = await metaRef.get();
+    if (!metaSnap.exists) {
+      throw new HttpsError("not-found", "Backup not found");
+    }
+    const meta = metaSnap.data() || {};
+    if (String(meta.status || "") !== "COMPLETED") {
+      throw new HttpsError("failed-precondition", "Backup is not completed");
+    }
+
+    const backupSchoolIds = normalizeStringArray(meta.schoolIds);
+    const targetSchoolIds = restoreAll ? backupSchoolIds : schoolIds;
+    if (targetSchoolIds.length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Provide schoolIds[] or restoreAll=true"
+      );
+    }
+
+    const expected = expectedRestorePhrase({ restoreAll, targetSchoolIds }).toUpperCase();
+    if (confirmPhrase.toUpperCase() !== expected) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Type the exact confirmation phrase: ${expected}`
+      );
+    }
+
+    const objectPath = String(meta.objectPath || "").trim();
+    if (!objectPath) {
+      throw new HttpsError("failed-precondition", "Backup objectPath missing");
+    }
+
+    await db.collection("platformResetLogs").add({
+      type: "restoreFileBackup",
+      backupFileId,
+      restoreAll,
+      schoolIds: targetSchoolIds,
+      requestedByUid: callerUid,
+      requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const targetSet = new Set(targetSchoolIds);
+
+    const bw = db.bulkWriter();
+    bw.onWriteError((err) => {
+      console.error("BulkWriter error during restoreFileBackup", err);
+      return err.failedAttempts < 5;
+    });
+
+    // 1) Delete existing data for target scope.
+    for (const sid of targetSchoolIds) {
+      const schoolRef = db.collection("schools").doc(sid);
+      await deleteDocTree({ db, docRef: schoolRef, bw });
+
+      const existingUsersSnap = await db
+        .collection("users")
+        .where("schoolId", "==", sid)
+        .get();
+      for (const doc of existingUsersSnap.docs) {
+        const role = String((doc.data() || {}).role || "");
+        if (role === "superAdmin") continue;
+        await deleteDocTree({ db, docRef: doc.ref, bw });
+      }
+
+      const existingPhonesSnap = await db
+        .collection("parentPhones")
+        .where("schoolId", "==", sid)
+        .get();
+      for (const doc of existingPhonesSnap.docs) {
+        bw.delete(doc.ref);
+      }
+    }
+
+    // 2) Stream restore from JSONL.GZ.
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(objectPath);
+
+    const rl = readline.createInterface({
+      input: file.createReadStream().pipe(zlib.createGunzip()),
+      crlfDelay: Infinity,
+    });
+
+    const userSchoolByUid = new Map();
+    let restoredDocs = 0;
+
+    for await (const line of rl) {
+      const trimmed = String(line || "").trim();
+      if (!trimmed) continue;
+
+      let obj;
+      try {
+        obj = JSON.parse(trimmed);
+      } catch (_) {
+        continue;
+      }
+
+      if (!obj || obj.type !== "doc") continue;
+      const path = String(obj.path || "");
+      if (!path) continue;
+
+      const segments = path.split("/").filter(Boolean);
+      if (segments.length < 2) continue;
+
+      const top = segments[0];
+      const id = segments[1];
+
+      if (top === "schools") {
+        if (!targetSet.has(id)) continue;
+        const decoded = decodeFirestoreValue(db, obj.data || {});
+        bw.set(db.doc(path), decoded, { merge: false });
+        restoredDocs++;
+        continue;
+      }
+
+      if (top === "users") {
+        const uid = id;
+        // Root doc first, then subcollections.
+        if (segments.length === 2) {
+          const decoded = decodeFirestoreValue(db, obj.data || {});
+          const sid = String((decoded || {}).schoolId || "");
+          if (!targetSet.has(sid)) {
+            userSchoolByUid.set(uid, null);
+            continue;
+          }
+          userSchoolByUid.set(uid, sid);
+          bw.set(db.doc(path), decoded, { merge: false });
+          restoredDocs++;
+          continue;
+        }
+
+        const sid = userSchoolByUid.get(uid);
+        if (!sid || !targetSet.has(sid)) continue;
+        const decoded = decodeFirestoreValue(db, obj.data || {});
+        bw.set(db.doc(path), decoded, { merge: false });
+        restoredDocs++;
+        continue;
+      }
+
+      if (top === "parentPhones") {
+        const decoded = decodeFirestoreValue(db, obj.data || {});
+        const sid = String((decoded || {}).schoolId || "");
+        if (!targetSet.has(sid)) continue;
+        bw.set(db.doc(path), decoded, { merge: false });
+        restoredDocs++;
+        continue;
+      }
+    }
+
+    await bw.close();
+
+    return {
+      ok: true,
+      backupFileId,
+      restored: {
+        schools: targetSchoolIds.length,
+        docs: restoredDocs,
+      },
+      warning:
+        "Restore copies Firestore data only. Firebase Auth users/passwords are not restored automatically.",
+    };
+  }
+);
+
+exports.resetSchoolData = onCall(
+  {
+    timeoutSeconds: 540,
+    memory: "2GiB",
+    enforceAppCheck: true,
+  },
+  async (request) => {
+    const { callerUid } = await requireSuperAdminCaller(request);
+    await requireMaintenanceModeEnabled();
+
+    const data = request.data || {};
+    const schoolId = String(data.schoolId || "").trim();
+    const schoolIds = normalizeStringArray(data.schoolIds);
+    const allSchools = normalizeBool(data.allSchools);
+    const confirmPhrase = String(data.confirmPhrase || "").trim();
+    const backupConfirmed = normalizeBool(data.backupConfirmed);
+    const backupId = String(data.backupId || "").trim();
+    const execute = normalizeBool(data.execute);
+    const deleteAuthUsers = normalizeBool(data.deleteAuthUsers);
+
+    const db = admin.firestore();
+    const resolved = await resolveTargetSchoolIds({
+      db,
+      schoolId,
+      schoolIds,
+      allSchools,
+    });
+    const targetSchoolIds = resolved.targetSchoolIds;
+    const isAll = resolved.allSchools;
+
+    if (!backupConfirmed) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Backup confirmation is required"
+      );
+    }
+
+    const expectedPhrase = expectedResetPhrase({ allSchools: isAll, targetSchoolIds }).toUpperCase();
+    if (confirmPhrase.toUpperCase() !== expectedPhrase) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Type the exact confirmation phrase: ${expectedPhrase}`
+      );
+    }
+
+    // Validate school existence (for selected schools).
+    for (const sid of targetSchoolIds) {
+      const schoolSnap = await db.collection("schools").doc(sid).get();
+      if (!schoolSnap.exists) {
+        throw new HttpsError("not-found", `School not found: ${sid}`);
+      }
+    }
+
+    // Collect related docs for reporting / optional Auth deletion.
+    let usersDocs = [];
+    let phonesDocs = [];
+    if (isAll) {
+      const [u, p] = await Promise.all([
+        db.collection("users").get(),
+        db.collection("parentPhones").get(),
+      ]);
+      usersDocs = u.docs;
+      phonesDocs = p.docs;
+    } else {
+      for (const chunk of chunkArray(targetSchoolIds, 10)) {
+        const [u, p] = await Promise.all([
+          db.collection("users").where("schoolId", "in", chunk).get(),
+          db.collection("parentPhones").where("schoolId", "in", chunk).get(),
+        ]);
+        usersDocs.push(...u.docs);
+        phonesDocs.push(...p.docs);
+      }
+    }
+
+    // Never delete the caller and never delete superAdmin user docs.
+    const affectedUserDocs = usersDocs.filter((d) => {
+      if (d.id === callerUid) return false;
+      const role = String((d.data() || {}).role || "");
+      if (role === "superAdmin") return false;
+      return true;
+    });
+
+    const affectedUserUids = affectedUserDocs
+      .map((d) => d.id)
+      .filter((uid) => uid && uid !== callerUid);
+
+    // Preview mode (safe default). Returns the planned deletes.
+    if (!execute) {
+      return {
+        ok: true,
+        mode: "preview",
+        allSchools: isAll,
+        schoolIds: targetSchoolIds,
+        willDelete: {
+          schools: targetSchoolIds.length,
+          userDocs: affectedUserDocs.length,
+          parentPhoneMappings: phonesDocs.length,
+          authUsers: deleteAuthUsers ? affectedUserUids.length : 0,
+        },
+        note:
+          "Set execute=true to perform the reset. This action is destructive and cannot be undone.",
+      };
+    }
+
+    // Enforce that a completed backup exists before executing.
+    await requireCompletedBackup({
+      db,
+      backupId,
+      targetSchoolIds,
+      allSchools: isAll,
+    });
+
+    // Write an audit log (Admin SDK bypasses rules; client read not required).
+    await db.collection("platformResetLogs").add({
+      type: "resetSchoolData",
+      schoolIds: targetSchoolIds,
+      allSchools: isAll,
+      backupId,
+      backupConfirmed: true,
+      deleteAuthUsers,
+      requestedByUid: callerUid,
+      requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Perform deletes using BulkWriter + recursiveDelete.
+    const bw = db.bulkWriter();
+    bw.onWriteError((err) => {
+      console.error("BulkWriter error during resetSchoolData", err);
+      return err.failedAttempts < 5;
+    });
+
+    // Delete school subtrees.
+    for (const sid of targetSchoolIds) {
+      await db.recursiveDelete(db.collection("schools").doc(sid), bw);
+    }
+
+    // Delete users (and subcollections like notifications).
+    for (const doc of affectedUserDocs) {
+      await db.recursiveDelete(doc.ref, bw);
+    }
+
+    // Delete phone mappings.
+    for (const doc of phonesDocs) {
+      bw.delete(doc.ref);
+    }
+
+    await bw.close();
+
+    // Optionally delete Auth users (never delete the caller).
+    const authDeleteResults = [];
+    if (deleteAuthUsers) {
+      for (const uid of affectedUserUids) {
+        try {
+          await admin.auth().deleteUser(uid);
+          authDeleteResults.push({ uid, ok: true });
+        } catch (e) {
+          // Auth deletion is best-effort. Firestore was already deleted above.
+          authDeleteResults.push({ uid, ok: false, error: String(e) });
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      mode: "execute",
+      allSchools: isAll,
+      schoolIds: targetSchoolIds,
+      deleted: {
+        schools: targetSchoolIds.length,
+        userDocs: affectedUserDocs.length,
+        parentPhoneMappings: phonesDocs.length,
+        authUsersAttempted: deleteAuthUsers ? affectedUserUids.length : 0,
+        authUsersDeleted: authDeleteResults.filter((r) => r.ok).length,
+      },
+      authUserDeleteFailures: authDeleteResults.filter((r) => !r.ok).slice(0, 25),
+      warning:
+        "Reset completed. If you deleted Auth users, some may fail if already removed or protected by provider. See authUserDeleteFailures.",
+    };
+  }
+);
+
+exports.changeParentPin = onCall({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in required");
   }
@@ -1683,7 +3362,7 @@ exports.changeParentPin = onCall(async (request) => {
 // Teacher Accounts (email/password)
 // ---------------------------------------------------------------------------
 
-exports.createOrResetTeacherAccount = onCall(async (request) => {
+exports.createOrResetTeacherAccount = onCall({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in required");
   }

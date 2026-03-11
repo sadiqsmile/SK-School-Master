@@ -3,7 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 /// Calls secure backend functions to create/reset parent logins.
 class ParentAccountService {
   ParentAccountService({FirebaseFunctions? functions})
-      : _functions = functions ?? FirebaseFunctions.instance;
+  : _functions = functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseFunctions _functions;
 

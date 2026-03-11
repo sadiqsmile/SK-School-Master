@@ -11,6 +11,10 @@ import 'package:school_app/models/announcement.dart';
 import 'package:school_app/models/student.dart';
 import 'package:school_app/providers/announcement_provider.dart';
 import 'package:school_app/providers/core_providers.dart';
+import 'package:school_app/models/school_branding.dart';
+import 'package:school_app/providers/current_user_doc_provider.dart';
+import 'package:school_app/providers/school_branding_provider.dart';
+import 'package:school_app/providers/school_provider.dart';
 
 class ParentShell extends ConsumerStatefulWidget {
   const ParentShell({super.key});
@@ -45,9 +49,79 @@ class _ParentShellState extends ConsumerState<ParentShell> {
   Widget build(BuildContext context) {
     final unreadAsync = ref.watch(parentUnreadNotificationsCountProvider);
 
+    final schoolName = ref.watch(schoolProvider).maybeWhen(
+          data: (doc) => (doc.data()?['name'] ?? '').toString().trim(),
+          orElse: () => '',
+        );
+
+    final branding = ref.watch(schoolBrandingProvider).maybeWhen(
+          data: (b) => b,
+          orElse: () => SchoolBranding.defaults(),
+        );
+
+    final logoUrl = ref.watch(schoolBrandingLogoUrlProvider).maybeWhen(
+          data: (u) => u,
+          orElse: () => null,
+        );
+
+    final parentName = ref.watch(currentUserDisplayNameProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_title),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              schoolName.isEmpty ? 'School' : schoolName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+            ),
+            Text(
+              parentName.trim().isEmpty ? _title : '$_title • ${parentName.trim()}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: Color(0xFFF1F5F9),
+              ),
+            ),
+          ],
+        ),
+        leading: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: (logoUrl ?? '').trim().isEmpty
+                ? const Icon(Icons.school_rounded, color: Color(0xFF0F172A))
+                : Image.network(
+                    logoUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(Icons.image_not_supported_rounded);
+                    },
+                  ),
+          ),
+        ),
+        leadingWidth: 56,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [branding.primaryColor, branding.secondaryColor],
+            ),
+          ),
+        ),
         actions: [
           unreadAsync.when(
             loading: () => IconButton(

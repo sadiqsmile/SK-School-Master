@@ -11,6 +11,7 @@ import 'package:school_app/models/exam_template.dart';
 import 'package:school_app/models/student.dart';
 import 'package:school_app/providers/exam_template_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
+import 'package:school_app/providers/school_branding_provider.dart';
 import 'package:school_app/providers/school_provider.dart';
 import 'package:school_app/services/exam_template_service.dart';
 
@@ -200,6 +201,11 @@ class _MarksCardTemplateBuilderScreenState extends ConsumerState<MarksCardTempla
     required String schoolName,
   }) {
     final templateForPreview = _buildTemplateForPreview();
+
+    final schoolLogoUrl = ref.watch(schoolBrandingLogoUrlProvider).maybeWhen(
+          data: (u) => u,
+          orElse: () => null,
+        );
 
     return ListView(
       padding: const EdgeInsets.all(12),
@@ -434,6 +440,7 @@ class _MarksCardTemplateBuilderScreenState extends ConsumerState<MarksCardTempla
           student: _mockStudent(),
           marks: _mockMarks(templateForPreview),
           schoolName: schoolName,
+          schoolLogoUrl: schoolLogoUrl,
         ),
         const SizedBox(height: 70),
       ],

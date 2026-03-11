@@ -6,7 +6,10 @@ import 'package:school_app/features/auth/screens/enter_school_screen.dart';
 import 'package:school_app/features/auth/screens/school_loader_screen.dart';
 import 'package:school_app/features/super_admin/screens/super_admin_dashboard.dart';
 import 'package:school_app/features/super_admin/screens/maintenance_screen.dart';
+import 'package:school_app/features/super_admin/screens/backup_restore_screen.dart';
+import 'package:school_app/features/super_admin/screens/google_sheets_sync_screen.dart';
 import 'package:school_app/features/school_admin/dashboard/screens/school_admin_dashboard.dart';
+import 'package:school_app/features/school_admin/data_tools/screens/data_tools_screen.dart';
 import 'package:school_app/features/school_admin/teachers/screens/teachers_screen.dart';
 import 'package:school_app/features/school_admin/teachers/screens/add_teacher_screen.dart';
 import 'package:school_app/features/school_admin/students/screens/students_screen.dart';
@@ -31,6 +34,7 @@ import 'package:school_app/features/school_admin/analytics/screens/school_analyt
 import 'package:school_app/features/school_admin/analytics/screens/student_risk_list_screen.dart';
 import 'package:school_app/features/school_admin/notifications/screens/notifications_screen.dart';
 import 'package:school_app/features/school_admin/settings/screens/modules_control_screen.dart';
+import 'package:school_app/features/school_admin/settings/screens/branding_screen.dart';
 import 'package:school_app/features/parent/screens/parent_login_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/teacher_attendance_screen.dart';
 import 'package:school_app/features/teacher/homework/screens/homework_screen.dart';
@@ -44,7 +48,7 @@ import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/models/user_role.dart';
 
 final appRouter = GoRouter(
-  initialLocation: '/school-loader',
+  initialLocation: '/',
   routes: [
     GoRoute(
       path: '/school-loader',
@@ -76,11 +80,35 @@ final appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/super-admin/backup-restore',
+      builder: (context, state) => const RoleGuard(
+        title: 'Backup & Restore',
+        allowedRoles: [UserRole.superAdmin],
+        child: BackupRestoreScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/super-admin/google-sheets',
+      builder: (context, state) => const RoleGuard(
+        title: 'Google Sheets Sync',
+        allowedRoles: [UserRole.superAdmin],
+        child: GoogleSheetsSyncScreen(),
+      ),
+    ),
+    GoRoute(
       path: '/school-admin',
       builder: (context, state) => const RoleGuard(
         title: 'School Admin',
         allowedRoles: [UserRole.admin],
         child: SchoolAdminDashboard(),
+      ),
+    ),
+    GoRoute(
+      path: '/school-admin/data-tools',
+      builder: (context, state) => const RoleGuard(
+        title: 'Data Tools',
+        allowedRoles: [UserRole.admin],
+        child: SchoolAdminDataToolsScreen(),
       ),
     ),
     GoRoute(
@@ -220,6 +248,14 @@ final appRouter = GoRouter(
         title: 'Module Control',
         allowedRoles: [UserRole.admin],
         child: ModulesControlScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/school-admin/settings/branding',
+      builder: (context, state) => const RoleGuard(
+        title: 'Branding',
+        allowedRoles: [UserRole.admin],
+        child: BrandingScreen(),
       ),
     ),
     GoRoute(

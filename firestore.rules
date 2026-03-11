@@ -60,6 +60,15 @@ service cloud.firestore {
       return isSchoolMember(schoolId) && isAdmin();
     }
 
+    function isStaffMember(schoolId) {
+      // Staff = super admin, school admin, or teacher in the same school.
+      // Parents are intentionally excluded to avoid leaking other students'
+      // data via analytics/index collections.
+      return isSuperAdmin()
+        || isSchoolAdmin(schoolId)
+        || (isTeacher() && isSchoolMember(schoolId));
+    }
+
     function teacherProfileExists(schoolId) {
       return exists(/databases/$(database)/documents/schools/$(schoolId)/teachers/$(request.auth.uid));
     }
@@ -77,16 +86,14 @@ service cloud.firestore {
     }
 
     function isTeacherAssignedToClassKey(schoolId, classKey) {
-      // Preferred: enforce by `assignmentKeys` on the teacher profile.
-      // Backward-compat: if a legacy teacher profile exists but doesn't yet
-      // have `assignmentKeys`, allow access (until a backfill is run).
+      // Strict: teacher can only access records for classKeys explicitly
+      // listed on their teacher profile as `assignmentKeys`.
+      // If you have legacy teacher docs without `assignmentKeys`, run the
+      // Super Admin maintenance/backfill to populate them.
       return isSchoolMember(schoolId)
         && isTeacher()
         && teacherProfileExists(schoolId)
-        && (
-          teacherAssignmentKeys(schoolId).hasAny([classKey])
-          || !(teacherProfile(schoolId).data.assignmentKeys is list)
-        );
+        && teacherAssignmentKeys(schoolId).hasAny([classKey]);
     }
 
     function isParentOfStudent(schoolId, studentId) {
@@ -149,6 +156,14 @@ service cloud.firestore {
         allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
       }
 
+      // schools/{schoolId}/settings/branding
+      // - Read: any signed-in user in the school (so dashboards + marks cards can show it)
+      // - Write: school admin or super admin
+      match /settings/branding {
+        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+        allow write: if isSuperAdmin() || isSchoolAdmin(schoolId);
+      }
+
       // ---- Notifications (system-managed) ----
       // Written by Cloud Functions (Admin SDK bypasses rules).
       // Clients may read for in-app notification feeds.
@@ -164,12 +179,43 @@ service cloud.firestore {
       // ---- Analytics / indexed summaries (system-managed) ----
       // These documents are written by Cloud Functions (Admin SDK bypasses rules).
       // Clients may read for fast dashboards/reports.
-      match /analytics/{docId} {
-        allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+      // IMPORTANT: Do NOT allow parents to read school analytics collections
+      // (they can contain other students' data).
+
+      // School-level risk summary:
+      // schools/{schoolId}/analytics/risk_summary
+      match /analytics/risk_summary {
+        allow read: if isStaffMember(schoolId);
+        allow write: if false;
+      }
+
+      // Attendance trend chart:
+      // schools/{schoolId}/analytics/attendance_daily/days/{dateKey}
+      match /analytics/attendance_daily {
+        allow read: if isStaffMember(schoolId);
         allow write: if false;
 
-        match /{subDoc=**} {
-          allow read: if isSchoolMember(schoolId) || isSuperAdmin();
+        match /days/{dateKey} {
+          allow read: if isStaffMember(schoolId);
+          allow write: if false;
+        }
+      }
+
+      // Student risk index:
+      // schools/{schoolId}/analytics/student_risk/students/{studentId}
+      match /analytics/student_risk {
+        allow read: if isStaffMember(schoolId);
+        allow write: if false;
+
+        match /students/{studentId} {
+          allow read: if isSuperAdmin()
+            || isSchoolAdmin(schoolId)
+            || (
+              isTeacher()
+              && isSchoolMember(schoolId)
+              && resource.data.classKey is string
+              && isTeacherAssignedToClassKey(schoolId, resource.data.classKey)
+            );
           allow write: if false;
         }
       }
@@ -225,7 +271,6 @@ service cloud.firestore {
           || (isTeacher() && isSchoolMember(schoolId)
               && resource.data.classKey is string
               && isTeacherAssignedToClassKey(schoolId, resource.data.classKey))
-          || (isTeacher() && isSchoolMember(schoolId) && !(resource.data.classKey is string))
           || isParentOfStudent(schoolId, studentId))
           && moduleEnabled(schoolId, 'students');
 
@@ -397,7 +442,6 @@ service cloud.firestore {
                     get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey
                   )
                 )
-                || !(get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey is string)
               )
             ))
             && moduleEnabled(schoolId, 'exams');
@@ -415,7 +459,6 @@ service cloud.firestore {
                     get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey
                   )
                 )
-                || !(get(/databases/$(database)/documents/schools/$(schoolId)/exams/$(examId)).data.classKey is string)
               )
             ))
             && moduleEnabled(schoolId, 'exams');
@@ -428,9 +471,12 @@ service cloud.firestore {
       }
     }
 
-    // Platform config/stats: super admin only.
+    // Platform documents:
+    // - platform/status: public read (used for global maintenance banner), super admin write.
+    // - everything else under platform/*: super admin only.
     match /platform/{docId} {
-      allow read, write: if isSuperAdmin();
+      allow read: if docId == 'status' || isSuperAdmin();
+      allow write: if isSuperAdmin();
     }
 
     // Parent phone -> parent uid mapping (system-managed).

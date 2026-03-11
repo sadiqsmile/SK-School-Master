@@ -10,6 +10,7 @@ import 'package:school_app/models/student.dart';
 import 'package:school_app/providers/exam_provider.dart';
 import 'package:school_app/providers/exam_template_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
+import 'package:school_app/providers/school_branding_provider.dart';
 import 'package:school_app/providers/school_provider.dart';
 import 'package:school_app/services/exam_template_service.dart';
 import 'package:school_app/features/exams/widgets/marks_card_renderer.dart';
@@ -301,6 +302,15 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
     required String schoolName,
     required ExamTemplate template,
   }) async {
+    String? schoolLogoUrl;
+    try {
+      schoolLogoUrl = await ref.read(schoolBrandingLogoUrlProvider.future);
+    } catch (_) {
+      schoolLogoUrl = null;
+    }
+
+    if (!context.mounted) return;
+
     // Lightweight mock preview.
     final exam = Exam(
       id: 'preview',
@@ -367,6 +377,7 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
                   student: student,
                   marks: marks,
                   schoolName: schoolName,
+                  schoolLogoUrl: schoolLogoUrl,
                 ),
               ],
             ),
