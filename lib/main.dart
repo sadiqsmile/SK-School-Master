@@ -1,9 +1,9 @@
 // main.dart
-import 'package:flutter/foundation.dart';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:school_app/config/app_router.dart';
 import 'package:school_app/core/constants/app_constants.dart';
 import 'package:school_app/core/offline/firestore_offline.dart';
@@ -15,21 +15,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // App Check hardening (Android: Play Integrity in release).
-  // NOTE: When you enable "enforcement" for Firestore/Functions in Firebase Console,
-  // debug builds will require registering a debug token.
-  if (!kIsWeb) {
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: kReleaseMode ? AndroidProvider.playIntegrity : AndroidProvider.debug,
-      );
-    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-      await FirebaseAppCheck.instance.activate(
-        appleProvider: kReleaseMode ? AppleProvider.deviceCheck : AppleProvider.debug,
-      );
-    }
-  }
 
   // Offline-first: queue writes locally and sync when connectivity returns.
   await configureFirestoreOfflinePersistence();
@@ -47,7 +32,33 @@ class SchoolApp extends StatelessWidget {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme(),
+      scrollBehavior: const _AdaptiveScrollBehavior(),
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        final clampedTextScaler = media.textScaler.clamp(
+          minScaleFactor: 0.9,
+          maxScaleFactor: 1.15,
+        );
+
+        return MediaQuery(
+          data: media.copyWith(textScaler: clampedTextScaler),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       routerConfig: appRouter,
     );
   }
+}
+
+class _AdaptiveScrollBehavior extends MaterialScrollBehavior {
+  const _AdaptiveScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.unknown,
+  };
 }

@@ -1,3 +1,4 @@
+// features/teacher/screens/teacher_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,10 +11,7 @@ import 'package:school_app/models/announcement.dart';
 import 'package:school_app/providers/announcement_provider.dart';
 import 'package:school_app/features/announcements/screens/announcement_detail_screen.dart';
 import 'package:school_app/core/offline/firestore_sync_status_action.dart';
-import 'package:school_app/core/widgets/school_brand_banner.dart';
-import 'package:school_app/models/school_branding.dart';
-import 'package:school_app/providers/school_branding_provider.dart';
-import 'package:school_app/providers/school_provider.dart';
+import 'package:school_app/core/widgets/web_dashboard_footer.dart';
 
 class TeacherDashboard extends ConsumerWidget {
   const TeacherDashboard({super.key});
@@ -23,47 +21,24 @@ class TeacherDashboard extends ConsumerWidget {
     final teacherData = ref.watch(teacherProvider);
     final announcementsAsync = ref.watch(announcementsProvider);
 
-    final schoolName = ref.watch(schoolProvider).maybeWhen(
-          data: (doc) => (doc.data()?['name'] ?? '').toString().trim(),
-          orElse: () => '',
-        );
-
-    final branding = ref.watch(schoolBrandingProvider).maybeWhen(
-          data: (b) => b,
-          orElse: () => SchoolBranding.defaults(),
-        );
-
-    final logoUrl = ref.watch(schoolBrandingLogoUrlProvider).maybeWhen(
-          data: (u) => u,
-          orElse: () => null,
-        );
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Teacher Dashboard'),
-        actions: const [
-          FirestoreSyncStatusAction(),
-        ],
+        actions: const [FirestoreSyncStatusAction()],
       ),
       body: teacherData.when(
         data: (doc) {
           final data = doc.data();
 
           if (data == null) {
-            return const Center(
-              child: Text('Teacher profile not found'),
-            );
+            return const Center(child: Text('Teacher profile not found'));
           }
 
           final rawClasses = data['classes'];
           final classes = rawClasses is List ? rawClasses : const [];
 
-          final teacherName = (data['name'] ?? data['fullName'] ?? '').toString().trim();
-
           if (classes.isEmpty) {
-            return const Center(
-              child: Text('No classes assigned'),
-            );
+            return const Center(child: Text('No classes assigned'));
           }
 
           final visibleAnnouncements = announcementsAsync.maybeWhen(
@@ -80,14 +55,6 @@ class TeacherDashboard extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(12),
             children: [
-              SchoolBrandBanner(
-                schoolName: schoolName,
-                subtitle: teacherName.isEmpty ? 'Teacher' : teacherName,
-                primary: branding.primaryColor,
-                secondary: branding.secondaryColor,
-                logoUrl: logoUrl,
-              ),
-              const SizedBox(height: 12),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -159,8 +126,8 @@ class TeacherDashboard extends ConsumerWidget {
                                       MaterialPageRoute(
                                         builder: (_) =>
                                             AnnouncementDetailScreen(
-                                          announcement: a,
-                                        ),
+                                              announcement: a,
+                                            ),
                                       ),
                                     );
                                   },
@@ -186,16 +153,17 @@ class TeacherDashboard extends ConsumerWidget {
                       final classId = (classData['classId'] ?? '').toString();
 
                       // Backward/forward compatible section keys.
-                      final section = (classData['section'] ??
-                              classData['sectionId'] ??
-                              classData['sectionName'] ??
-                              '')
-                          .toString();
+                      final section =
+                          (classData['section'] ??
+                                  classData['sectionId'] ??
+                                  classData['sectionName'] ??
+                                  '')
+                              .toString();
 
-                      final className =
-                          (classData['className'] ?? '').toString();
-                      final sectionName =
-                          (classData['sectionName'] ?? '').toString();
+                      final className = (classData['className'] ?? '')
+                          .toString();
+                      final sectionName = (classData['sectionName'] ?? '')
+                          .toString();
 
                       final c = className.trim().isNotEmpty
                           ? className.trim()
@@ -220,7 +188,8 @@ class TeacherDashboard extends ConsumerWidget {
                                     ),
                                   ),
                                 );
-                              } else if (action == _TeacherClassAction.homework) {
+                              } else if (action ==
+                                  _TeacherClassAction.homework) {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -272,15 +241,12 @@ class TeacherDashboard extends ConsumerWidget {
                       );
                     },
                   ),
+              const WebDashboardFooter(),
             ],
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
-        error: (e, _) => Center(
-          child: Text('Error: $e'),
-        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
       ),
     );
   }
