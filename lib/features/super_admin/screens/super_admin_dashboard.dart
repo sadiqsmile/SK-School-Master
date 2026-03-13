@@ -21,6 +21,13 @@ class SuperAdminDashboard extends ConsumerStatefulWidget {
 class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
   String _searchQuery = '';
 
+  // State for selected school
+  String? _selectedSchoolId;
+  bool _isArchiveMode = false;
+
+  bool _isMobile(BuildContext context) =>
+      MediaQuery.of(context).size.width < 600;
+
   static const List<Map<String, dynamic>> _gradientPalettes = [
     {
       'name': 'Ocean Wave',
@@ -251,412 +258,38 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    const accentGreen = Color(0xFF00B889);
-    const textPrimary = Color(0xFF1F2937);
-    final platformData = ref.watch(platformProvider);
-
-    return platformData.when(
-      data: (doc) {
-        final data = doc.data() ?? <String, dynamic>{};
-        final totalSchools = data['totalSchools'] ?? 0;
-        final totalStudents = data['totalStudents'] ?? 0;
-        final gradientColors = _readCurrentThemeHex(data);
-        final applyToAll = (data['applyToAll'] ?? false) as bool;
-        final colors = _getGradientColors(gradientColors);
-
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
         return Scaffold(
-          extendBodyBehindAppBar: true,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            title: const Text(
-              'SUPER ADMIN',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(51),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.logout_rounded, color: Colors.white),
-                    tooltip: 'Logout',
-                    onPressed: () async {
-                      await FirebaseAuth.instance.signOut();
-
-                      if (context.mounted) {
-                        // Keep navigation within GoRouter; pushing LoginScreen via
-                        // Navigator can leave the app outside the router context on web.
-                        context.go('/');
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomRight,
-                end: Alignment.topLeft,
-                colors: colors,
-                stops: const [0.0, 0.5, 1.0],
-              ),
-            ),
-            child: SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final isCompact = constraints.maxWidth < 720;
-
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          backgroundColor: const Color(0xFFF3F8FC),
+          drawer: isMobile ? Drawer(child: _buildSidebar(context, isMobile: true)) : null,
+          body: SafeArea(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!isMobile)
+                  _buildSidebar(context, isMobile: false),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(43),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: Colors.white.withAlpha(82),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Colors.white,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(6),
-                                  child: Image.asset(
-                                    'assets/images/logo.png',
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, _, _) => const Icon(
-                                      Icons.school_rounded,
-                                      color: accentGreen,
-                                      size: 24,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Welcome back! Manage schools and monitor the platform from one place.',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildStatCard(
-                                title: 'Total Schools',
-                                value: '$totalSchools',
-                                icon: Icons.school_rounded,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildStatCard(
-                                title: 'Total Students',
-                                value: '$totalStudents',
-                                icon: Icons.groups_rounded,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        isCompact
-                            ? Column(
-                                children: [
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 52,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        showModalBottomSheet<void>(
-                                          context: context,
-                                          isScrollControlled: true,
-                                          builder: (context) => const SafeArea(
-                                            child: CreateSchoolScreen(),
-                                          ),
-                                        );
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.white,
-                                        foregroundColor: const Color(
-                                          0xFF1E3A8A,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                        ),
-                                        elevation: 1,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.add_circle_outline_rounded,
-                                      ),
-                                      label: const Text(
-                                        'Add School',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 52,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () => context.push(
-                                        '/super-admin/maintenance',
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.white.withAlpha(
-                                          230,
-                                        ),
-                                        foregroundColor: const Color(
-                                          0xFF1E3A8A,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            14,
-                                          ),
-                                        ),
-                                        elevation: 1,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.build_circle_outlined,
-                                      ),
-                                      label: const Text(
-                                        'Maintenance',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : SizedBox(
-                                height: 52,
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () {
-                                          showModalBottomSheet<void>(
-                                            context: context,
-                                            isScrollControlled: true,
-                                            builder: (context) =>
-                                                const SafeArea(
-                                                  child: CreateSchoolScreen(),
-                                                ),
-                                          );
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white,
-                                          foregroundColor: const Color(
-                                            0xFF1E3A8A,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                          ),
-                                          elevation: 1,
-                                        ),
-                                        icon: const Icon(
-                                          Icons.add_circle_outline_rounded,
-                                        ),
-                                        label: const Text(
-                                          'Add School',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () => context.push(
-                                          '/super-admin/maintenance',
-                                        ),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white
-                                              .withAlpha(230),
-                                          foregroundColor: const Color(
-                                            0xFF1E3A8A,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14,
-                                            ),
-                                          ),
-                                          elevation: 1,
-                                        ),
-                                        icon: const Icon(
-                                          Icons.build_circle_outlined,
-                                        ),
-                                        label: const Text(
-                                          'Maintenance',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          decoration: InputDecoration(
-                            hintText: 'Search schools by name...',
-                            prefixIcon: const Icon(
-                              Icons.search_rounded,
-                              color: Color(0xFF1E3A8A),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                color: Colors.grey.shade300,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                color: Colors.grey.shade300,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF1E3A8A),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 18),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(20),
-                                blurRadius: 16,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Schools',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1F2937),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              RepaintBoundary(
-                                child: SizedBox(
-                                  height: 380,
-                                  child: SchoolsScreen(
-                                    searchQuery: _searchQuery,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        _buildTopCards(),
+                        const SizedBox(height: 24),
+                        _buildCenterArea(),
+                        const SizedBox(height: 24),
                         const WebDashboardFooter(),
                       ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
           ),
         );
       },
-      loading: () => Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomRight,
-              end: Alignment.topLeft,
-              colors: _getGradientColors(null),
-            ),
-          ),
-          child: const Center(
-            child: CircularProgressIndicator(color: Colors.white),
-          ),
-        ),
-      ),
-      error: (e, _) => Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomRight,
-              end: Alignment.topLeft,
-              colors: _getGradientColors(null),
-            ),
-          ),
-          child: Center(
-            child: Container(
-              margin: const EdgeInsets.all(20),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                'Error: $e',
-                style: const TextStyle(
-                  color: Color(0xFFB91C1C),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -706,4 +339,284 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
       ),
     );
   }
-}
+
+  Widget _buildSidebar(BuildContext context, {required bool isMobile}) {
+    return Container(
+      width: isMobile ? null : 260,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E3A8A),
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(18),
+            blurRadius: 12,
+            offset: const Offset(2, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white),
+              label: const Text('Add School', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 2,
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: () {
+                // Add school logic
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('schools').snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final docs = snapshot.data!.docs;
+                return ListView.builder(
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final school = docs[index].data() as Map<String, dynamic>;
+                    final schoolId = docs[index].id;
+                    final isSelected = _selectedSchoolId == schoolId;
+                    return ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      tileColor: isSelected ? Colors.white.withAlpha(40) : Colors.transparent,
+                      leading: CircleAvatar(backgroundImage: NetworkImage(school['logoUrl'] ?? ''), backgroundColor: Colors.white),
+                      title: Text(school['name'] ?? '', style: TextStyle(color: Colors.white)),
+                      onTap: () => setState(() => _selectedSchoolId = schoolId),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopCards() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('schools').snapshots(),
+      builder: (context, snapshot) {
+        int totalSchools = 0;
+        int totalStudents = 0;
+        if (snapshot.hasData) {
+          totalSchools = snapshot.data!.docs.length;
+          totalStudents = snapshot.data!.docs.fold(0, (sum, doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return sum + ((data['studentCount'] ?? 0) as int);
+          });
+        }
+        return Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                title: 'Total Schools',
+                value: '$totalSchools',
+                icon: Icons.school_rounded,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                title: 'Total Students',
+                value: '$totalStudents',
+                icon: Icons.groups_rounded,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCenterArea() {
+    if (_selectedSchoolId == null) {
+      return Center(
+        child: Text('Select a school to view dashboard', style: TextStyle(fontSize: 18, color: Color(0xFF1E3A8A), fontWeight: FontWeight.w600)),
+      );
+    }
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('schools').doc(_selectedSchoolId).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return Center(child: CircularProgressIndicator());
+        }
+        final school = snapshot.data!.data() as Map<String, dynamic>;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 48,
+              backgroundImage: NetworkImage(school['logoUrl'] ?? ''),
+              backgroundColor: Colors.white,
+            ),
+            const SizedBox(height: 16),
+            Text(school['name'] ?? '', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Color(0xFF1E3A8A))),
+            const SizedBox(height: 8),
+            Text('School ID: $_selectedSchoolId', style: TextStyle(fontSize: 14, color: Color(0xFF6B7280))),
+            const SizedBox(height: 24),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                _actionCard('Manage Students', Icons.people_alt_rounded),
+                _actionCard('Manage Teachers', Icons.person_rounded),
+                _actionCard('Attendance', Icons.check_circle_rounded),
+                _actionCard('Settings', Icons.settings_rounded),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _actionCard(String title, IconData icon) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
+      color: Colors.white,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {},
+        child: Container(
+          width: 180,
+          height: 120,
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 36, color: Color(0xFF1E3A8A)),
+              const SizedBox(height: 12),
+              Text(title, style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF1E3A8A), fontSize: 16)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSchoolDetailsPanel(Map<String, dynamic> school) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(18),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundImage: NetworkImage(school['logoUrl'] ?? ''),
+                radius: 28,
+                backgroundColor: Colors.white,
+              ),
+              const SizedBox(width: 16),
+              Text(
+                school['name'] ?? '',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  color: Color(0xFF1E3A8A),
+                ),
+              ),
+              const Spacer(),
+              ElevatedButton.icon(
+                icon: Icon(Icons.archive_rounded),
+                label: Text('Archive'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF1E3A8A),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {}, // Implement archive logic
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.email_rounded, color: Color(0xFF1E3A8A)),
+              const SizedBox(width: 8),
+              Text(
+                'Admin Email: ${school['adminEmail'] ?? ''}',
+                style: TextStyle(color: Color(0xFF1E3A8A)),
+              ),
+              const SizedBox(width: 24),
+              Icon(Icons.login_rounded, color: Color(0xFF1E3A8A)),
+              const SizedBox(width: 8),
+              Text(
+                'Last Login: ${school['lastLogin'] ?? ''}',
+                style: TextStyle(color: Color(0xFF1E3A8A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.color_lens_rounded, color: Color(0xFF1E3A8A)),
+              const SizedBox(width: 8),
+              Text(
+                'Theme Color Change',
+                style: TextStyle(color: Color(0xFF1E3A8A)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  }
+  Widget _buildCalendar() {
+    return Container(
+      height: 320,
+      margin: const EdgeInsets.only(top: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(18),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          'Calendar Widget Coming Soon',
+          style: TextStyle(
+            color: Color(0xFF1E3A8A),
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+      ),
+    );
+  }
+// End of class
