@@ -19,11 +19,11 @@ class SuperAdminDashboard extends ConsumerStatefulWidget {
 }
 
 class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
-  String _searchQuery = '';
+  final String _searchQuery = '';
 
   // State for selected school
   String? _selectedSchoolId;
-  bool _isArchiveMode = false;
+  final bool _isArchiveMode = false;
 
   bool _isMobile(BuildContext context) =>
       MediaQuery.of(context).size.width < 600;
