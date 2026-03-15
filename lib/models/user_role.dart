@@ -1,2 +1,8 @@
-// models/user_role.dart
-enum UserRole { superAdmin, admin, teacher, parent, unknown }
+enum UserRole {
+  unknown,
+  superAdmin,
+  admin,
+  teacher,
+  parent,
+  mentor,
+}
