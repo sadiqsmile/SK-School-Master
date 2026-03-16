@@ -91,7 +91,6 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
 
   Future<void> _save() async {
     final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
 
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
@@ -181,7 +180,7 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
       messenger.showSnackBar(SnackBar(content: Text('Teacher "$name" added')));
 
       if (mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(context).maybePop();
       }
     } catch (e) {
       messenger.showSnackBar(
@@ -234,7 +233,7 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
                   const SizedBox(height: 10),
 
                   DropdownButtonFormField<String>(
-                    value: selectedRole,
+                    initialValue: selectedRole,
                     decoration: const InputDecoration(labelText: "Role"),
                     items: const [
                       DropdownMenuItem(
