@@ -1684,9 +1684,12 @@ exports.changeParentPin = onCall(async (request) => {
 // ---------------------------------------------------------------------------
 
 exports.createOrResetTeacherAccount = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Sign in required");
-  }
+if (!request.auth) {
+  throw new HttpsError(
+    "unauthenticated",
+    "Authentication required"
+  );
+}
 
   const data = request.data || {};
   const schoolId = String(data.schoolId || "").trim();
@@ -1749,14 +1752,16 @@ exports.createOrResetTeacherAccount = onCall(async (request) => {
   }
 
   // Claims + user doc.
-  await admin.auth().setCustomUserClaims(userRecord.uid, {
-    role: "teacher",
-    schoolId,
-  });
+const role = String(data.role || "teacher");
 
-  await admin.firestore().collection("users").doc(userRecord.uid).set(
-    {
-      role: "teacher",
+await admin.auth().setCustomUserClaims(userRecord.uid, {
+  role: role,
+  schoolId,
+});
+
+ await admin.firestore().collection("users").doc(userRecord.uid).set(
+{
+  role: role,
       schoolId,
       phone: phoneDigits,
       email,

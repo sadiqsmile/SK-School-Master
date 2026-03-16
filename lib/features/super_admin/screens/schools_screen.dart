@@ -58,7 +58,7 @@ class SchoolsScreen extends ConsumerWidget {
 
         return ListView.separated(
           itemCount: docs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
             final doc = docs[index];
             final data = doc.data();

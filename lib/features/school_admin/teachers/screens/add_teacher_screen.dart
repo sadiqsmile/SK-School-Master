@@ -1,8 +1,8 @@
+// features/school_admin/teachers/screens/add_teacher_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'package:school_app/features/school_admin/classes/providers/classes_provider.dart';
 import 'package:school_app/features/school_admin/classes/providers/sections_provider.dart';
 import 'package:school_app/features/school_admin/teachers/services/teacher_service.dart';
@@ -28,6 +28,7 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
 
   String? _selectedClassId;
   String? _selectedSectionId;
+  String selectedRole = "teacher";
 
   bool _isSaving = false;
 
@@ -62,7 +63,9 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
     final className = (classDoc.data()['name'] ?? classDoc.id).toString();
     final classLabel = className;
 
-    final sectionsSnap = await ref.read(sectionsProvider(_selectedClassId!).future);
+    final sectionsSnap = await ref.read(
+      sectionsProvider(_selectedClassId!).future,
+    );
     final sectionDoc = sectionsSnap.docs.firstWhere(
       (d) => d.id == _selectedSectionId,
       orElse: () => throw StateError('Section not found'),
@@ -114,6 +117,7 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
           teacherName: name,
           email: email,
           phone: phone,
+          role: selectedRole,
         );
 
         final teacherUid = (result['uid'] ?? '').toString();
@@ -174,12 +178,15 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
         return;
       }
 
-      messenger.showSnackBar(
-        SnackBar(content: Text('Teacher "$name" added')),
-      );
-      navigator.pop();
+      messenger.showSnackBar(SnackBar(content: Text('Teacher "$name" added')));
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Failed to add teacher: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Failed to add teacher: $e')),
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -202,7 +209,9 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
                   TextField(
                     controller: _nameController,
                     textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(labelText: 'Teacher Name'),
+                    decoration: const InputDecoration(
+                      labelText: 'Teacher Name',
+                    ),
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -215,9 +224,30 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s()]')),
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'[0-9+\-\s()]'),
+                      ),
                     ],
                     decoration: const InputDecoration(labelText: 'Phone'),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    decoration: const InputDecoration(labelText: "Role"),
+                    items: const [
+                      DropdownMenuItem(
+                        value: "teacher",
+                        child: Text("Teacher"),
+                      ),
+                      DropdownMenuItem(value: "mentor", child: Text("Mentor")),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        selectedRole = value!;
+                      });
+                    },
                   ),
                 ],
               ),
@@ -273,7 +303,9 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
                           for (final doc in docs)
                             DropdownMenuItem(
                               value: doc.id,
-                              child: Text((doc.data()['name'] ?? doc.id).toString()),
+                              child: Text(
+                                (doc.data()['name'] ?? doc.id).toString(),
+                              ),
                             ),
                         ],
                         onChanged: _isSaving
@@ -296,33 +328,44 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
                       child: Text('Select a class to pick a section'),
                     )
                   else
-                    ref.watch(sectionsProvider(_selectedClassId!)).when(
-                      data: (snapshot) {
-                        final docs = snapshot.docs;
-                        return DropdownButtonFormField<String>(
-                          key: ValueKey<String?>(_selectedSectionId),
-                          initialValue: _selectedSectionId,
-                          decoration: const InputDecoration(labelText: 'Section'),
-                          items: [
-                            for (final doc in docs)
-                              DropdownMenuItem(
-                                value: doc.id,
-                                child: Text((doc.data()['name'] ?? doc.id).toString()),
+                    ref
+                        .watch(sectionsProvider(_selectedClassId!))
+                        .when(
+                          data: (snapshot) {
+                            final docs = snapshot.docs;
+                            return DropdownButtonFormField<String>(
+                              key: ValueKey<String?>(_selectedSectionId),
+                              initialValue: _selectedSectionId,
+                              decoration: const InputDecoration(
+                                labelText: 'Section',
                               ),
-                          ],
-                          onChanged: _isSaving
-                              ? null
-                              : (value) => setState(() => _selectedSectionId = value),
-                        );
-                      },
-                      loading: () => const LinearProgressIndicator(),
-                      error: (e, _) => Text('Failed to load sections: $e'),
-                    ),
+                              items: [
+                                for (final doc in docs)
+                                  DropdownMenuItem(
+                                    value: doc.id,
+                                    child: Text(
+                                      (doc.data()['name'] ?? doc.id).toString(),
+                                    ),
+                                  ),
+                              ],
+                              onChanged: _isSaving
+                                  ? null
+                                  : (value) => setState(
+                                      () => _selectedSectionId = value,
+                                    ),
+                            );
+                          },
+                          loading: () => const LinearProgressIndicator(),
+                          error: (e, _) => Text('Failed to load sections: $e'),
+                        ),
                   const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton.icon(
-                      onPressed: _isSaving || _selectedClassId == null || _selectedSectionId == null
+                      onPressed:
+                          _isSaving ||
+                              _selectedClassId == null ||
+                              _selectedSectionId == null
                           ? null
                           : () async {
                               final messenger = ScaffoldMessenger.of(context);
@@ -331,7 +374,11 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
                               } catch (e) {
                                 if (!mounted) return;
                                 messenger.showSnackBar(
-                                  SnackBar(content: Text('Failed to add assignment: $e')),
+                                  SnackBar(
+                                    content: Text(
+                                      'Failed to add assignment: $e',
+                                    ),
+                                  ),
                                 );
                               }
                             },
@@ -413,10 +460,7 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _ChipWrap extends StatelessWidget {
-  const _ChipWrap({
-    required this.values,
-    required this.onRemove,
-  });
+  const _ChipWrap({required this.values, required this.onRemove});
 
   final List<String> values;
   final void Function(String value)? onRemove;
@@ -426,10 +470,7 @@ class _ChipWrap extends StatelessWidget {
     if (values.isEmpty) {
       return const Align(
         alignment: Alignment.centerLeft,
-        child: Text(
-          'None yet',
-          style: TextStyle(color: Color(0xFF6B7280)),
-        ),
+        child: Text('None yet', style: TextStyle(color: Color(0xFF6B7280))),
       );
     }
     return Wrap(
@@ -479,10 +520,7 @@ class _TeacherAssignment {
 }
 
 class _AssignmentChips extends StatelessWidget {
-  const _AssignmentChips({
-    required this.assignments,
-    required this.onRemove,
-  });
+  const _AssignmentChips({required this.assignments, required this.onRemove});
 
   final List<_TeacherAssignment> assignments;
   final void Function(_TeacherAssignment assignment)? onRemove;

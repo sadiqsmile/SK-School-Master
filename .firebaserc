@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "sk-school-master"
-  }
+    "default": "sk-school-master",
+    "schoolapp": "sk-school-master"
+  },
+  "targets": {},
+  "etags": {}
 }

@@ -1,3 +1,4 @@
+// features/super_admin/screens/super_admin_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -59,7 +60,7 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
         "activeSchools": 0,
         "archivedSchools": 0,
       },
-      error: (_, __) => {
+      error: (_, _) => {
         "totalSchools": 0,
         "activeSchools": 0,
         "archivedSchools": 0,
@@ -117,7 +118,6 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-
             /// STATS ROW 1
             Row(
               children: [
@@ -175,7 +175,6 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
             /// ACTION BUTTONS
             Row(
               children: [
-
                 Expanded(
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.add),
@@ -233,7 +232,6 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
                     const Text(
                       "Schools",
                       style: TextStyle(
@@ -265,11 +263,7 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
 
                     const SizedBox(height: 10),
 
-                    Expanded(
-                      child: SchoolsScreen(
-                        searchQuery: _searchQuery,
-                      ),
-                    ),
+                    Expanded(child: SchoolsScreen(searchQuery: _searchQuery)),
                   ],
                 ),
               ),
@@ -286,10 +280,7 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.25),
-            color.withOpacity(0.08),
-          ],
+          colors: [color.withOpacity(0.25), color.withOpacity(0.08)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

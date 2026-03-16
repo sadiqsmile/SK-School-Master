@@ -197,15 +197,19 @@ class _TeachersBody extends ConsumerWidget {
                             ...sorted.map((doc) {
                               final data = doc.data();
                               final teacherId = doc.id;
-                              final name = (data['name'] ?? 'Teacher').toString();
+                              final name = (data['name'] ?? 'Teacher')
+                                  .toString();
                               final email = (data['email'] ?? '').toString();
                               final phone = (data['phone'] ?? '').toString();
-                              final subjects = (data['subjects'] as List?)
+                              final subjects =
+                                  (data['subjects'] as List?)
                                       ?.map((e) => e.toString())
                                       .toList() ??
                                   const <String>[];
 
-                              final assignments = _parseTeacherAssignments(data);
+                              final assignments = _parseTeacherAssignments(
+                                data,
+                              );
 
                               return _TeacherRow(
                                 accent: accent,
@@ -219,17 +223,21 @@ class _TeachersBody extends ConsumerWidget {
                                   final ok = await showDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
-                                      title: const Text('Reset teacher password?'),
+                                      title: const Text(
+                                        'Reset teacher password?',
+                                      ),
                                       content: Text(
                                         'This will reset "$name" password to the first 6 characters of their email and force a password change on next login.',
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.of(context).pop(false),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(false),
                                           child: const Text('Cancel'),
                                         ),
                                         FilledButton(
-                                          onPressed: () => Navigator.of(context).pop(true),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(true),
                                           child: const Text('Reset'),
                                         ),
                                       ],
@@ -238,16 +246,22 @@ class _TeachersBody extends ConsumerWidget {
 
                                   if (ok != true) return;
                                   try {
-                                    final schoolId = await ref.read(schoolIdProvider.future);
-                                    final result = await TeacherAccountService().resetTeacherPassword(
-                                      schoolId: schoolId,
-                                      teacherName: name,
-                                      email: email,
-                                      phone: phone,
-                                      teacherId: teacherId,
+                                    final schoolId = await ref.read(
+                                      schoolIdProvider.future,
                                     );
+                                    final result = await TeacherAccountService()
+                                        .resetTeacherLogin(
+                                          schoolId: schoolId,
+                                          teacherName: name,
+                                          email: email,
+                                          phone: phone,
+                                          role: 'teacher',
+                                          teacherId: teacherId,
+                                        );
 
-                                    final tempPassword = (result['temporaryPassword'] ?? '').toString();
+                                    final tempPassword =
+                                        (result['temporaryPassword'] ?? '')
+                                            .toString();
                                     if (!context.mounted) return;
                                     await showDialog<void>(
                                       context: context,
@@ -260,7 +274,8 @@ class _TeachersBody extends ConsumerWidget {
                                         ),
                                         actions: [
                                           FilledButton(
-                                            onPressed: () => Navigator.of(context).pop(),
+                                            onPressed: () =>
+                                                Navigator.of(context).pop(),
                                             child: const Text('OK'),
                                           ),
                                         ],
@@ -269,7 +284,9 @@ class _TeachersBody extends ConsumerWidget {
                                   } catch (e) {
                                     if (!context.mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Reset failed: $e')),
+                                      SnackBar(
+                                        content: Text('Reset failed: $e'),
+                                      ),
                                     );
                                   }
                                 },
@@ -278,7 +295,9 @@ class _TeachersBody extends ConsumerWidget {
                                     if (!context.mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('No email found for this teacher.'),
+                                        content: Text(
+                                          'No email found for this teacher.',
+                                        ),
                                       ),
                                     );
                                     return;
@@ -287,17 +306,21 @@ class _TeachersBody extends ConsumerWidget {
                                   final ok = await showDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
-                                      title: const Text('Send password reset email?'),
+                                      title: const Text(
+                                        'Send password reset email?',
+                                      ),
                                       content: Text(
                                         'This will send a password reset link to:\n\n$email',
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.of(context).pop(false),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(false),
                                           child: const Text('Cancel'),
                                         ),
                                         FilledButton(
-                                          onPressed: () => Navigator.of(context).pop(true),
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(true),
                                           child: const Text('Send'),
                                         ),
                                       ],
@@ -308,17 +331,25 @@ class _TeachersBody extends ConsumerWidget {
 
                                   try {
                                     await FirebaseAuth.instance
-                                        .sendPasswordResetEmail(email: email.trim());
+                                        .sendPasswordResetEmail(
+                                          email: email.trim(),
+                                        );
                                     if (!context.mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text('Password reset email sent to $email'),
+                                        content: Text(
+                                          'Password reset email sent to $email',
+                                        ),
                                       ),
                                     );
                                   } catch (e) {
                                     if (!context.mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Failed to send email: $e')),
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to send email: $e',
+                                        ),
+                                      ),
                                     );
                                   }
                                 },
@@ -541,10 +572,7 @@ class _TeacherRow extends StatelessWidget {
           ),
         ),
         for (final v in values)
-          Chip(
-            label: Text(v),
-            visualDensity: VisualDensity.compact,
-          ),
+          Chip(label: Text(v), visualDensity: VisualDensity.compact),
       ],
     );
   }
@@ -584,13 +612,19 @@ List<String> _parseTeacherAssignments(Map<String, dynamic> data) {
   }
 
   // Older format: classes + sections stored separately.
-  final classes = (data['classes'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
-  final sections = (data['sections'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
+  final classes =
+      (data['classes'] as List?)?.map((e) => e.toString()).toList() ??
+      const <String>[];
+  final sections =
+      (data['sections'] as List?)?.map((e) => e.toString()).toList() ??
+      const <String>[];
   if (classes.isEmpty && sections.isEmpty) return const <String>[];
 
   // If we don't have pairing information, show a reasonable summary.
   if (classes.isNotEmpty && sections.isNotEmpty) {
-    final minLen = classes.length < sections.length ? classes.length : sections.length;
+    final minLen = classes.length < sections.length
+        ? classes.length
+        : sections.length;
     final paired = <String>[];
     for (var i = 0; i < minLen; i++) {
       final c = classes[i].trim();
