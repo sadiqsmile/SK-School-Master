@@ -3,6 +3,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../providers/super_admin_provider.dart'; // 🔥 IMPORTANT
 
 class SchoolDetailsScreen extends StatefulWidget {
   final String schoolId;
@@ -19,39 +28,11 @@ class SchoolDetailsScreen extends StatefulWidget {
 }
 
 class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
-  /// 🔥 ADMIN EMAIL FETCH
-  Widget _adminEmailWidget() {
-    final adminUid = widget.data['adminUid'];
-
-    if (adminUid == null) {
-      return const Text("No Admin Assigned");
-    }
-
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance
-          .collection('users')
-          .doc(adminUid)
-          .get(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Text("Loading...");
-        }
-
-        final userData = snapshot.data!.data() as Map<String, dynamic>?;
-
-        if (userData == null) {
-          return const Text("No Email Found");
-        }
-
-        return Text(userData['email'] ?? "No Email");
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final name = widget.data['name'] ?? '';
     final logo = widget.data['logo'] ?? '';
+
     final themePrimary = widget.data['themeColorPrimary'] ?? "#6366F1";
     final themeSecondary = widget.data['themeColorSecondary'] ?? "#4F46E5";
 
@@ -61,24 +42,7 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-
-        /// 🔥 CUSTOM BACK BUTTON (OPTION 3)
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: InkWell(
-            onTap: () => Navigator.pop(context),
-            borderRadius: BorderRadius.circular(30),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xffF1F5F9),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.chevron_left, color: Color(0xff1E3A8A)),
-            ),
-          ),
-        ),
-
+        leading: _backButton(context),
         title: const Text(
           "School Details",
           style: TextStyle(
@@ -86,9 +50,6 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-
-        iconTheme: const IconThemeData(color: Color(0xff1E3A8A)),
-
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1),
@@ -99,7 +60,7 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            /// 🏫 HEADER
+            /// HEADER
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -117,7 +78,9 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
                     radius: 30,
                     backgroundColor: Colors.white,
                     backgroundImage: logo.isNotEmpty
-                        ? NetworkImage(logo)
+                        ? NetworkImage(
+                            "$logo?v=${DateTime.now().millisecondsSinceEpoch}",
+                          ) // 🔥 FIX CACHE
                         : null,
                     child: logo.isEmpty
                         ? const Icon(Icons.school, size: 30)
@@ -140,7 +103,6 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
 
             const SizedBox(height: 20),
 
-            /// 📋 DETAILS
             _tile("School ID", widget.schoolId, Icons.tag),
 
             _tile(
@@ -151,52 +113,39 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
 
             const SizedBox(height: 20),
 
-            /// ⚙️ ACTIONS
             _actionTile(
-              context,
               "Change School Name",
               Icons.edit,
               () => _changeName(context),
             ),
 
-            _actionTile(
-              context,
-              "Change Logo",
-              Icons.image,
-              () => _changeLogo(context),
-            ),
+            _actionTile("Change Logo", Icons.image, () => _changeLogo(context)),
 
-            /// 🎨 NEW COLOR OPTIONS
             _actionTile(
-              context,
               "Change Primary Color",
               Icons.color_lens,
-              () => _comingSoon(context),
+              () => _pickColor(true),
             ),
 
             _actionTile(
-              context,
               "Change Secondary Color",
               Icons.gradient,
-              () => _comingSoon(context),
+              () => _pickColor(false),
             ),
 
             _actionTile(
-              context,
               "Reset Admin Password",
               Icons.lock_reset,
               () => _resetPassword(context),
             ),
 
             _actionTile(
-              context,
               "Archive School",
               Icons.archive,
               () => _archiveSchool(context),
             ),
 
             _actionTile(
-              context,
               "Delete School",
               Icons.delete,
               () => _deleteSchool(context),
@@ -208,7 +157,25 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
     );
   }
 
-  /// 🔹 INFO TILE
+  /// 🔙 BACK BUTTON
+  Widget _backButton(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: InkWell(
+        onTap: () => Navigator.pop(context),
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: const BoxDecoration(
+            color: Color(0xffF1F5F9),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.chevron_left, color: Color(0xff1E3A8A)),
+        ),
+      ),
+    );
+  }
+
   Widget _tile(String title, String value, IconData icon) {
     return ListTile(
       leading: Icon(icon, color: const Color(0xff1E3A8A)),
@@ -217,9 +184,7 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
     );
   }
 
-  /// 🔹 ACTION TILE
   Widget _actionTile(
-    BuildContext context,
     String title,
     IconData icon,
     VoidCallback onTap, {
@@ -245,11 +210,15 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
         actions: [
           TextButton(
             onPressed: () async {
+              if (newName.isEmpty) return;
+
               await FirebaseFirestore.instance
                   .collection('schools')
                   .doc(widget.schoolId)
                   .update({'name': newName.toUpperCase()});
+
               Navigator.pop(context);
+              setState(() {});
             },
             child: const Text("Save"),
           ),
@@ -258,44 +227,181 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
     );
   }
 
-  /// 🔥 PLACEHOLDER
-  void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text("Coming in next step 🚀")));
+  /// 🔥 LOGO FIX
+  Future<void> _changeLogo(BuildContext context) async {
+    try {
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+
+      if (picked == null) return;
+
+      final ref = FirebaseStorage.instance.ref().child(
+        "school_logos/${widget.schoolId}.png",
+      );
+
+      if (kIsWeb) {
+        final bytes = await picked.readAsBytes();
+        await ref.putData(bytes);
+      } else {
+        final file = File(picked.path);
+        await ref.putFile(file);
+      }
+
+      final url = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .update({'logo': url});
+
+      widget.data['logo'] = url;
+
+      if (mounted) setState(() {});
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Logo updated ✅")));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Logo error: $e")));
+    }
   }
 
-  /// 🔥 CHANGE LOGO (placeholder)
-  void _changeLogo(BuildContext context) {
-    _comingSoon(context);
-  }
+  /// 🔥 PASSWORD RESET
+  Future<void> _resetPassword(BuildContext context) async {
+    try {
+      final adminUid = widget.data['adminUid'];
+      final email = widget.data['email'] ?? "";
 
-  /// 🔥 RESET PASSWORD (placeholder)
-  void _resetPassword(BuildContext context) {
-    _comingSoon(context);
-  }
+      if (adminUid == null || email.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Missing admin data ❌")));
+        return;
+      }
 
-  /// 🔥 ARCHIVE
-  Future<void> _archiveSchool(BuildContext context) async {
-    await FirebaseFirestore.instance
-        .collection('schools')
-        .doc(widget.schoolId)
-        .update({'archived': true});
+      final defaultPassword = email.substring(0, 6);
 
-    Navigator.pop(context);
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'resetUserPassword',
+      );
+
+      await callable.call({'uid': adminUid, 'newPassword': defaultPassword});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Password reset: $defaultPassword")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
   }
 
   /// 🔥 DELETE
   Future<void> _deleteSchool(BuildContext context) async {
+    final confirm = await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Delete School"),
+        content: const Text("This will delete ALL data permanently!"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'deleteSchoolCompletely',
+      );
+
+      await callable.call({'schoolId': widget.schoolId});
+
+      /// 🔥 FORCE REFRESH
+      ProviderScope.containerOf(context).invalidate(schoolsProvider);
+
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("School deleted ✅")));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Delete error: $e")));
+    }
+  }
+
+  /// 🔥 ARCHIVE SCHOOL
+  Future<void> _archiveSchool(BuildContext context) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .update({
+            'archived': true,
+            'archivedAt': FieldValue.serverTimestamp(),
+          });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("School archived ✅")));
+
+      Navigator.pop(context); // go back
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Archive error: $e")));
+    }
+  }
+
+  /// 🎨 COLOR
+  Future<void> _pickColor(bool isPrimary) async {
+    final selected = await showDialog<Color>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Pick Color"),
+        content: Wrap(
+          children: Colors.primaries.map((c) {
+            return GestureDetector(
+              onTap: () => Navigator.pop(context, c),
+              child: Container(
+                margin: const EdgeInsets.all(4),
+                width: 30,
+                height: 30,
+                color: c,
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+
+    if (selected == null) return;
+
+    final hex = "#${selected.value.toRadixString(16).substring(2)}";
+
     await FirebaseFirestore.instance
         .collection('schools')
         .doc(widget.schoolId)
-        .update({'archived': true, 'status': 'deleted'});
+        .update({
+          if (isPrimary) 'themeColorPrimary': hex,
+          if (!isPrimary) 'themeColorSecondary': hex,
+        });
 
-    Navigator.pop(context);
+    setState(() {});
   }
 
-  /// 🎨 HEX → COLOR
   Color _hexToColor(String hex) {
     final clean = hex.replaceAll("#", "");
     return Color(int.parse("FF$clean", radix: 16));
