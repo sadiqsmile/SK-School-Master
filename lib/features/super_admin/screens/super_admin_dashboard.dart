@@ -1,219 +1,72 @@
-// features/super_admin/screens/super_admin_dashboard.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'create_school_screen.dart';
-import 'schools_screen.dart';
-import 'package:school_app/providers/super_admin_provider.dart';
-
-/// REAL STUDENT COUNT FROM FIREBASE
-final studentsProvider = StreamProvider<int>((ref) {
-  return FirebaseFirestore.instance
-      .collectionGroup('students')
-      .snapshots()
-      .map((snapshot) => snapshot.docs.length);
-});
-
-class SuperAdminDashboard extends ConsumerStatefulWidget {
+class SuperAdminDashboard extends StatelessWidget {
   const SuperAdminDashboard({super.key});
 
   @override
-  ConsumerState<SuperAdminDashboard> createState() =>
-      _SuperAdminDashboardState();
-}
-
-class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
-  String _searchQuery = '';
-
-  @override
   Widget build(BuildContext context) {
-    final schoolsSnapshot = ref.watch(schoolsProvider);
-    final studentCount = ref.watch(studentsProvider).value ?? 0;
-
-    final schoolStats = schoolsSnapshot.when(
-      data: (snapshot) {
-        int totalSchools = snapshot.docs.length;
-        int activeSchools = 0;
-        int archivedSchools = 0;
-
-        for (var doc in snapshot.docs) {
-          final data = doc.data();
-
-          if (data['archived'] == true) {
-            archivedSchools++;
-          } else {
-            activeSchools++;
-          }
-        }
-
-        return {
-          "totalSchools": totalSchools,
-          "activeSchools": activeSchools,
-          "archivedSchools": archivedSchools,
-        };
-      },
-      loading: () => {
-        "totalSchools": 0,
-        "activeSchools": 0,
-        "archivedSchools": 0,
-      },
-      error: (_, _) => {
-        "totalSchools": 0,
-        "activeSchools": 0,
-        "archivedSchools": 0,
-      },
-    );
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
+      backgroundColor: const Color(0xffF5F7FB),
 
-      /// APP BAR
+      /// TOP BAR
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        titleSpacing: 16,
+        titleSpacing: 0,
         title: Row(
-          children: [
-            /// USER ICON
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.admin_panel_settings,
-                color: Colors.blue,
-                size: 20,
-              ),
+          children: const [
+            SizedBox(width: 10),
+            CircleAvatar(
+              radius: 16,
+              child: Icon(Icons.person, size: 18),
             ),
-
-            const SizedBox(width: 10),
-
-            const Text(
+            SizedBox(width: 10),
+            Text(
               "Super Admin",
               style: TextStyle(
                 color: Colors.black,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.notifications_none, color: Colors.black),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings, color: Colors.black),
+            onPressed: () {},
+          ),
+          IconButton(
             icon: const Icon(Icons.logout, color: Colors.black),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
+            onPressed: () {},
           ),
         ],
       ),
 
-      /// BODY
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            /// STATS ROW 1
+
+            /// STATS
             Row(
-              children: [
+              children: const [
                 Expanded(
-                  child: _statCard(
-                    "Total Schools",
-                    schoolStats["totalSchools"].toString(),
-                    Icons.school,
-                    Colors.purple,
+                  child: _StatCard(
+                    title: "Total Schools",
+                    value: "12",
+                    colors: [Color(0xff4facfe), Color(0xff00f2fe)],
                   ),
                 ),
-
-                const SizedBox(width: 12),
-
+                SizedBox(width: 12),
                 Expanded(
-                  child: _statCard(
-                    "Active Schools",
-                    schoolStats["activeSchools"].toString(),
-                    Icons.check_circle,
-                    Colors.green,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 12),
-
-            /// STATS ROW 2
-            Row(
-              children: [
-                Expanded(
-                  child: _statCard(
-                    "Archived Schools",
-                    schoolStats["archivedSchools"].toString(),
-                    Icons.archive,
-                    Colors.orange,
-                  ),
-                ),
-
-                const SizedBox(width: 12),
-
-                Expanded(
-                  child: _statCard(
-                    "Total Students",
-                    studentCount.toString(),
-                    Icons.groups,
-                    Colors.blue,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            /// ACTION BUTTONS
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text("Add School"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => const CreateSchoolScreen(),
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.build),
-                    label: const Text("Maintenance"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: () {
-                      context.push('/super-admin/maintenance');
-                    },
+                  child: _StatCard(
+                    title: "Total Students",
+                    value: "2450",
+                    colors: [Color(0xff43e97b), Color(0xff38f9d7)],
                   ),
                 ),
               ],
@@ -221,51 +74,51 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
 
             const SizedBox(height: 20),
 
+            /// ADD SCHOOL BUTTON
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xff6366F1),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.add_business),
+                label: const Text(
+                  "Add School",
+                  style: TextStyle(fontSize: 16),
+                ),
+                onPressed: () {},
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            /// SEARCH BAR
+            TextField(
+              decoration: InputDecoration(
+                hintText: "Search school...",
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             /// SCHOOL LIST
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 248, 250, 252),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Schools",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    /// SEARCH
-                    TextField(
-                      decoration: InputDecoration(
-                        hintText: "Search school...",
-                        prefixIcon: const Icon(Icons.search),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Expanded(child: SchoolsScreen(searchQuery: _searchQuery)),
-                  ],
-                ),
+              child: ListView.builder(
+                itemCount: 10,
+                itemBuilder: (context, index) {
+                  return const _SchoolTile();
+                },
               ),
             ),
           ],
@@ -273,51 +126,114 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
       ),
     );
   }
+}
 
-  /// STAT CARD
-  Widget _statCard(String title, String value, IconData icon, Color color) {
+class _StatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final List<Color> colors;
+
+  const _StatCard({
+    required this.title,
+    required this.value,
+    required this.colors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      height: 90,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color.withOpacity(0.25), color.withOpacity(0.08)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(colors: colors),
+        borderRadius: BorderRadius.circular(14),
       ),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-
-          const SizedBox(height: 12),
-
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-
-          const SizedBox(height: 4),
-
           Text(
             title,
+            style: const TextStyle(color: Colors.white70),
+          ),
+          const Spacer(),
+          Text(
+            value,
             style: const TextStyle(
-              fontSize: 13,
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
+              fontSize: 24,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SchoolTile extends StatelessWidget {
+  const _SchoolTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        title: const Text(
+          "ABC INTERNATIONAL SCHOOL",
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: const Text("Tap for options"),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            builder: (context) {
+              return const _SchoolOptions();
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SchoolOptions extends StatelessWidget {
+  const _SchoolOptions();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+
+          ListTile(
+            leading: Icon(Icons.archive),
+            title: Text("Archive School"),
+          ),
+
+          ListTile(
+            leading: Icon(Icons.color_lens),
+            title: Text("Change Theme"),
+          ),
+
+          ListTile(
+            leading: Icon(Icons.admin_panel_settings),
+            title: Text("School Admin ID"),
+          ),
+
+          ListTile(
+            leading: Icon(Icons.tag),
+            title: Text("School ID"),
+          ),
+
+          ListTile(
+            leading: Icon(Icons.delete),
+            title: Text("Remove School"),
           ),
         ],
       ),

@@ -170,6 +170,10 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
             },
           );
         }
+
+
+
+
       } catch (e) {
         messenger.showSnackBar(
           SnackBar(content: Text('Failed to create teacher login/profile: $e')),
@@ -177,17 +181,54 @@ class _AddTeacherScreenState extends ConsumerState<AddTeacherScreen> {
         return;
       }
 
-      messenger.showSnackBar(SnackBar(content: Text('Teacher "$name" added')));
+messenger.showSnackBar(
+  SnackBar(content: Text('Teacher "$name" added')),
+);
 
-      if (mounted) {
-        Navigator.of(context).maybePop();
-      }
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Failed to add teacher: $e')),
-      );
+if (mounted) {
+  setState(() {
+    _nameController.clear();
+    _emailController.clear();
+    _phoneController.clear();
+    _subjectController.clear();
+
+    _subjects.clear();
+    _assignments.clear();
+
+    _selectedClassId = null;
+    _selectedSectionId = null;
+
+    selectedRole = "teacher";
+  });
+}
+
+
+
+   messenger.showSnackBar(
+  SnackBar(content: Text('Teacher "$name" added')),
+);
+
+if (!mounted) return;
+
+setState(() {
+  _nameController.text = '';
+  _emailController.text = '';
+  _phoneController.text = '';
+  _subjectController.text = '';
+
+  _subjects.clear();
+  _assignments.clear();
+
+  _selectedClassId = null;
+  _selectedSectionId = null;
+
+  selectedRole = "teacher";
+});
+
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
