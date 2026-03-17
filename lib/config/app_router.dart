@@ -1,6 +1,6 @@
 // config/app_router.dart
+import 'package:school_app/features/school_admin/teachers/screens/add_teacher_screen.dart';
 import 'package:go_router/go_router.dart';
-
 import 'package:school_app/features/auth/screens/auth_gate.dart';
 import 'package:school_app/features/auth/screens/enter_school_screen.dart';
 import 'package:school_app/features/auth/screens/school_loader_screen.dart';

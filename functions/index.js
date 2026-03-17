@@ -1799,3 +1799,77 @@ await admin.auth().setCustomUserClaims(userRecord.uid, {
     temporaryPassword,
   };
 });
+
+exports.createSchoolWithAdmin = onCall(async (request) => {
+
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Login required");
+  }
+
+  const data = request.data || {};
+
+  const schoolName = String(data.schoolName || "").trim();
+  const email = String(data.email || "").trim().toLowerCase();
+  const phone = String(data.phone || "").trim();
+  const themeStart = data.themeStart;
+  const themeEnd = data.themeEnd;
+  const logo = data.logo;
+
+  if (!schoolName || !email || phone.length < 10 || !logo) {
+    throw new HttpsError("invalid-argument", "Invalid data: logo is required");
+  }
+
+  const db = admin.firestore();
+
+  /// 1️⃣ CREATE SCHOOL
+  const schoolRef = db.collection("schools").doc();
+
+  await schoolRef.set({
+    name: schoolName,
+    nameLower: schoolName.toLowerCase(),
+    themeStart,
+    themeEnd,
+    logo,
+    totalStudents: 0,
+    totalTeachers: 0,
+    totalClasses: 0,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  const schoolId = schoolRef.id;
+
+  /// 2️⃣ CREATE ADMIN USER
+  const password = email.substring(0, 6);
+
+  const userRecord = await admin.auth().createUser({
+    email,
+    password,
+    displayName: schoolName,
+  });
+
+  /// 3️⃣ SET ROLE
+  await admin.auth().setCustomUserClaims(userRecord.uid, {
+    role: "admin",
+    schoolId,
+  });
+
+  /// 4️⃣ SAVE USER
+  await db.collection("users").doc(userRecord.uid).set({
+    name: schoolName,
+    email,
+    phone,
+    role: "admin",
+    schoolId,
+    mustChangePassword: true,
+    passwordUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return {
+    success: true,
+    schoolId,
+    password,
+  };
+});
