@@ -32,6 +32,7 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
         elevation: 0,
         title: const Row(
           children: [
+            
             CircleAvatar(radius: 16, child: Icon(Icons.person, size: 18)),
             SizedBox(width: 10),
             Text(
@@ -209,21 +210,27 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
                           ),
                           child: Row(
                             children: [
+                             
+
                               CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Colors
-                                    .primaries[index % Colors.primaries.length]
-                                    .shade100,
-                                backgroundImage: logo.isNotEmpty
-                                    ? NetworkImage(logo)
-                                    : null,
-                                child: logo.isEmpty
-                                    ? const Icon(
-                                        Icons.school,
-                                        color: Color(0xff1E3A8A),
-                                      )
-                                    : null,
-                              ),
+  radius: 25,
+  backgroundColor: Colors.grey.shade200,
+  child: logo.isNotEmpty
+      ? ClipOval(
+          child: Image.network(
+            logo,
+            key: ValueKey(logo),
+            fit: BoxFit.cover,
+            width: 50,
+            height: 50,
+          ),
+        )
+      : const Icon(Icons.school),
+),
+
+
+
+
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(

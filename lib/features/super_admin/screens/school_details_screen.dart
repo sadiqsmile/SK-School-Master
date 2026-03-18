@@ -28,134 +28,138 @@ class SchoolDetailsScreen extends StatefulWidget {
 }
 
 class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
+  
   @override
-  Widget build(BuildContext context) {
-    final name = widget.data['name'] ?? '';
-    final logo = widget.data['logo'] ?? '';
+Widget build(BuildContext context) {
+  return StreamBuilder<DocumentSnapshot>(
+    stream: FirebaseFirestore.instance
+        .collection('schools')
+        .doc(widget.schoolId)
+        .snapshots(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      }
 
-    final themePrimary = widget.data['themeColorPrimary'] ?? "#6366F1";
-    final themeSecondary = widget.data['themeColorSecondary'] ?? "#4F46E5";
+      final data = snapshot.data!.data() as Map<String, dynamic>;
+      final name = data['name'] ?? '';
+      final logo = data['logo'] ?? '';
 
-    return Scaffold(
-      backgroundColor: const Color(0xffF5F7FB),
+      final themePrimary = data['themeColorPrimary'] ?? "#6366F1";
+      final themeSecondary = data['themeColorSecondary'] ?? "#4F46E5";
 
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: _backButton(context),
-        title: const Text(
-          "School Details",
-          style: TextStyle(
-            color: Color(0xff1E3A8A),
-            fontWeight: FontWeight.w600,
+      return Scaffold(
+        backgroundColor: const Color(0xffF5F7FB),
+
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: _backButton(context),
+          title: const Text(
+            "School Details",
+            style: TextStyle(
+              color: Color(0xff1E3A8A),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          bottom: const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(height: 1),
           ),
         ),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1),
-        ),
-      ),
 
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            /// HEADER
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    _hexToColor(themePrimary),
-                    _hexToColor(themeSecondary),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    backgroundImage: logo.isNotEmpty
-                        ? NetworkImage(
-                            "$logo?v=${DateTime.now().millisecondsSinceEpoch}",
-                          ) // 🔥 FIX CACHE
-                        : null,
-                    child: logo.isEmpty
-                        ? const Icon(Icons.school, size: 30)
-                        : null,
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              /// HEADER
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      _hexToColor(themePrimary),
+                      _hexToColor(themeSecondary),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 35,
+                      backgroundColor: Colors.white,
+                      child: logo.isNotEmpty
+                          ? ClipOval(
+                              child: Image.network(
+                                logo,
+                                key: ValueKey(logo),
+                                fit: BoxFit.cover,
+                                width: 70,
+                                height: 70,
+                              ),
+                            )
+                          : const Icon(Icons.school, size: 30),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            _tile("School ID", widget.schoolId, Icons.tag),
+              _tile("School ID", widget.schoolId, Icons.tag),
 
-            _tile(
-              "Admin Email",
-              widget.data['email'] ?? "No Email",
-              Icons.email,
-            ),
+              _tile(
+                "Admin Email",
+                widget.data['email'] ?? "No Email",
+                Icons.email,
+              ),
 
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            _actionTile(
-              "Change School Name",
-              Icons.edit,
-              () => _changeName(context),
-            ),
+              _actionTile("Change School Name", Icons.edit,
+                  () => _changeName(context)),
 
-            _actionTile("Change Logo", Icons.image, () => _changeLogo(context)),
+              _actionTile(
+                  "Change Logo", Icons.image, () => _changeLogo(context)),
 
-            _actionTile(
-              "Change Primary Color",
-              Icons.color_lens,
-              () => _pickColor(true),
-            ),
+              _actionTile("Change Primary Color", Icons.color_lens,
+                  () => _pickColor(true)),
 
-            _actionTile(
-              "Change Secondary Color",
-              Icons.gradient,
-              () => _pickColor(false),
-            ),
+              _actionTile("Change Secondary Color", Icons.gradient,
+                  () => _pickColor(false)),
 
-            _actionTile(
-              "Reset Admin Password",
-              Icons.lock_reset,
-              () => _resetPassword(context),
-            ),
+              _actionTile("Reset Admin Password", Icons.lock_reset,
+                  () => _resetPassword(context)),
 
-            _actionTile(
-              "Archive School",
-              Icons.archive,
-              () => _archiveSchool(context),
-            ),
+              _actionTile("Archive School", Icons.archive,
+                  () => _archiveSchool(context)),
 
-            _actionTile(
-              "Delete School",
-              Icons.delete,
-              () => _deleteSchool(context),
-              color: Colors.red,
-            ),
-          ],
+              _actionTile("Delete School", Icons.delete,
+                  () => _deleteSchool(context),
+                  color: Colors.red),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
+}
 
   /// 🔙 BACK BUTTON
   Widget _backButton(BuildContext context) {

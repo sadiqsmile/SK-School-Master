@@ -10,12 +10,13 @@ import 'package:school_app/providers/core_providers.dart';
 
 import 'login_screen.dart';
 
-import '../../super_admin/screens/super_admin_dashboard.dart';
+import '../../super_admin/screens/super_admin_dashboard.dart backup';
 import '../../school_admin/dashboard/screens/school_admin_dashboard.dart';
 import '../../parent/screens/force_change_password_screen.dart';
 import '../../parent/screens/parent_shell.dart';
 import '../../teacher/screens/teacher_dashboard.dart';
 import '../../teacher/screens/teacher_force_change_password_screen.dart';
+import '../../mentor/screens/mentor_dashboard_screen.dart';
 
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
@@ -95,7 +96,8 @@ class AuthGate extends ConsumerWidget {
                   title: 'Teacher Access',
                   message: 'Failed to load school modules: $e',
                   onLogout: () => ref.read(authServiceProvider).signOut(),
-                ),
+                    ),
+                      
                 data: (modules) {
                   if (!modules.teachers) {
                     return _ModuleBlockedScreen(
@@ -120,6 +122,13 @@ class AuthGate extends ConsumerWidget {
                 },
               );
             }
+
+
+if (role == UserRole.mentor) {
+  return const MentorDashboardScreen();
+}
+
+
 
             return const LoginScreen();
           },
