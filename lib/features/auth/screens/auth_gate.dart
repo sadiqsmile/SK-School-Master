@@ -10,7 +10,7 @@ import 'package:school_app/providers/core_providers.dart';
 
 import 'login_screen.dart';
 
-import '../../super_admin/screens/super_admin_dashboard.dart backup';
+import '../../super_admin/screens/super_admin_dashboard.dart';
 import '../../school_admin/dashboard/screens/school_admin_dashboard.dart';
 import '../../parent/screens/force_change_password_screen.dart';
 import '../../parent/screens/parent_shell.dart';
@@ -73,17 +73,18 @@ class AuthGate extends ConsumerWidget {
                     );
                   }
 
-              final mustChangeAsync = ref.watch(mustChangePasswordProvider);
-              return mustChangeAsync.when(
-                loading: () => const Scaffold(body: AppLoader()),
-                error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
-                data: (mustChange) {
-                  if (mustChange) {
-                    return const ForceChangePasswordScreen();
-                  }
-                  return const ParentShell();
-                },
-              );
+                  final mustChangeAsync = ref.watch(mustChangePasswordProvider);
+                  return mustChangeAsync.when(
+                    loading: () => const Scaffold(body: AppLoader()),
+                    error: (e, _) =>
+                        Scaffold(body: Center(child: Text(e.toString()))),
+                    data: (mustChange) {
+                      if (mustChange) {
+                        return const ForceChangePasswordScreen();
+                      }
+                      return const ParentShell();
+                    },
+                  );
                 },
               );
             }
@@ -96,8 +97,8 @@ class AuthGate extends ConsumerWidget {
                   title: 'Teacher Access',
                   message: 'Failed to load school modules: $e',
                   onLogout: () => ref.read(authServiceProvider).signOut(),
-                    ),
-                      
+                ),
+
                 data: (modules) {
                   if (!modules.teachers) {
                     return _ModuleBlockedScreen(
@@ -108,27 +109,25 @@ class AuthGate extends ConsumerWidget {
                     );
                   }
 
-              final mustChangeAsync = ref.watch(mustChangePasswordProvider);
-              return mustChangeAsync.when(
-                loading: () => const Scaffold(body: AppLoader()),
-                error: (e, _) => Scaffold(body: Center(child: Text(e.toString()))),
-                data: (mustChange) {
-                  if (mustChange) {
-                    return const TeacherForceChangePasswordScreen();
-                  }
-                  return const TeacherDashboard();
-                },
-              );
+                  final mustChangeAsync = ref.watch(mustChangePasswordProvider);
+                  return mustChangeAsync.when(
+                    loading: () => const Scaffold(body: AppLoader()),
+                    error: (e, _) =>
+                        Scaffold(body: Center(child: Text(e.toString()))),
+                    data: (mustChange) {
+                      if (mustChange) {
+                        return const TeacherForceChangePasswordScreen();
+                      }
+                      return const TeacherDashboard();
+                    },
+                  );
                 },
               );
             }
 
-
-if (role == UserRole.mentor) {
-  return const MentorDashboardScreen();
-}
-
-
+            if (role == UserRole.mentor) {
+              return const MentorDashboardScreen();
+            }
 
             return const LoginScreen();
           },
@@ -169,14 +168,17 @@ class _ModuleBlockedScreen extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
+                        fontWeight: FontWeight.w900,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       message,
-                      style: const TextStyle(color: Colors.black54, height: 1.4),
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        height: 1.4,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 14),

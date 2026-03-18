@@ -6,12 +6,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../providers/super_admin_provider.dart'; // 🔥 IMPORTANT
+import '../../../providers/super_admin_provider.dart';
 
 class SchoolDetailsScreen extends StatefulWidget {
   final String schoolId;
@@ -28,140 +26,169 @@ class SchoolDetailsScreen extends StatefulWidget {
 }
 
 class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
-  
   @override
-Widget build(BuildContext context) {
-  return StreamBuilder<DocumentSnapshot>(
-    stream: FirebaseFirestore.instance
-        .collection('schools')
-        .doc(widget.schoolId)
-        .snapshots(),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData) {
-        return const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        );
-      }
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-      final data = snapshot.data!.data() as Map<String, dynamic>;
-      final name = data['name'] ?? '';
-      final logo = data['logo'] ?? '';
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final name = data['name'] ?? '';
+        final logo = (data['logo'] ?? '').toString();
+        final email = data['email'] ?? widget.data['email'] ?? "No Email";
 
-      final themePrimary = data['themeColorPrimary'] ?? "#6366F1";
-      final themeSecondary = data['themeColorSecondary'] ?? "#4F46E5";
+        final themePrimary = data['themeColorPrimary'] ?? "#6366F1";
+        final themeSecondary = data['themeColorSecondary'] ?? "#4F46E5";
 
-      return Scaffold(
-        backgroundColor: const Color(0xffF5F7FB),
+        return Scaffold(
+          backgroundColor: const Color(0xffF5F7FB),
 
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: _backButton(context),
-          title: const Text(
-            "School Details",
-            style: TextStyle(
-              color: Color(0xff1E3A8A),
-              fontWeight: FontWeight.w600,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: _backButton(context),
+            title: const Text(
+              "School Details",
+              style: TextStyle(
+                color: Color(0xff1E3A8A),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            bottom: const PreferredSize(
+              preferredSize: Size.fromHeight(1),
+              child: Divider(height: 1),
             ),
           ),
-          bottom: const PreferredSize(
-            preferredSize: Size.fromHeight(1),
-            child: Divider(height: 1),
-          ),
-        ),
 
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              /// HEADER
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      _hexToColor(themePrimary),
-                      _hexToColor(themeSecondary),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 35,
-                      backgroundColor: Colors.white,
-                      child: logo.isNotEmpty
-                          ? ClipOval(
-                              child: Image.network(
-                                logo,
-                                key: ValueKey(logo),
-                                fit: BoxFit.cover,
-                                width: 70,
-                                height: 70,
-                              ),
-                            )
-                          : const Icon(Icons.school, size: 30),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  /// HEADER (FIXED)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          _hexToColor(themePrimary),
+                          _hexToColor(themeSecondary),
+                        ],
                       ),
+                      borderRadius: BorderRadius.circular(18),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 35,
+                          backgroundColor: Colors.white,
+                          child: ClipOval(
+                            child: logo.isNotEmpty
+                                ? Image.network(
+                                    logo,
+                                    key: ValueKey(logo), // 🔥 forces rebuild
+                                    width: 70,
+                                    height: 70,
+                                    fit: BoxFit.contain,
+                                  )
+                                : const Icon(Icons.school, size: 30),
+                          ),
+                        ),
+
+                        const SizedBox(width: 16),
+
+                        /// SCHOOL NAME + EMAIL
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                email,
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  _tile("School ID", widget.schoolId, Icons.tag),
+                  _tile("Admin Email", email, Icons.email),
+
+                  const SizedBox(height: 20),
+
+                  _actionTile(
+                    "Change School Name",
+                    Icons.edit,
+                    () => _changeName(context),
+                  ),
+
+                  _actionTile(
+                    "Change Logo",
+                    Icons.image,
+                    () => _changeLogo(context),
+                  ),
+
+                  _actionTile(
+                    "Change Primary Color",
+                    Icons.color_lens,
+                    () => _pickColor(true),
+                  ),
+
+                  _actionTile(
+                    "Change Secondary Color",
+                    Icons.gradient,
+                    () => _pickColor(false),
+                  ),
+
+                  _actionTile(
+                    "Reset Admin Password",
+                    Icons.lock_reset,
+                    () => _resetPassword(context),
+                  ),
+
+                  _actionTile(
+                    "Archive School",
+                    Icons.archive,
+                    () => _archiveSchool(context),
+                  ),
+
+                  _actionTile(
+                    "Delete School",
+                    Icons.delete,
+                    () => _deleteSchool(context),
+                    color: Colors.red,
+                  ),
+                ],
               ),
-
-              const SizedBox(height: 20),
-
-              _tile("School ID", widget.schoolId, Icons.tag),
-
-              _tile(
-                "Admin Email",
-                widget.data['email'] ?? "No Email",
-                Icons.email,
-              ),
-
-              const SizedBox(height: 20),
-
-              _actionTile("Change School Name", Icons.edit,
-                  () => _changeName(context)),
-
-              _actionTile(
-                  "Change Logo", Icons.image, () => _changeLogo(context)),
-
-              _actionTile("Change Primary Color", Icons.color_lens,
-                  () => _pickColor(true)),
-
-              _actionTile("Change Secondary Color", Icons.gradient,
-                  () => _pickColor(false)),
-
-              _actionTile("Reset Admin Password", Icons.lock_reset,
-                  () => _resetPassword(context)),
-
-              _actionTile("Archive School", Icons.archive,
-                  () => _archiveSchool(context)),
-
-              _actionTile("Delete School", Icons.delete,
-                  () => _deleteSchool(context),
-                  color: Colors.red),
-            ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
-  /// 🔙 BACK BUTTON
+  /// BACK BUTTON
   Widget _backButton(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 8),
@@ -202,7 +229,7 @@ Widget build(BuildContext context) {
     );
   }
 
-  /// 🔥 CHANGE NAME
+  /// CHANGE NAME
   Future<void> _changeName(BuildContext context) async {
     String newName = "";
 
@@ -221,8 +248,9 @@ Widget build(BuildContext context) {
                   .doc(widget.schoolId)
                   .update({'name': newName.toUpperCase()});
 
+              ProviderScope.containerOf(context).invalidate(schoolsProvider);
+
               Navigator.pop(context);
-              setState(() {});
             },
             child: const Text("Save"),
           ),
@@ -231,35 +259,44 @@ Widget build(BuildContext context) {
     );
   }
 
-  /// 🔥 LOGO FIX
+  /// LOGO FIX (CACHE FIX ADDED)
   Future<void> _changeLogo(BuildContext context) async {
     try {
-      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80, // 🔥 compress + fix corruption
+      );
 
       if (picked == null) return;
 
       final ref = FirebaseStorage.instance.ref().child(
-        "school_logos/${widget.schoolId}.png",
-      );
+        "school_logos/${widget.schoolId}.jpg",
+      ); // 🔥 use jpg
 
       if (kIsWeb) {
         final bytes = await picked.readAsBytes();
-        await ref.putData(bytes);
+
+        await ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'image/jpeg'), // 🔥 IMPORTANT
+        );
       } else {
         final file = File(picked.path);
-        await ref.putFile(file);
+
+        await ref.putFile(
+          file,
+          SettableMetadata(contentType: 'image/jpeg'), // 🔥 IMPORTANT
+        );
       }
 
       final url = await ref.getDownloadURL();
 
+      final updatedUrl = "$url?time=${DateTime.now().millisecondsSinceEpoch}";
+
       await FirebaseFirestore.instance
           .collection('schools')
           .doc(widget.schoolId)
-          .update({'logo': url});
-
-      widget.data['logo'] = url;
-
-      if (mounted) setState(() {});
+          .set({'logo': updatedUrl}, SetOptions(merge: true));
 
       ScaffoldMessenger.of(
         context,
@@ -271,7 +308,7 @@ Widget build(BuildContext context) {
     }
   }
 
-  /// 🔥 PASSWORD RESET
+  /// RESET PASSWORD
   Future<void> _resetPassword(BuildContext context) async {
     try {
       final adminUid = widget.data['adminUid'];
@@ -302,7 +339,7 @@ Widget build(BuildContext context) {
     }
   }
 
-  /// 🔥 DELETE
+  /// DELETE
   Future<void> _deleteSchool(BuildContext context) async {
     final confirm = await showDialog(
       context: context,
@@ -331,7 +368,6 @@ Widget build(BuildContext context) {
 
       await callable.call({'schoolId': widget.schoolId});
 
-      /// 🔥 FORCE REFRESH
       ProviderScope.containerOf(context).invalidate(schoolsProvider);
 
       Navigator.pop(context);
@@ -346,30 +382,17 @@ Widget build(BuildContext context) {
     }
   }
 
-  /// 🔥 ARCHIVE SCHOOL
+  /// ARCHIVE
   Future<void> _archiveSchool(BuildContext context) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('schools')
-          .doc(widget.schoolId)
-          .update({
-            'archived': true,
-            'archivedAt': FieldValue.serverTimestamp(),
-          });
+    await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(widget.schoolId)
+        .update({'archived': true});
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("School archived ✅")));
-
-      Navigator.pop(context); // go back
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Archive error: $e")));
-    }
+    Navigator.pop(context);
   }
 
-  /// 🎨 COLOR
+  /// COLOR
   Future<void> _pickColor(bool isPrimary) async {
     final selected = await showDialog<Color>(
       context: context,
@@ -402,8 +425,6 @@ Widget build(BuildContext context) {
           if (isPrimary) 'themeColorPrimary': hex,
           if (!isPrimary) 'themeColorSecondary': hex,
         });
-
-    setState(() {});
   }
 
   Color _hexToColor(String hex) {

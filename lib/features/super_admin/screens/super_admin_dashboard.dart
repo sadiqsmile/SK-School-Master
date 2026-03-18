@@ -32,7 +32,7 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
         elevation: 0,
         title: const Row(
           children: [
-            
+           
             CircleAvatar(radius: 16, child: Icon(Icons.person, size: 18)),
             SizedBox(width: 10),
             Text(
@@ -44,6 +44,8 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
             ),
           ],
         ),
+
+        
         actions: const [
           Icon(Icons.notifications_none, color: Color(0xff1E3A8A)),
           SizedBox(width: 10),
@@ -211,25 +213,33 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
                           child: Row(
                             children: [
                              
-
                               CircleAvatar(
-  radius: 25,
-  backgroundColor: Colors.grey.shade200,
-  child: logo.isNotEmpty
-      ? ClipOval(
-          child: Image.network(
-            logo,
-            key: ValueKey(logo),
-            fit: BoxFit.cover,
-            width: 50,
-            height: 50,
-          ),
-        )
-      : const Icon(Icons.school),
-),
+                                radius: 35,
+                                backgroundColor: Colors.white,
+                                child: ClipOval(
+                                  child: logo.isNotEmpty
+                                      ? Image.network(
+                                          logo,
+                                          key: ValueKey(logo),
+                                          width: 70,
+                                          height: 70,
+                                          fit: BoxFit
+                                              .contain, // 🔥 FIXED (no crop)
+                                          filterQuality: FilterQuality.high,
 
-
-
+                                          // 🔥 WEB FIX
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                print("IMAGE ERROR: $error");
+                                                return const Icon(
+                                                  Icons.school,
+                                                  size: 30,
+                                                );
+                                              },
+                                        )
+                                      : const Icon(Icons.school, size: 30),
+                                ),
+                              ),
 
                               const SizedBox(width: 12),
                               Expanded(
