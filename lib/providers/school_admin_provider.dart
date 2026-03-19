@@ -119,3 +119,12 @@ final feesProvider =
           .limit(50)
           .snapshots();
     });
+
+
+final archivedSchoolsProvider =
+    StreamProvider<QuerySnapshot<Map<String, dynamic>>>((ref) {
+  return FirebaseFirestore.instance
+      .collection('schools')
+      .where('archived', isEqualTo: true)
+      .snapshots();
+});

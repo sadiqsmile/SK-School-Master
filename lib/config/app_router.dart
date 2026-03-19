@@ -8,7 +8,7 @@ import 'package:school_app/features/super_admin/screens/super_admin_dashboard.da
 import 'package:school_app/features/super_admin/screens/maintenance_screen.dart';
 import 'package:school_app/features/school_admin/dashboard/screens/school_admin_dashboard.dart';
 import 'package:school_app/features/school_admin/teachers/screens/teachers_screen.dart';
-import 'package:school_app/features/school_admin/teachers/screens/add_teacher_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:school_app/features/school_admin/students/screens/students_screen.dart';
 import 'package:school_app/features/school_admin/students/screens/add_student_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/classes_screen.dart';
@@ -45,6 +45,36 @@ import 'package:school_app/models/user_role.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/school-loader',
+
+  /// 🔥 ADD THIS BLOCK (VERY IMPORTANT)
+  redirect: (context, state) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    final isAuthRoute =
+        state.matchedLocation == '/' ||
+        state.matchedLocation == '/enter-school' ||
+        state.matchedLocation == '/parent-login';
+
+    final isLoadingRoute = state.matchedLocation == '/school-loader';
+
+    // 🔴 NOT LOGGED IN
+    if (user == null) {
+      if (isAuthRoute || isLoadingRoute) return null;
+      return '/'; // go to AuthGate
+    }
+
+    // 🟢 LOGGED IN
+    if (user != null) {
+      // prevent going back to login
+      if (isAuthRoute) {
+        return '/school-loader'; // let loader decide role
+      }
+    }
+
+    return null;
+  },
+
+ 
   routes: [
     GoRoute(
       path: '/school-loader',

@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:school_app/models/user_role.dart';
 import 'package:school_app/providers/core_providers.dart';
 
-final authStateProvider = StreamProvider.autoDispose<User?>((ref) {
-  return ref.watch(authServiceProvider).authChanges();
+final authStateProvider = StreamProvider<User?>((ref) {
+  return FirebaseAuth.instance.authStateChanges();
 });
 
 final userRoleProvider = FutureProvider.autoDispose<UserRole>((ref) async {

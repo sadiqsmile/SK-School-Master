@@ -1,15 +1,16 @@
 // features/super_admin/screens/super_admin_dashboard.dart
-// features/super_admin/screens/super_admin_dashboard.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../providers/super_admin_provider.dart';
 import 'add_school_screen.dart';
-import 'school_details_screen.dart'; // ✅ IMPORTANT
+import 'school_details_screen.dart';
+import 'settings_screen.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SuperAdminDashboard extends ConsumerStatefulWidget {
-  const SuperAdminDashboard({Key? key}) : super(key: key);
+  const SuperAdminDashboard({super.key});
 
   @override
   ConsumerState<SuperAdminDashboard> createState() =>
@@ -19,23 +20,35 @@ class SuperAdminDashboard extends ConsumerStatefulWidget {
 class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
   String search = "";
 
+  /// ✅ LOGOUT (SIMPLIFIED)
+  Future<void> _logout(BuildContext context) async {
+    await FirebaseAuth.instance.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final totalSchools = ref.watch(totalSchoolsProvider);
-    final totalStudentsAsync = ref.watch(totalStudentsProvider);
     final schoolsAsync = ref.watch(schoolsProvider);
+    final totalSchoolsAsync = ref.watch(totalSchoolsProvider);
+    final totalStudentsAsync = ref.watch(totalStudentsProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xffF5F7FB),
+
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Row(
+        title: Row(
           children: [
-           
-            CircleAvatar(radius: 16, child: Icon(Icons.person, size: 18)),
-            SizedBox(width: 10),
-            Text(
+            CircleAvatar(
+              backgroundColor: Colors.transparent,
+              child: SvgPicture.asset(
+                'assets/icons/admin.svg',
+                width: 28,
+                height: 28,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
               "Super Admin",
               style: TextStyle(
                 color: Color(0xff1E3A8A),
@@ -44,15 +57,30 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
             ),
           ],
         ),
+        actions: [
+          const Icon(Icons.notifications_none, color: Color(0xff1E3A8A)),
+          const SizedBox(width: 10),
 
-        
-        actions: const [
-          Icon(Icons.notifications_none, color: Color(0xff1E3A8A)),
-          SizedBox(width: 10),
-          Icon(Icons.settings, color: Color(0xff1E3A8A)),
-          SizedBox(width: 10),
-          Icon(Icons.logout, color: Color(0xff1E3A8A)),
-          SizedBox(width: 10),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              );
+            },
+            child: const Icon(Icons.settings, color: Color(0xff1E3A8A)),
+          ),
+
+          const SizedBox(width: 10),
+
+          GestureDetector(
+            onTap: () => _logout(context),
+            child: const Icon(Icons.logout, color: Color(0xff1E3A8A)),
+          ),
+
+          const SizedBox(width: 10),
         ],
       ),
 
@@ -60,13 +88,32 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "Welcome, Super Admin 👋",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xff1E3A8A),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             /// 🔥 STATS
             Row(
               children: [
                 Expanded(
                   child: _StatCard(
                     title: "Total Schools",
-                    value: totalSchools.toString(),
+                    value: totalSchoolsAsync.when(
+                      data: (count) => count.toString(),
+                      loading: () => "0",
+                      error: (_, __) => "0",
+                    ),
                     icon: Icons.school,
                     colors: const [Color(0xff16A34A), Color(0xff4ADE80)],
                   ),
@@ -76,7 +123,7 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
                   child: _StatCard(
                     title: "Total Students",
                     value: totalStudentsAsync.when(
-                      data: (snap) => snap.docs.length.toString(),
+                      data: (count) => count.toString(),
                       loading: () => "0",
                       error: (_, __) => "0",
                     ),
@@ -89,58 +136,49 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
 
             const SizedBox(height: 20),
 
-            /// 🚀 PREMIUM ADD SCHOOL BUTTON
-            SizedBox(
-              width: double.infinity,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xff7F1D1D), // deep red
-                      Color(0xffDC2626), // bright red
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AddSchoolScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  icon: const Icon(Icons.school, color: Colors.white),
-                  label: const Text(
-                    "Add School",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
+           SizedBox(
+  width: double.infinity,
+  child: GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const AddSchoolScreen(),
+        ),
+      );
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color.fromARGB(255, 138, 30, 30), // dark blue
+            Color.fromARGB(255, 246, 59, 106), // light blue
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.school, color: Colors.white),
+          SizedBox(width: 8),
+          Text(
+            "Add School",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
-
+          ),
+        ],
+      ),
+    ),
+  ),
+),
             const SizedBox(height: 20),
 
-            /// 🔍 SEARCH
             TextField(
               decoration: InputDecoration(
                 hintText: "Search school...",
@@ -161,13 +199,10 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
 
             const SizedBox(height: 20),
 
-            /// 🏫 SCHOOL LIST
             Expanded(
               child: schoolsAsync.when(
                 data: (snapshot) {
-                  final schools = snapshot.docs;
-
-                  final filtered = schools.where((doc) {
+                  final filtered = snapshot.docs.where((doc) {
                     final name = (doc.data()['name'] ?? '').toLowerCase();
                     return name.contains(search);
                   }).toList();
@@ -183,9 +218,17 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
                       final name = data['name'] ?? '';
                       final logo = data['logo'] ?? '';
 
-                      return GestureDetector(
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.white,
+                          child: logo.isNotEmpty
+                              ? (logo.toLowerCase().endsWith('.svg')
+                                  ? SvgPicture.network(logo)
+                                  : Image.network(logo))
+                              : const Icon(Icons.school),
+                        ),
+                        title: Text(name),
                         onTap: () {
-                          /// ✅ OPEN DETAILS SCREEN (FIXED)
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -196,73 +239,12 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
                             ),
                           );
                         },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                             
-                              CircleAvatar(
-                                radius: 35,
-                                backgroundColor: Colors.white,
-                                child: ClipOval(
-                                  child: logo.isNotEmpty
-                                      ? Image.network(
-                                          logo,
-                                          key: ValueKey(logo),
-                                          width: 70,
-                                          height: 70,
-                                          fit: BoxFit
-                                              .contain, // 🔥 FIXED (no crop)
-                                          filterQuality: FilterQuality.high,
-
-                                          // 🔥 WEB FIX
-                                          errorBuilder:
-                                              (context, error, stackTrace) {
-                                                print("IMAGE ERROR: $error");
-                                                return const Icon(
-                                                  Icons.school,
-                                                  size: 30,
-                                                );
-                                              },
-                                        )
-                                      : const Icon(Icons.school, size: 30),
-                                ),
-                              ),
-
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xff1E3A8A),
-                                  ),
-                                ),
-                              ),
-                              const Icon(Icons.arrow_forward_ios, size: 16),
-                            ],
-                          ),
-                        ),
                       );
                     },
                   );
                 },
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text("Error: $e")),
               ),
             ),
@@ -273,7 +255,7 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
   }
 }
 
-/// 🎨 STAT CARD (IMPROVED)
+/// STAT CARD
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
@@ -299,20 +281,17 @@ class _StatCard extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Stack(
         children: [
           Positioned(
             right: 0,
             top: 0,
-            child: Icon(icon, size: 42, color: Colors.white.withOpacity(0.25)),
+            child: Icon(
+              icon,
+              size: 42,
+              color: Colors.white.withOpacity(0.25),
+            ),
           ),
           Center(
             child: Column(
@@ -329,7 +308,10 @@ class _StatCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.white70,
+                  ),
                 ),
               ],
             ),

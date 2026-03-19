@@ -1,15 +1,12 @@
 // features/super_admin/screens/school_details_screen.dart
-// features/super_admin/screens/school_details_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../providers/super_admin_provider.dart';
 
 class SchoolDetailsScreen extends StatefulWidget {
   final String schoolId;
@@ -26,6 +23,7 @@ class SchoolDetailsScreen extends StatefulWidget {
 }
 
 class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
@@ -54,7 +52,10 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
-            leading: _backButton(context),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Color(0xff1E3A8A)),
+              onPressed: () => Navigator.pop(context),
+            ),
             title: const Text(
               "School Details",
               style: TextStyle(
@@ -62,148 +63,106 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            bottom: const PreferredSize(
-              preferredSize: Size.fromHeight(1),
-              child: Divider(height: 1),
-            ),
           ),
 
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  /// HEADER (FIXED)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          _hexToColor(themePrimary),
-                          _hexToColor(themeSecondary),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 35,
-                          backgroundColor: Colors.white,
-                          child: ClipOval(
-                            child: logo.isNotEmpty
-                                ? Image.network(
-                                    logo,
-                                    key: ValueKey(logo), // 🔥 forces rebuild
-                                    width: 70,
-                                    height: 70,
-                                    fit: BoxFit.contain,
-                                  )
-                                : const Icon(Icons.school, size: 30),
-                          ),
-                        ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
 
-                        const SizedBox(width: 16),
-
-                        /// SCHOOL NAME + EMAIL
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                email,
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                            ],
-                          ),
-                        ),
+                /// HEADER
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        _hexToColor(themePrimary),
+                        _hexToColor(themeSecondary),
                       ],
                     ),
+                    borderRadius: BorderRadius.circular(18),
                   ),
+                  child: Row(
+                    children: [
 
-                  const SizedBox(height: 20),
+                      /// LOGO
+                      Container(
+                        width: 70,
+                        height: 70,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: ClipOval(
+                          child: logo.isNotEmpty
+                              ? (logo.toLowerCase().endsWith('.svg')
+                                  ? SvgPicture.network(logo)
+                                  : Image.network(logo, fit: BoxFit.contain))
+                              : const Icon(Icons.school),
+                        ),
+                      ),
 
-                  _tile("School ID", widget.schoolId, Icons.tag),
-                  _tile("Admin Email", email, Icons.email),
+                      const SizedBox(width: 16),
 
-                  const SizedBox(height: 20),
-
-                  _actionTile(
-                    "Change School Name",
-                    Icons.edit,
-                    () => _changeName(context),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              email,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
+                ),
 
-                  _actionTile(
-                    "Change Logo",
-                    Icons.image,
-                    () => _changeLogo(context),
-                  ),
+                const SizedBox(height: 20),
 
-                  _actionTile(
-                    "Change Primary Color",
-                    Icons.color_lens,
-                    () => _pickColor(true),
-                  ),
+                _tile("School ID", widget.schoolId, Icons.tag),
+                _tile("Admin Email", email, Icons.email),
 
-                  _actionTile(
-                    "Change Secondary Color",
-                    Icons.gradient,
-                    () => _pickColor(false),
-                  ),
+                const SizedBox(height: 20),
 
-                  _actionTile(
-                    "Reset Admin Password",
-                    Icons.lock_reset,
-                    () => _resetPassword(context),
-                  ),
+                _actionTile("Change School Name", Icons.edit,
+                    () => _changeName(context)),
 
-                  _actionTile(
-                    "Archive School",
-                    Icons.archive,
-                    () => _archiveSchool(context),
-                  ),
+                _actionTile("Change Logo", Icons.image,
+                    () => _changeLogo(context)),
 
-                  _actionTile(
-                    "Delete School",
-                    Icons.delete,
-                    () => _deleteSchool(context),
-                    color: Colors.red,
-                  ),
-                ],
-              ),
+              _actionTile("Change Admin Email", Icons.email,
+                    () => _changeEmail(context)),
+
+                _actionTile("Change Primary Color", Icons.color_lens,
+                    () => _pickColor(true)),
+
+                _actionTile("Change Secondary Color", Icons.gradient,
+                    () => _pickColor(false)),
+
+                _actionTile("Archive School", Icons.archive,
+                    () => _archiveSchool(context)),
+
+                _actionTile(
+                  "Delete School",
+                  Icons.delete,
+                  () => _deleteSchool(context),
+                  color: Colors.red,
+                ),
+              ],
             ),
           ),
         );
       },
-    );
-  }
-
-  /// BACK BUTTON
-  Widget _backButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: InkWell(
-        onTap: () => Navigator.pop(context),
-        borderRadius: BorderRadius.circular(30),
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: const BoxDecoration(
-            color: Color(0xffF1F5F9),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.chevron_left, color: Color(0xff1E3A8A)),
-        ),
-      ),
     );
   }
 
@@ -215,12 +174,8 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
     );
   }
 
-  Widget _actionTile(
-    String title,
-    IconData icon,
-    VoidCallback onTap, {
-    Color color = const Color(0xff1E3A8A),
-  }) {
+  Widget _actionTile(String title, IconData icon, VoidCallback onTap,
+      {Color color = const Color(0xff1E3A8A)}) {
     return ListTile(
       leading: Icon(icon, color: color),
       title: Text(title),
@@ -248,8 +203,6 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
                   .doc(widget.schoolId)
                   .update({'name': newName.toUpperCase()});
 
-              ProviderScope.containerOf(context).invalidate(schoolsProvider);
-
               Navigator.pop(context);
             },
             child: const Text("Save"),
@@ -259,87 +212,89 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
     );
   }
 
-  /// LOGO FIX (CACHE FIX ADDED)
+  /// CHANGE LOGO (WEB SAFE)
   Future<void> _changeLogo(BuildContext context) async {
     try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80, // 🔥 compress + fix corruption
-      );
-
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (picked == null) return;
 
-      final ref = FirebaseStorage.instance.ref().child(
-        "school_logos/${widget.schoolId}.jpg",
-      ); // 🔥 use jpg
+      final ref = FirebaseStorage.instance
+          .ref("school_logos/${widget.schoolId}.png");
 
       if (kIsWeb) {
         final bytes = await picked.readAsBytes();
-
-        await ref.putData(
-          bytes,
-          SettableMetadata(contentType: 'image/jpeg'), // 🔥 IMPORTANT
-        );
+        await ref.putData(bytes);
       } else {
-        final file = File(picked.path);
-
-        await ref.putFile(
-          file,
-          SettableMetadata(contentType: 'image/jpeg'), // 🔥 IMPORTANT
-        );
+        await ref.putFile(File(picked.path));
       }
 
       final url = await ref.getDownloadURL();
 
-      final updatedUrl = "$url?time=${DateTime.now().millisecondsSinceEpoch}";
-
       await FirebaseFirestore.instance
           .collection('schools')
           .doc(widget.schoolId)
-          .set({'logo': updatedUrl}, SetOptions(merge: true));
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Logo updated ✅")));
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Logo error: $e")));
-    }
-  }
-
-  /// RESET PASSWORD
-  Future<void> _resetPassword(BuildContext context) async {
-    try {
-      final adminUid = widget.data['adminUid'];
-      final email = widget.data['email'] ?? "";
-
-      if (adminUid == null || email.isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Missing admin data ❌")));
-        return;
-      }
-
-      final defaultPassword = email.substring(0, 6);
-
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'resetUserPassword',
-      );
-
-      await callable.call({'uid': adminUid, 'newPassword': defaultPassword});
+          .update({'logo': url});
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Password reset: $defaultPassword")),
+        const SnackBar(content: Text("Logo updated ✅")),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
     }
   }
 
-  /// DELETE
+Future<void> _changeEmail(BuildContext context) async {
+  String newEmail = "";
+
+  await showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text("New Admin Email"),
+      content: TextField(
+        onChanged: (val) => newEmail = val,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () async {
+            if (newEmail.isEmpty) return;
+
+            final defaultPassword = newEmail.substring(0, 6);
+
+            await FirebaseFirestore.instance
+                .collection('schools')
+                .doc(widget.schoolId)
+                .update({
+              'email': newEmail,
+              'defaultPassword': defaultPassword,
+            });
+
+            Navigator.pop(context);
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    "Email updated\nNew Password: $defaultPassword"),
+              ),
+            );
+          },
+          child: const Text("Save"),
+        ),
+      ],
+    ),
+  );
+}
+
+
+
+
+
+
+
+
+
+  /// DELETE SCHOOL (ONLY FIRESTORE)
   Future<void> _deleteSchool(BuildContext context) async {
     final confirm = await showDialog(
       context: context,
@@ -348,38 +303,23 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
         content: const Text("This will delete ALL data permanently!"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel")),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete"),
-          ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Delete")),
         ],
       ),
     );
 
     if (confirm != true) return;
 
-    try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'deleteSchoolCompletely',
-      );
+    await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(widget.schoolId)
+        .delete();
 
-      await callable.call({'schoolId': widget.schoolId});
-
-      ProviderScope.containerOf(context).invalidate(schoolsProvider);
-
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("School deleted ✅")));
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Delete error: $e")));
-    }
+    Navigator.pop(context);
   }
 
   /// ARCHIVE
@@ -422,9 +362,9 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
         .collection('schools')
         .doc(widget.schoolId)
         .update({
-          if (isPrimary) 'themeColorPrimary': hex,
-          if (!isPrimary) 'themeColorSecondary': hex,
-        });
+      if (isPrimary) 'themeColorPrimary': hex,
+      if (!isPrimary) 'themeColorSecondary': hex,
+    });
   }
 
   Color _hexToColor(String hex) {

@@ -1,64 +1,70 @@
-// main.dart
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:school_app/config/app_router.dart';
-import 'package:school_app/core/constants/app_constants.dart';
-import 'package:school_app/core/offline/firestore_offline.dart';
-import 'package:school_app/core/offline/firestore_sync_tracker.dart';
-import 'package:school_app/core/theme/app_theme.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'package:school_app/features/auth/screens/login_screen.dart';
+import 'package:school_app/features/super_admin/screens/super_admin_dashboard.dart';
 import 'firebase_options.dart';
 
-Future<void> main() async {
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+await Firebase.initializeApp(
+  options: DefaultFirebaseOptions.currentPlatform,
+);
 
-  // Offline-first: queue writes locally and sync when connectivity returns.
-  await configureFirestoreOfflinePersistence();
-  FirestoreSyncTracker.instance.start();
-
-  runApp(const ProviderScope(child: SchoolApp()));
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
 }
 
-class SchoolApp extends StatelessWidget {
-  const SchoolApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: AppConstants.appName,
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme(),
-      scrollBehavior: const _AdaptiveScrollBehavior(),
-      builder: (context, child) {
-        final media = MediaQuery.of(context);
-        final clampedTextScaler = media.textScaler.clamp(
-          minScaleFactor: 0.9,
-          maxScaleFactor: 1.15,
-        );
-
-        return MediaQuery(
-          data: media.copyWith(textScaler: clampedTextScaler),
-          child: child ?? const SizedBox.shrink(),
-        );
-      },
-      routerConfig: appRouter,
+      home: AuthWrapper(),
     );
   }
 }
 
-class _AdaptiveScrollBehavior extends MaterialScrollBehavior {
-  const _AdaptiveScrollBehavior();
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
 
   @override
-  Set<PointerDeviceKind> get dragDevices => {
-    PointerDeviceKind.touch,
-    PointerDeviceKind.mouse,
-    PointerDeviceKind.trackpad,
-    PointerDeviceKind.stylus,
-    PointerDeviceKind.unknown,
-  };
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+
+        // 🔥 WAIT UNTIL AUTH READY
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final user = snapshot.data;
+
+        // 🔥 NOT LOGGED IN
+        if (user == null) {
+          return const LoginScreen();
+        }
+
+        // 🔥 ADD SMALL DELAY TO ENSURE TOKEN READY
+        return FutureBuilder(
+          future: Future.delayed(const Duration(milliseconds: 300)),
+          builder: (context, _) {
+            return const SuperAdminDashboard();
+          },
+        );
+      },
+    );
+  }
 }
