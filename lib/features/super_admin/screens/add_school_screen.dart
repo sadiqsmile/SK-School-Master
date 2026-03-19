@@ -88,22 +88,38 @@ class _AddSchoolScreenState extends State<AddSchoolScreen> {
     try {
       String logoUrl = "";
 
-      if (imageBytes != null) {
-        final ref = FirebaseStorage.instance
-            .ref("school_logos/${DateTime.now().millisecondsSinceEpoch}");
+      
+if (imageBytes != null) {
+  final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
 
-        final isSvg = imageName != null &&
-            imageName!.toLowerCase().endsWith('.svg');
+  if (picked == null) return;
 
-        await ref.putData(
-          imageBytes!,
-          SettableMetadata(
-            contentType: isSvg ? 'image/svg+xml' : 'image/png',
-          ),
-        );
+  final imageName = picked.name;
 
-        logoUrl = await ref.getDownloadURL();
-      }
+  final isSvg = imageName.toLowerCase().endsWith('.svg');
+
+  final fileName =
+      "${DateTime.now().millisecondsSinceEpoch}.${isSvg ? 'svg' : 'png'}";
+
+  final ref = FirebaseStorage.instance
+      .ref("school_logos/$fileName");
+
+  await ref.putData(
+    imageBytes!,
+    SettableMetadata(
+      contentType: isSvg ? 'image/svg+xml' : 'image/png',
+    ),
+  );
+
+  logoUrl = await ref.getDownloadURL();
+}
+
+
+
+
+
+
+
 
       await FirebaseFirestore.instance.collection('schools').add({
         'name': name,

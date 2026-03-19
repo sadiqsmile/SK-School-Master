@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class SchoolDetailsScreen extends StatefulWidget {
@@ -19,7 +18,8 @@ class SchoolDetailsScreen extends StatefulWidget {
   });
 
   @override
-  State<SchoolDetailsScreen> createState() => _SchoolDetailsScreenState();
+  State<SchoolDetailsScreen> createState() =>
+      _SchoolDetailsScreenState();
 }
 
 class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
@@ -53,7 +53,8 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
             backgroundColor: Colors.white,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Color(0xff1E3A8A)),
+              icon: const Icon(Icons.arrow_back,
+                  color: Color(0xff1E3A8A)),
               onPressed: () => Navigator.pop(context),
             ),
             title: const Text(
@@ -93,20 +94,37 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
                           color: Colors.white,
                           shape: BoxShape.circle,
                         ),
-                        child: ClipOval(
-                          child: logo.isNotEmpty
-                              ? (logo.toLowerCase().endsWith('.svg')
-                                  ? SvgPicture.network(logo)
-                                  : Image.network(logo, fit: BoxFit.contain))
-                              : const Icon(Icons.school),
-                        ),
+
+
+child: ClipOval(
+  child: logo.isNotEmpty
+      ? (logo.toLowerCase().endsWith('.svg')
+          ? SvgPicture.network(
+              logo,
+              fit: BoxFit.contain,
+              placeholderBuilder: (context) => const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : Image.network(
+              logo,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.broken_image);
+              },
+            ))
+      : const Icon(Icons.school),
+),
+
+
                       ),
 
                       const SizedBox(width: 16),
 
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
                           children: [
                             Text(
                               name,
@@ -118,7 +136,8 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
                             ),
                             Text(
                               email,
-                              style: const TextStyle(color: Colors.white70),
+                              style: const TextStyle(
+                                  color: Colors.white70),
                             ),
                           ],
                         ),
@@ -140,7 +159,7 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
                 _actionTile("Change Logo", Icons.image,
                     () => _changeLogo(context)),
 
-              _actionTile("Change Admin Email", Icons.email,
+                _actionTile("Change Admin Email", Icons.email,
                     () => _changeEmail(context)),
 
                 _actionTile("Change Primary Color", Icons.color_lens,
@@ -212,28 +231,59 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
     );
   }
 
-  /// CHANGE LOGO (WEB SAFE)
+  /// ✅ CHANGE LOGO (CLEAN STORAGE FIXED)
   Future<void> _changeLogo(BuildContext context) async {
     try {
-      final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+      );
+
       if (picked == null) return;
 
-      final ref = FirebaseStorage.instance
-          .ref("school_logos/${widget.schoolId}.png");
+      final bytes = await picked.readAsBytes();
+      final isSvg = picked.name.toLowerCase().endsWith('.svg');
 
-      if (kIsWeb) {
-        final bytes = await picked.readAsBytes();
-        await ref.putData(bytes);
-      } else {
-        await ref.putFile(File(picked.path));
+      // 🔍 GET OLD DATA
+      final doc = await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .get();
+
+      final oldPath = doc.data()?['logoPath'];
+
+      // 🗑️ DELETE OLD IMAGE
+      if (oldPath != null) {
+        try {
+          await FirebaseStorage.instance.ref(oldPath).delete();
+        } catch (e) {
+          debugPrint("Old image already deleted");
+        }
       }
+
+      // 📤 UPLOAD NEW IMAGE (SAME NAME)
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('school_logos')
+          .child('${widget.schoolId}.${isSvg ? 'svg' : 'png'}');
+
+      await ref.putData(
+        bytes,
+        SettableMetadata(
+          contentType:
+              isSvg ? 'image/svg+xml' : 'image/png',
+        ),
+      );
 
       final url = await ref.getDownloadURL();
 
+      // 💾 SAVE
       await FirebaseFirestore.instance
           .collection('schools')
           .doc(widget.schoolId)
-          .update({'logo': url});
+          .update({
+        'logo': url,
+        'logoPath': ref.fullPath,
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Logo updated ✅")),
@@ -245,81 +295,39 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
     }
   }
 
-Future<void> _changeEmail(BuildContext context) async {
-  String newEmail = "";
-
-  await showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text("New Admin Email"),
-      content: TextField(
-        onChanged: (val) => newEmail = val,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () async {
-            if (newEmail.isEmpty) return;
-
-            final defaultPassword = newEmail.substring(0, 6);
-
-            await FirebaseFirestore.instance
-                .collection('schools')
-                .doc(widget.schoolId)
-                .update({
-              'email': newEmail,
-              'defaultPassword': defaultPassword,
-            });
-
-            Navigator.pop(context);
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    "Email updated\nNew Password: $defaultPassword"),
-              ),
-            );
-          },
-          child: const Text("Save"),
-        ),
-      ],
-    ),
-  );
-}
-
-
-
-
-
-
-
-
-
-  /// DELETE SCHOOL (ONLY FIRESTORE)
+  /// DELETE SCHOOL + IMAGE
   Future<void> _deleteSchool(BuildContext context) async {
-    final confirm = await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Delete School"),
-        content: const Text("This will delete ALL data permanently!"),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("Cancel")),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text("Delete")),
-        ],
-      ),
-    );
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .get();
 
-    if (confirm != true) return;
+      final logoPath = doc.data()?['logoPath'];
 
-    await FirebaseFirestore.instance
-        .collection('schools')
-        .doc(widget.schoolId)
-        .delete();
+      if (logoPath != null) {
+        try {
+          await FirebaseStorage.instance.ref(logoPath).delete();
+        } catch (e) {
+          debugPrint("Image already deleted");
+        }
+      }
 
-    Navigator.pop(context);
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .delete();
+
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("School deleted ✅")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
   }
 
   /// ARCHIVE
@@ -330,6 +338,49 @@ Future<void> _changeEmail(BuildContext context) async {
         .update({'archived': true});
 
     Navigator.pop(context);
+  }
+
+  /// CHANGE EMAIL
+  Future<void> _changeEmail(BuildContext context) async {
+    String newEmail = "";
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("New Admin Email"),
+        content: TextField(
+          onChanged: (val) => newEmail = val,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              if (newEmail.isEmpty) return;
+
+              final defaultPassword =
+                  newEmail.substring(0, 6);
+
+              await FirebaseFirestore.instance
+                  .collection('schools')
+                  .doc(widget.schoolId)
+                  .update({
+                'email': newEmail,
+                'defaultPassword': defaultPassword,
+              });
+
+              Navigator.pop(context);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      "Email updated\nPassword: $defaultPassword"),
+                ),
+              );
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
   }
 
   /// COLOR
@@ -356,7 +407,8 @@ Future<void> _changeEmail(BuildContext context) async {
 
     if (selected == null) return;
 
-    final hex = "#${selected.value.toRadixString(16).substring(2)}";
+    final hex =
+        "#${selected.value.toRadixString(16).substring(2)}";
 
     await FirebaseFirestore.instance
         .collection('schools')
