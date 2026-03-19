@@ -179,10 +179,13 @@ if (imageBytes != null) {
                 ),
                 child: imageBytes == null
                     ? const Icon(Icons.camera_alt)
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.memory(imageBytes!, fit: BoxFit.cover),
-                      ),
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(
+                            imageBytes!,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
               ),
             ),
 

@@ -88,8 +88,8 @@ class _SchoolDetailsScreenState extends State<SchoolDetailsScreen> {
 
                       /// LOGO
                       Container(
-                        width: 70,
-                        height: 70,
+                        width: 60,
+                        height: 60,
                         decoration: const BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
@@ -109,6 +109,7 @@ child: ClipOval(
           : Image.network(
               logo,
               fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
               errorBuilder: (context, error, stackTrace) {
                 return const Icon(Icons.broken_image);
               },
