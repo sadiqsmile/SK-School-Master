@@ -4,6 +4,10 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+
 
 class AddSchoolScreen extends StatefulWidget {
   const AddSchoolScreen({super.key});
@@ -13,6 +17,256 @@ class AddSchoolScreen extends StatefulWidget {
 }
 
 class _AddSchoolScreenState extends State<AddSchoolScreen> {
+  bool _isReplacingAdmin = false;
+
+  Future<void> _replaceSchoolAdmin({
+    required String schoolId,
+    required String currentEmail,
+  }) async {
+    final controller = TextEditingController(text: currentEmail);
+
+    final newEmail = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Replace School Admin',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Enter the new school admin email. This email should already exist in Firebase Auth or be created by your existing flow.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'New Admin Email',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+
+    if (newEmail == null || newEmail.isEmpty) return;
+
+    setState(() => _isReplacingAdmin = true);
+
+    try {
+      await FirebaseFirestore.instance.collection('schools').doc(schoolId).update({
+        'adminEmail': newEmail,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      try {
+        await FirebaseAuth.instance.sendPasswordResetEmail(email: newEmail);
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'user-not-found') {
+          await _showErrorDialog(
+            'Admin Updated But Reset Email Failed',
+            'School admin email was updated in Firestore, but no Firebase Auth user exists for:\n\n$newEmail\n\nCreate the Auth user first, then send reset email again.',
+          );
+          return;
+        } else {
+          rethrow;
+        }
+      }
+
+      await _showSuccessDialog(
+        'School Admin Replaced',
+        'School admin email updated successfully.\n\nNew admin: $newEmail\n\nA password reset email has also been sent.',
+      );
+    } on FirebaseAuthException catch (e) {
+      await _showErrorDialog(
+        'Replace Failed',
+        e.message ?? 'Failed while sending reset email.',
+      );
+    } catch (e) {
+      await _showErrorDialog(
+        'Replace Failed',
+        'Something went wrong while replacing school admin.\n\n$e',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isReplacingAdmin = false);
+      }
+    }
+  }
+
+  Widget _buildAdminActions({
+    required String schoolId,
+    required String adminEmail,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Admin Email: $adminEmail',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            ElevatedButton.icon(
+              onPressed: _isSendingReset
+                  ? null
+                  : () => _sendPasswordResetEmail(adminEmail),
+              icon: _isSendingReset
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.lock_reset),
+              label: Text(_isSendingReset ? 'Sending...' : 'Reset Password'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: _isReplacingAdmin
+                  ? null
+                  : () => _replaceSchoolAdmin(
+                        schoolId: schoolId,
+                        currentEmail: adminEmail,
+                      ),
+              icon: _isReplacingAdmin
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.swap_horiz),
+              label: Text(_isReplacingAdmin ? 'Updating...' : 'Replace Admin'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  bool _isSendingReset = false;
+
+  Future<void> _sendPasswordResetEmail(String email) async {
+    setState(() => _isSendingReset = true);
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email.trim());
+
+      await _showSuccessDialog(
+        'Reset Email Sent',
+        'A password reset link has been sent to:\n\n$email\n\nThe school admin can use that link to set a new password.',
+      );
+    } on FirebaseAuthException catch (e) {
+      String message = 'Failed to send password reset email.';
+
+      if (e.code == 'user-not-found') {
+        message =
+            'No Firebase Auth user exists for this email.\n\nMake sure the school admin account was created in Firebase Auth first.';
+      } else if (e.code == 'invalid-email') {
+        message = 'The email address is invalid.';
+      } else if (e.message != null && e.message!.trim().isNotEmpty) {
+        message = e.message!;
+      }
+
+      await _showErrorDialog('Reset Failed', message);
+    } catch (e) {
+      await _showErrorDialog(
+        'Reset Failed',
+        'Something went wrong while sending reset email.\n\n$e',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingReset = false);
+      }
+    }
+  }
+
+    Future<void> _showSuccessDialog(String title, String message) async {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    Future<void> _showErrorDialog(String title, String message) async {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   Uint8List? imageBytes;
   String? imageName;
 

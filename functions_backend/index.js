@@ -290,3 +290,127 @@ exports.deleteSchoolCompletely = onCall(
     }
   }
 );
+
+
+exports.replaceSchoolAdmin = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    try {
+      await requireSuperAdmin(request);
+
+      const data = request.data || {};
+      const schoolId = (data.schoolId || "").toString().trim();
+      const newEmail = (data.newEmail || "").toString().trim().toLowerCase();
+
+      if (!schoolId) {
+        throw new HttpsError("invalid-argument", "schoolId is required.");
+      }
+
+      if (!newEmail || !newEmail.includes("@")) {
+        throw new HttpsError("invalid-argument", "Valid newEmail is required.");
+      }
+
+      const schoolRef = admin.firestore().collection("schools").doc(schoolId);
+      const schoolDoc = await schoolRef.get();
+
+      if (!schoolDoc.exists) {
+        throw new HttpsError("not-found", "School not found.");
+      }
+
+      const schoolData = schoolDoc.data() || {};
+      const schoolName = (schoolData.name || "School Admin").toString().trim();
+      const phone = (schoolData.phone || "").toString().trim();
+      const oldEmail = (schoolData.email || "").toString().trim().toLowerCase();
+
+      if (oldEmail === newEmail) {
+        throw new HttpsError(
+          "already-exists",
+          "New admin email is same as current admin email."
+        );
+      }
+
+      const defaultPassword =
+        newEmail.length >= 6 ? newEmail.substring(0, 6) : newEmail.padEnd(6, "0");
+
+  let newAuthUser;
+let createdNewUser = false;
+
+try {
+  newAuthUser = await admin.auth().getUserByEmail(newEmail);
+} catch (_) {
+  newAuthUser = await admin.auth().createUser({
+    email: newEmail,
+    password: defaultPassword,
+    displayName: schoolName,
+  });
+  createdNewUser = true;
+}
+
+await admin.auth().updateUser(newAuthUser.uid, {
+  disabled: false,
+});
+
+      await admin.firestore().collection("users").doc(newAuthUser.uid).set(
+        {
+          name: schoolName,
+          email: newEmail,
+          phone,
+          role: "admin",
+          schoolId,
+          status: "active",
+          mustChangePassword: true,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await schoolRef.update({
+        email: newEmail,
+        mustChangePassword: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      let oldAdminUid = null;
+
+      if (oldEmail) {
+        try {
+          const oldAuthUser = await admin.auth().getUserByEmail(oldEmail);
+          oldAdminUid = oldAuthUser.uid;
+
+          if (oldAuthUser.uid !== newAuthUser.uid) {
+            await admin.auth().updateUser(oldAuthUser.uid, {
+              disabled: true,
+            });
+
+            await admin.firestore().collection("users").doc(oldAuthUser.uid).set(
+              {
+                status: "disabled",
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+              { merge: true }
+            );
+          }
+        } catch (e) {
+          logger.warn("Old admin disable skipped", {
+            oldEmail,
+            error: e.message,
+          });
+        }
+      }
+
+      return {
+        success: true,
+        schoolId,
+        email: newEmail,
+        uid: newAuthUser.uid,
+        createdNewUser,
+        oldAdminUid,
+      };
+    } catch (error) {
+      logger.error("replaceSchoolAdmin error", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", error.message || "Something went wrong.");
+    }
+  }
+);
