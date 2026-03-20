@@ -7,14 +7,20 @@ import 'package:go_router/go_router.dart';
 import 'package:school_app/core/utils/school_storage.dart';
 import 'package:school_app/services/parent_account_service.dart';
 
-class LoginScreen extends StatefulWidget {
+
+import 'package:school_app/features/parent/screens/force_change_password_screen.dart';
+import 'package:school_app/providers/auth_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
+class _LoginScreenState extends ConsumerState<LoginScreen>
     with TickerProviderStateMixin {
   static const String _superAdminEmail = 'sadiq.smile@gmail.com';
 
@@ -205,10 +211,27 @@ class _LoginScreenState extends State<LoginScreen>
         );
       }
 
-      await _syncSchoolContextForSignedInUser();
+       await _syncSchoolContextForSignedInUser();
+
+      final mustChangePassword = await ref.read(
+        mustChangePasswordProvider.future,
+      );
 
       if (!mounted) return;
+
+      if (mustChangePassword) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const ForceChangePasswordScreen(),
+          ),
+        );
+        return;
+      }
+
       context.go('/');
+
+
+
     } on FirebaseAuthException catch (e) {
       setState(() {
         _isLoading = false;

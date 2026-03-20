@@ -1,49 +1,64 @@
 {
-	"flutter": {
-		"platforms": {
-			"android": {
-				"default": {
-					"projectId": "sk-school-master",
-					"appId": "1:836702428678:android:cc3657204e1a1ff51bad87",
-					"fileOutput": "android/app/google-services.json"
-				}
-			},
-			"dart": {
-				"lib/firebase_options.dart": {
-					"projectId": "sk-school-master",
-					"configurations": {
-						"android": "1:836702428678:android:cc3657204e1a1ff51bad87",
-						"web": "1:836702428678:web:0744a0e5276096fd1bad87"
-					}
-				}
-			}
-		}
-	},
-	"firestore": {
-		"rules": "firestore.rules"
-	},
-	"functions": {
-		"source": "functions"
-	},
-	"hosting": {
-		"public": "build/web",
-		"ignore": [
-			"firebase.json",
-			"**/.*",
-			"**/node_modules/**"
-		],
-		"redirects": [
-			{
-				"source": "/privacy",
-				"destination": "/privacy.html",
-				"type": 301
-			}
-		],
-		"rewrites": [
-			{
-				"source": "**",
-				"destination": "/index.html"
-			}
-		]
-	}
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "sk-school-master",
+          "appId": "1:836702428678:android:cc3657204e1a1ff51bad87",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "sk-school-master",
+          "configurations": {
+            "android": "1:836702428678:android:cc3657204e1a1ff51bad87",
+            "web": "1:836702428678:web:0744a0e5276096fd1bad87"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "functions": [
+    {
+      "codebase": "default",
+      "source": "functions"
+    },
+    {
+      "source": "functions_backend",
+      "codebase": "functions",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "redirects": [
+      {
+        "source": "/privacy",
+        "destination": "/privacy.html",
+        "type": 301
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
 }

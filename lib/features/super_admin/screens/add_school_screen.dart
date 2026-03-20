@@ -1,10 +1,9 @@
-// features/super_admin/screens/add_school_screen.dart
+import 'dart:typed_data';
 
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:typed_data';
 
 class AddSchoolScreen extends StatefulWidget {
   const AddSchoolScreen({super.key});
@@ -15,7 +14,9 @@ class AddSchoolScreen extends StatefulWidget {
 
 class _AddSchoolScreenState extends State<AddSchoolScreen> {
   Uint8List? imageBytes;
-  String? imageName; // ✅ FIXED
+  String? imageName;
+
+  String? loadingMessage;
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -26,21 +27,17 @@ class _AddSchoolScreenState extends State<AddSchoolScreen> {
 
   bool isSaving = false;
 
-  /// 📸 PICK LOGO
   Future<void> _pickLogo() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-
     if (picked != null) {
       final bytes = await picked.readAsBytes();
-
       setState(() {
         imageBytes = bytes;
-        imageName = picked.name; // ✅ IMPORTANT
+        imageName = picked.name;
       });
     }
   }
 
-  /// 🎨 COLOR PICKER
   Future<Color?> _pickColor(BuildContext context) async {
     return showDialog<Color>(
       context: context,
@@ -68,87 +65,105 @@ class _AddSchoolScreenState extends State<AddSchoolScreen> {
     return "#${hex.substring(2)}";
   }
 
-  /// 💾 SAVE SCHOOL (SVG FIXED)
   Future<void> _saveSchool() async {
     if (isSaving) return;
 
     final name = _nameController.text.trim().toUpperCase();
-    final email = _emailController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
     final phone = _phoneController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || phone.length != 10) {
+    if (name.isEmpty || email.isEmpty || phone.length != 10 || !email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Fill all fields correctly")),
       );
       return;
     }
 
-    setState(() => isSaving = true);
+    setState(() {
+      isSaving = true;
+      loadingMessage = 'Creating school...';
+    });
+
+    String logoUrl = '';
+    String logoPath = '';
 
     try {
-      String logoUrl = "";
+      if (imageBytes != null) {
+        final ext = (imageName ?? '').toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}.$ext';
+        final ref = FirebaseStorage.instance.ref().child('school_logos').child(fileName);
 
-      
-if (imageBytes != null) {
-  final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+        await ref.putData(
+          imageBytes!,
+          SettableMetadata(
+            contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+          ),
+        );
 
-  if (picked == null) return;
+        logoUrl = await ref.getDownloadURL();
+        logoPath = ref.fullPath;
+          if (mounted) {
+            setState(() {
+              loadingMessage = 'Uploading and creating admin account...';
+            });
+          }
+      }
 
-  final imageName = picked.name;
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('createSchoolWithAdmin');
 
-  final isSvg = imageName.toLowerCase().endsWith('.svg');
-
-  final fileName =
-      "${DateTime.now().millisecondsSinceEpoch}.${isSvg ? 'svg' : 'png'}";
-
-  final ref = FirebaseStorage.instance
-      .ref("school_logos/$fileName");
-
-  await ref.putData(
-    imageBytes!,
-    SettableMetadata(
-      contentType: isSvg ? 'image/svg+xml' : 'image/png',
-    ),
-  );
-
-  logoUrl = await ref.getDownloadURL();
-}
-
-
-
-
-
-
-
-
-      await FirebaseFirestore.instance.collection('schools').add({
+      final result = await callable.call({
         'name': name,
         'email': email,
         'phone': phone,
         'logo': logoUrl,
+        'logoPath': logoPath,
         'themeColorPrimary': _colorToHex(startColor),
         'themeColorSecondary': _colorToHex(endColor),
-        'archived': false,
-        'createdAt': Timestamp.now(),
       });
 
-      if (!mounted) return;
+      final data = Map<String, dynamic>.from(result.data as Map);
 
+      if (!mounted) return;
+      setState(() {
+        loadingMessage = null;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("School Created Successfully ✅"),
+        SnackBar(
+          content: Text(
+            'School created ✅\nDefault password: ${data['tempPassword']}',
+          ),
           backgroundColor: Colors.green,
         ),
       );
-
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
-    }
+      if (logoPath.isNotEmpty) {
+        try {
+          await FirebaseStorage.instance.ref(logoPath).delete();
+        } catch (_) {}
+      }
 
-    setState(() => isSaving = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSaving = false;
+          loadingMessage = null;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
   }
 
   @override
@@ -161,13 +176,44 @@ if (imageBytes != null) {
         foregroundColor: const Color(0xff1E3A8A),
         elevation: 0,
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-
-            /// LOGO
+            if (isSaving)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xffE8F5E9),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xff66BB6A)),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xff2E7D32)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        loadingMessage ?? 'Please wait...',
+                        style: const TextStyle(
+                          color: Color(0xff1B5E20),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // ...existing code...
             GestureDetector(
               onTap: _pickLogo,
               child: Container(
@@ -179,32 +225,26 @@ if (imageBytes != null) {
                 ),
                 child: imageBytes == null
                     ? const Icon(Icons.camera_alt)
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.memory(
-                            imageBytes!,
-                            fit: BoxFit.cover,
-                          ),
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.memory(
+                          imageBytes!,
+                          fit: BoxFit.cover,
                         ),
+                      ),
               ),
             ),
-
             const SizedBox(height: 20),
-
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: "School Name"),
             ),
-
             const SizedBox(height: 12),
-
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(labelText: "Admin Email"),
             ),
-
             const SizedBox(height: 12),
-
             TextField(
               controller: _phoneController,
               keyboardType: TextInputType.number,
@@ -213,10 +253,7 @@ if (imageBytes != null) {
                 labelText: "Admin Mobile Number",
               ),
             ),
-
             const SizedBox(height: 20),
-
-            /// 🎨 COLOR BOX
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -226,7 +263,6 @@ if (imageBytes != null) {
               ),
               child: Column(
                 children: [
-
                   const Center(
                     child: Text(
                       "Create Color Theme",
@@ -236,9 +272,7 @@ if (imageBytes != null) {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   Row(
                     children: [
                       Expanded(
@@ -252,14 +286,12 @@ if (imageBytes != null) {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
-                              border:
-                                  Border.all(color: Colors.grey.shade300),
+                              border: Border.all(color: Colors.grey.shade300),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.color_lens,
-                                    color: Color(0xff1E3A8A)),
+                                const Icon(Icons.color_lens, color: Color(0xff1E3A8A)),
                                 const SizedBox(width: 8),
                                 const Text("Color 1"),
                                 const SizedBox(width: 10),
@@ -276,9 +308,7 @@ if (imageBytes != null) {
                           ),
                         ),
                       ),
-
                       const SizedBox(width: 10),
-
                       Expanded(
                         child: GestureDetector(
                           onTap: () async {
@@ -290,14 +320,12 @@ if (imageBytes != null) {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(12),
-                              border:
-                                  Border.all(color: Colors.grey.shade300),
+                              border: Border.all(color: Colors.grey.shade300),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.color_lens,
-                                    color: Color(0xff1E3A8A)),
+                                const Icon(Icons.color_lens, color: Color(0xff1E3A8A)),
                                 const SizedBox(width: 8),
                                 const Text("Color 2"),
                                 const SizedBox(width: 10),
@@ -319,10 +347,7 @@ if (imageBytes != null) {
                 ],
               ),
             ),
-
             const SizedBox(height: 30),
-
-            /// BUTTON
             GestureDetector(
               onTap: isSaving ? null : _saveSchool,
               child: Container(
