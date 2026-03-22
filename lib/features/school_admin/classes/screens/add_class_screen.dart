@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 
 import '../services/class_service.dart';
@@ -27,10 +28,8 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
   Widget build(BuildContext context) {
     final classes = sectionClasses[selectedSection]!;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Add Class"),
-      ),
+    return AdminLayout(
+      title: 'Classes',
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -112,7 +111,13 @@ class _AddClassScreenState extends ConsumerState<AddClassScreen> {
                         }
                       }
                     },
-              child: const Text("Create Class"),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text("Create Class"),
             ),
           ],
         ),

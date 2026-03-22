@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:school_app/core/utils/firestore_keys.dart';
+import 'package:school_app/features/exams/widgets/marks_card_renderer.dart';
 import 'package:school_app/features/school_admin/exams/screens/marks_card_template_builder_screen.dart';
+import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/models/exam.dart';
 import 'package:school_app/models/exam_marks.dart';
 import 'package:school_app/models/exam_template.dart';
@@ -12,16 +14,17 @@ import 'package:school_app/providers/exam_template_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/providers/school_provider.dart';
 import 'package:school_app/services/exam_template_service.dart';
-import 'package:school_app/features/exams/widgets/marks_card_renderer.dart';
 
 class MarksCardTemplatesScreen extends ConsumerStatefulWidget {
   const MarksCardTemplatesScreen({super.key});
 
   @override
-  ConsumerState<MarksCardTemplatesScreen> createState() => _MarksCardTemplatesScreenState();
+  ConsumerState<MarksCardTemplatesScreen> createState() =>
+      _MarksCardTemplatesScreenState();
 }
 
-class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScreen> {
+class _MarksCardTemplatesScreenState
+    extends ConsumerState<MarksCardTemplatesScreen> {
   String? _selectedExamTypeKey;
 
   @override
@@ -29,10 +32,8 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
     final schoolIdAsync = ref.watch(schoolIdProvider);
     final schoolDocAsync = ref.watch(schoolProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Marks Card Templates'),
-      ),
+    return AdminLayout(
+      title: 'Marks Card Templates',
       body: schoolIdAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Failed to load school: $e')),
@@ -49,7 +50,8 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
                     return (
                       key: d.id,
                       name: (data['name'] ?? '').toString(),
-                      defaultTemplateId: (data['defaultTemplateId'] ?? '').toString(),
+                      defaultTemplateId:
+                          (data['defaultTemplateId'] ?? '').toString(),
                     );
                   })
                   .where((t) => t.name.trim().isNotEmpty)
@@ -82,7 +84,10 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
                         children: [
                           const Text(
                             'Exam type',
-                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           InputDecorator(
@@ -92,7 +97,9 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
-                                value: examTypes.any((t) => t.key == _selectedExamTypeKey)
+                                value: examTypes.any(
+                                  (t) => t.key == _selectedExamTypeKey,
+                                )
                                     ? _selectedExamTypeKey
                                     : null,
                                 isExpanded: true,
@@ -121,9 +128,11 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
                                         .firstOrNull;
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) => MarksCardTemplateBuilderScreen(
+                                        builder: (_) =>
+                                            MarksCardTemplateBuilderScreen(
                                           examTypeKey: selectedKey,
-                                          examTypeName: selected?.name ?? selectedKey,
+                                          examTypeName:
+                                              selected?.name ?? selectedKey,
                                         ),
                                       ),
                                     );
@@ -177,52 +186,71 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
                                     if (action == _TemplateAction.edit) {
                                       Navigator.of(context).push(
                                         MaterialPageRoute(
-                                          builder: (_) => MarksCardTemplateBuilderScreen(
+                                          builder: (_) =>
+                                              MarksCardTemplateBuilderScreen(
                                             templateId: t.id,
                                             examTypeKey: t.examTypeKey,
                                             examTypeName: t.examTypeName,
                                           ),
                                         ),
                                       );
-                                    } else if (action == _TemplateAction.preview) {
+                                    } else if (action ==
+                                        _TemplateAction.preview) {
                                       await _showPreview(
                                         context: context,
                                         schoolName: schoolName,
                                         template: t,
                                       );
-                                    } else if (action == _TemplateAction.setDefault) {
+                                    } else if (action ==
+                                        _TemplateAction.setDefault) {
                                       try {
-                                        await ExamTemplateService().setDefaultTemplateForExamType(
+                                        await ExamTemplateService()
+                                            .setDefaultTemplateForExamType(
                                           schoolId: schoolId,
-                                          examTypeKey: normalizeKeyLower(t.examTypeKey),
+                                          examTypeKey:
+                                              normalizeKeyLower(t.examTypeKey),
                                           templateId: t.id,
                                         );
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Default template set')),
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Default template set',
+                                              ),
+                                            ),
                                           );
                                         }
                                       } catch (e) {
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('Failed: $e')),
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text('Failed: $e'),
+                                            ),
                                           );
                                         }
                                       }
-                                    } else if (action == _TemplateAction.delete) {
+                                    } else if (action ==
+                                        _TemplateAction.delete) {
                                       final ok = await showDialog<bool>(
                                         context: context,
                                         builder: (ctx) {
                                           return AlertDialog(
-                                            title: const Text('Delete template?'),
-                                            content: Text('Delete "${t.name}"?'),
+                                            title: const Text(
+                                              'Delete template?',
+                                            ),
+                                            content:
+                                                Text('Delete "${t.name}"?'),
                                             actions: [
                                               TextButton(
-                                                onPressed: () => Navigator.pop(ctx, false),
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx, false),
                                                 child: const Text('Cancel'),
                                               ),
                                               FilledButton(
-                                                onPressed: () => Navigator.pop(ctx, true),
+                                                onPressed: () =>
+                                                    Navigator.pop(ctx, true),
                                                 child: const Text('Delete'),
                                               ),
                                             ],
@@ -233,19 +261,26 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
                                       if (ok != true) return;
 
                                       try {
-                                        await ExamTemplateService().deleteTemplate(
+                                        await ExamTemplateService()
+                                            .deleteTemplate(
                                           schoolId: schoolId,
                                           templateId: t.id,
                                         );
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Deleted')),
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Deleted'),
+                                            ),
                                           );
                                         }
                                       } catch (e) {
                                         if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('Failed: $e')),
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text('Failed: $e'),
+                                            ),
                                           );
                                         }
                                       }
@@ -301,7 +336,6 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
     required String schoolName,
     required ExamTemplate template,
   }) async {
-    // Lightweight mock preview.
     final exam = Exam(
       id: 'preview',
       examName: 'Unit Test 1',
@@ -351,7 +385,10 @@ class _MarksCardTemplatesScreenState extends ConsumerState<MarksCardTemplatesScr
                     Expanded(
                       child: Text(
                         'Preview • ${template.name}',
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                     IconButton(

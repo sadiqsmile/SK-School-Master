@@ -67,7 +67,7 @@ class _DrawerList extends ConsumerWidget {
   static const Color _textColor = Color(0xFF0F172A);
   static const Color _mutedText = Color(0xFF64748B);
   static const Color _borderColor = Color(0xFFE2E8F0);
-  static const Color _activeBg = Color(0xFFF6F8FF);
+  static const Color _activeBg = Color(0xFFF1F5FF);
 
   bool _isMobile(BuildContext context) =>
       MediaQuery.of(context).size.width < 700;
@@ -78,83 +78,47 @@ class _DrawerList extends ConsumerWidget {
         GoRouter.of(context).routerDelegate.currentConfiguration.uri.toString();
     final isMobile = _isMobile(context);
 
-    return Container(
-      color: _sidebarBg,
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.fromLTRB(16, isMobile ? 16 : 18, 16, 14),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: _borderColor),
-              ),
-            ),
-            child: isMobile
-                ? Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        color: _sidebarBg,
+        child: Column(
+          children: [
+            if (isMobile)
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 10, 10, 12),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: _borderColor),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x332563EB),
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
                           ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x332563EB),
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.admin_panel_settings,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          AppNavigation.roleTitle(role),
-                          style: const TextStyle(
-                            color: _textColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                      child: const Icon(
+                        Icons.admin_panel_settings,
+                        color: Colors.white,
+                        size: 18,
                       ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
-                          ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x332563EB),
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.admin_panel_settings,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
                         AppNavigation.roleTitle(role),
                         style: const TextStyle(
                           color: _textColor,
@@ -162,74 +126,131 @@ class _DrawerList extends ConsumerWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
-                  ),
-          ),
-          Expanded(
-            child: entries.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'No menu items for this role.',
-                      style: TextStyle(color: _mutedText),
                     ),
-                  )
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-                    children: [
-                      for (final e in entries)
-                        if (e.isHeader)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8, 12, 8, 6),
-                            child: Text(
-                              e.header!,
-                              style: const TextStyle(
-                                color: _mutedText,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          )
-                        else
-                          _NavTile(
-                            style: _menuStyleForLabel(e.label!),
-                            label: e.label!,
-                            route: e.route!,
-                            selected: _isSelected(currentLocation, e.route!),
-                            onTap: () {
-                              Navigator.of(context).maybePop();
-                              context.go(e.route!);
-                            },
-                          ),
-                    ],
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 18,
+                        color: _textColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (!isMobile)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: _borderColor),
                   ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(color: _borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2563EB), Color(0xFF06B6D4)],
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x332563EB),
+                            blurRadius: 10,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.admin_panel_settings,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      AppNavigation.roleTitle(role),
+                      style: const TextStyle(
+                        color: _textColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: entries.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'No menu items for this role.',
+                        style: TextStyle(color: _mutedText),
+                      ),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                      children: [
+                        for (final e in entries)
+                          if (e.isHeader)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(8, 12, 8, 6),
+                              child: Text(
+                                e.header!,
+                                style: const TextStyle(
+                                  color: _mutedText,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            )
+                          else
+                            _NavTile(
+                              style: _menuStyleForLabel(e.label!),
+                              label: e.label!,
+                              route: e.route!,
+                              selected: _isSelected(currentLocation, e.route!),
+                              onTap: () {
+                                Navigator.of(context).maybePop();
+                                context.go(e.route!);
+                              },
+                            ),
+                      ],
+                    ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: _borderColor),
+                ),
+              ),
+              child: _NavTile(
+                style: const _MenuItemStyle(
+                  icon: Icons.logout_rounded,
+                  startColor: Color(0xFFEF4444),
+                  endColor: Color(0xFFF97316),
+                ),
+                label: 'Logout',
+                route: '',
+                selected: false,
+                onTap: () async {
+                  await ref.read(authServiceProvider).signOut();
+                  if (context.mounted) {
+                    context.go('/');
+                  }
+                },
               ),
             ),
-            child: _NavTile(
-              style: const _MenuItemStyle(
-                icon: Icons.logout_rounded,
-                startColor: Color(0xFFEF4444),
-                endColor: Color(0xFFF97316),
-              ),
-              label: 'Logout',
-              route: '',
-              selected: false,
-              onTap: () async {
-                await ref.read(authServiceProvider).signOut();
-                if (context.mounted) {
-                  context.go('/');
-                }
-              },
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -249,8 +270,8 @@ class _DrawerList extends ConsumerWidget {
       case 'Dashboard':
         return const _MenuItemStyle(
           icon: Icons.space_dashboard_rounded,
-          startColor: Color(0xFF4F46E5),
-          endColor: Color(0xFF7C3AED),
+          startColor: Color(0xFF94A3B8),
+          endColor: Color(0xFF64748B),
         );
       case 'Teachers':
         return const _MenuItemStyle(
@@ -372,7 +393,7 @@ class _NavTile extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: selected
@@ -385,7 +406,7 @@ class _NavTile extends StatelessWidget {
                   width: 27,
                   height: 27,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(8),
                     gradient: LinearGradient(
                       colors: [style.startColor, style.endColor],
                     ),
@@ -414,12 +435,11 @@ class _NavTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (selected)
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: _primaryDark,
-                    size: 18,
-                  ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: selected ? _primaryDark : const Color(0xFF94A3B8),
+                  size: 18,
+                ),
               ],
             ),
           ),
