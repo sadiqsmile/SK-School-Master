@@ -181,9 +181,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Future<void> _login() async {
-    setState(() {
-      _isLoading = true;
-    });
+   if (!mounted) return;
+setState(() {
+  _isLoading = true;
+});
 
     try {
       final identity = _identityController.text.trim();
@@ -232,24 +233,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
 
 
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        _showErrorSnackbar(e.message ?? 'Authentication failed');
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        _showErrorSnackbar(
-          'Login failed. Please check your details and try again.',
-        );
-      }
-    }
+   } on FirebaseAuthException catch (e) {
+  if (!mounted) return;
+  setState(() {
+    _isLoading = false;
+  });
+  _showErrorSnackbar(e.message ?? 'Authentication failed');
+
+
+
+
+
+   } catch (e) {
+  if (!mounted) return;
+  setState(() {
+    _isLoading = false;
+  });
+  _showErrorSnackbar(
+    'Login failed. Please check your details and try again.',
+  );
+
+   }
   }
+  
+
 
   @override
   Widget build(BuildContext context) {
@@ -551,4 +558,5 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       ),
     );
   }
-}
+ }
+

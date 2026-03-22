@@ -4,14 +4,37 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="SK School Master">
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>SK School Master</title>
 
   <link rel="manifest" href="manifest.json">
 
-  <!-- ✅ REQUIRED -->
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #f4f7fb;
+    }
+
+    body {
+      position: fixed;
+      inset: 0;
+    }
+
+    flutter-view,
+    flt-glass-pane,
+    flt-scene-host,
+    flt-scene,
+    #flt-glass-pane {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  </style>
+
   <script src="flutter.js" defer></script>
 </head>
 
