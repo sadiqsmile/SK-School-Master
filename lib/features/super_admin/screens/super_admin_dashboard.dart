@@ -112,7 +112,7 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
                     value: totalSchoolsAsync.when(
                       data: (count) => count.toString(),
                       loading: () => "0",
-                      error: (_, __) => "0",
+                      error: (_, _) => "0",
                     ),
                     icon: Icons.school,
                     colors: const [Color(0xff16A34A), Color(0xff4ADE80)],
@@ -125,7 +125,7 @@ class _SuperAdminDashboardState extends ConsumerState<SuperAdminDashboard> {
                     value: totalStudentsAsync.when(
                       data: (count) => count.toString(),
                       loading: () => "0",
-                      error: (_, __) => "0",
+                      error: (_, _) => "0",
                     ),
                     icon: Icons.groups,
                     colors: const [Color(0xff1E3A8A), Color(0xff3B82F6)],

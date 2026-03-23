@@ -42,7 +42,7 @@ final schoolsProvider =
           .snapshots();
     },
     loading: () => const Stream.empty(),
-    error: (_, __) => const Stream.empty(),
+    error: (_, _) => const Stream.empty(),
   );
 });
 
@@ -64,7 +64,7 @@ final totalSchoolsProvider = StreamProvider.autoDispose<int>((ref) {
     .map((snap) => snap.docs.length);
     },
     loading: () => const Stream.empty(),
-    error: (_, __) => const Stream.empty(),
+    error: (_, _) => const Stream.empty(),
   );
 });
 
@@ -102,7 +102,7 @@ final totalStudentsProvider = StreamProvider.autoDispose<int>((ref) {
       });
     },
     loading: () => const Stream.empty(),
-    error: (_, __) => const Stream.empty(),
+    error: (_, _) => const Stream.empty(),
   );
 });
 

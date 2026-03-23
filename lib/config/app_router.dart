@@ -64,13 +64,11 @@ final appRouter = GoRouter(
     }
 
     // 🟢 LOGGED IN
-    if (user != null) {
-      // prevent going back to login
-      if (isAuthRoute) {
-        return '/school-loader'; // let loader decide role
-      }
+    // prevent going back to login
+    if (isAuthRoute) {
+      return '/school-loader'; // let loader decide role
     }
-
+  
     return null;
   },
 

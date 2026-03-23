@@ -93,7 +93,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
 
             /// 🔥 ROLE SELECTOR
             DropdownButtonFormField<String>(
-              value: selectedRole,
+              initialValue: selectedRole,
               decoration: const InputDecoration(labelText: "Role"),
               items: const [
                 DropdownMenuItem(value: "teacher", child: Text("Teacher")),
