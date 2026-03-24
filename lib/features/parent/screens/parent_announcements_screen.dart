@@ -46,7 +46,7 @@ class ParentAnnouncementsScreen extends ConsumerWidget {
               return ListView.separated(
                 padding: const EdgeInsets.all(16),
                 itemCount: visible.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                separatorBuilder: (context, index) => const SizedBox(height: 10),
                 itemBuilder: (context, i) {
                   final a = visible[i];
                   return Card(

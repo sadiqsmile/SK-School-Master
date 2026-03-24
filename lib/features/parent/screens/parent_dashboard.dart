@@ -343,7 +343,7 @@ class _FeesCard extends ConsumerWidget {
       tint: const Color(0xFFF59E0B),
       child: feesAsync.when(
         loading: () => const _CardLoadingRow(),
-        error: (_, _) => const Text(
+        error: (error, stack) => const Text(
           'Fees: not available yet',
           style: TextStyle(color: Color(0xFF6B7280)),
         ),

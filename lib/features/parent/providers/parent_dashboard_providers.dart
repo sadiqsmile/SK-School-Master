@@ -62,7 +62,7 @@ final parentAttendanceTodayProvider = StreamProvider.autoDispose
 
   return schoolAsync.when(
     loading: () => const Stream.empty(),
-    error: (_, _) => const Stream.empty(),
+    error: (error, stack) => const Stream.empty(),
     data: (schoolDoc) {
       final schoolId = schoolDoc.id;
       final today = DateTime.now();
@@ -149,7 +149,7 @@ final parentPendingHomeworkCountProvider = StreamProvider.autoDispose
 
   return schoolAsync.when(
     loading: () => const Stream.empty(),
-    error: (_, _) => const Stream.empty(),
+    error: (error, stack) => const Stream.empty(),
     data: (schoolDoc) {
       final schoolId = schoolDoc.id;
       final startOfToday = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
@@ -192,7 +192,7 @@ final parentFeesSummaryProvider = StreamProvider.autoDispose
 
   return schoolAsync.when(
     loading: () => const Stream.empty(),
-    error: (_, _) => const Stream.empty(),
+    error: (error, stack) => const Stream.empty(),
     data: (schoolDoc) {
       final schoolId = schoolDoc.id;
 

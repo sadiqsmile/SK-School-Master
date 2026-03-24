@@ -164,7 +164,7 @@ class _GlobalSearchDialogState extends ConsumerState<GlobalSearchDialog> {
                           )
                         : ListView.separated(
                             itemCount: _results.length,
-                            separatorBuilder: (_, _) => const Divider(height: 1),
+                            separatorBuilder: (context, index) => const Divider(height: 1),
                             itemBuilder: (context, i) {
                               final r = _results[i];
                               return ListTile(

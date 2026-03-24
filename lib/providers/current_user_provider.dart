@@ -31,7 +31,6 @@ final currentUserDocProvider =
 
 final currentUserDataProvider = Provider<Map<String, dynamic>?>((ref) {
   final doc = ref.watch(currentUserDocProvider).value;
-
   if (doc == null || !doc.exists) return null;
   return doc.data();
 });
@@ -44,4 +43,9 @@ final currentUserRoleProvider = Provider<String?>((ref) {
 final currentSchoolIdProvider = Provider<String?>((ref) {
   final userData = ref.watch(currentUserDataProvider);
   return userData?['schoolId']?.toString();
+});
+
+final currentUserStatusProvider = Provider<String?>((ref) {
+  final userData = ref.watch(currentUserDataProvider);
+  return userData?['status']?.toString();
 });

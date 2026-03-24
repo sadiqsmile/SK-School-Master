@@ -314,7 +314,7 @@ setState(() {
                                 width: 88,
                                 height: 88,
                                 fit: BoxFit.contain,
-                                errorBuilder: (_, _, _) => const Icon(
+                                errorBuilder: (context, error, stackTrace) => const Icon(
                                   Icons.school_rounded,
                                   size: 64,
                                   color: Color(0xFF0E5F83),

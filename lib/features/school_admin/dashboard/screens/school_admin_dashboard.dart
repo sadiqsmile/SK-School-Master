@@ -456,7 +456,7 @@ class _SchoolLogoBox extends StatelessWidget {
           ? Image.network(
               logoUrl!,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Icon(
+              errorBuilder: (context, error, stackTrace) => Icon(
                 Icons.school,
                 color: primaryColor,
                 size: isMobile ? 26 : 28,

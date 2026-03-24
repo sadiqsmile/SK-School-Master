@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:school_app/core/rbac/app_navigation.dart';
 import 'package:school_app/core/widgets/app_loader.dart';
+import 'package:school_app/features/data_center/screens/data_center_screen.dart';
 import 'package:school_app/models/user_role.dart';
 import 'package:school_app/providers/auth_provider.dart';
 import 'package:school_app/providers/core_providers.dart';
@@ -67,7 +68,6 @@ class _DrawerList extends ConsumerWidget {
   static const Color _textColor = Color(0xFF0F172A);
   static const Color _mutedText = Color(0xFF64748B);
   static const Color _borderColor = Color(0xFFE2E8F0);
-  static const Color _activeBg = Color(0xFFF1F5FF);
 
   bool _isMobile(BuildContext context) =>
       MediaQuery.of(context).size.width < 700;
@@ -79,6 +79,7 @@ class _DrawerList extends ConsumerWidget {
     final isMobile = _isMobile(context);
 
     return SafeArea(
+      top: true,
       bottom: false,
       child: Container(
         color: _sidebarBg,
@@ -86,8 +87,10 @@ class _DrawerList extends ConsumerWidget {
           children: [
             if (isMobile)
               Container(
-                padding: const EdgeInsets.fromLTRB(14, 10, 10, 12),
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 18, 10, 14),
                 decoration: const BoxDecoration(
+                  color: Colors.white,
                   border: Border(
                     bottom: BorderSide(color: _borderColor),
                   ),
@@ -117,10 +120,10 @@ class _DrawerList extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Expanded(
+                    const Expanded(
                       child: Text(
-                        AppNavigation.roleTitle(role),
-                        style: const TextStyle(
+                        'School Admin',
+                        style: TextStyle(
                           color: _textColor,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -129,7 +132,7 @@ class _DrawerList extends ConsumerWidget {
                     ),
                     IconButton(
                       tooltip: 'Close',
-                      onPressed: () => Navigator.of(context).maybePop(),
+                      onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(
                         Icons.arrow_back_ios_new_rounded,
                         size: 18,
@@ -222,6 +225,34 @@ class _DrawerList extends ConsumerWidget {
                                 context.go(e.route!);
                               },
                             ),
+                        const SizedBox(height: 10),
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(8, 12, 8, 6),
+                          child: Text(
+                            'DATA TOOLS',
+                            style: TextStyle(
+                              color: _mutedText,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                        _NavTile(
+                          style: _menuStyleForLabel('Data Center'),
+                          label: 'Data Center',
+                          route: '/school-admin/data-center',
+                          selected: currentLocation == '/school-admin/data-center',
+                          onTap: () {
+                            Navigator.of(context).maybePop();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DataCenterScreen(),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
             ),
@@ -259,7 +290,9 @@ class _DrawerList extends ConsumerWidget {
     if (route == '/school-admin' && currentLocation == '/school-admin') {
       return true;
     }
-    if (route != '/school-admin' && currentLocation.startsWith(route)) {
+    if (route != '/school-admin' &&
+        route != '/school-admin/data-center' &&
+        currentLocation.startsWith(route)) {
       return true;
     }
     return false;
@@ -350,6 +383,12 @@ class _DrawerList extends ConsumerWidget {
           icon: Icons.trending_up_rounded,
           startColor: Color(0xFF22C55E),
           endColor: Color(0xFF16A34A),
+        );
+      case 'Data Center':
+        return const _MenuItemStyle(
+          icon: Icons.storage_rounded,
+          startColor: Color(0xFF0F172A),
+          endColor: Color(0xFF2563EB),
         );
       default:
         return const _MenuItemStyle(

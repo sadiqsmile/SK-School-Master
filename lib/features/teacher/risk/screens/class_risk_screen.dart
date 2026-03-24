@@ -60,7 +60,7 @@ class ClassRiskScreen extends ConsumerWidget {
           return ListView.separated(
             padding: const EdgeInsets.all(12),
             itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 6),
+            separatorBuilder: (context, index) => const SizedBox(height: 6),
             itemBuilder: (context, i) {
               final r = items[i];
               final c = _riskColor(r.riskLevel);

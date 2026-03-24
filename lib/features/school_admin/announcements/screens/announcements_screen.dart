@@ -95,7 +95,7 @@ class AnnouncementsScreen extends ConsumerWidget {
 
                         return ListView.separated(
                           itemCount: docs.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 10),
+                          separatorBuilder: (context, index) => const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final doc = docs[index];
                             final a = Announcement.fromDoc(doc);

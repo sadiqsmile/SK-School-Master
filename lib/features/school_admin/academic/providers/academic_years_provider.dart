@@ -22,7 +22,7 @@ final academicYearsProvider = StreamProvider.autoDispose<
             .snapshots();
       },
       loading: () => const Stream.empty(),
-      error: (_, _) => const Stream.empty(),
+      error: (error, stack) => const Stream.empty(),
     );
   },
 );
