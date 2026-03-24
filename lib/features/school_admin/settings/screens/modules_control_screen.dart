@@ -1,6 +1,8 @@
+// features/school_admin/settings/screens/modules_control_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/providers/school_modules_provider.dart';
@@ -12,10 +14,8 @@ class ModulesControlScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final modulesAsync = ref.watch(schoolModulesProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Module Control'),
-      ),
+    return AdminLayout(
+      title: 'Module Control',
       body: modulesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(

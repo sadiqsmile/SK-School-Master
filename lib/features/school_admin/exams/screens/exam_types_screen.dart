@@ -1,6 +1,8 @@
+// features/school_admin/exams/screens/exam_types_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/exam_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/services/exam_service.dart';
@@ -13,33 +15,33 @@ class ExamTypesScreen extends ConsumerWidget {
     final schoolIdAsync = ref.watch(schoolIdProvider);
 
     return schoolIdAsync.when(
-      loading: () => const Scaffold(
+      loading: () => const AdminLayout(
+        title: 'Exam Types',
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Scaffold(
-        appBar: AppBar(title: const Text('Exam Types')),
-        body: Center(child: Text(e.toString())),
+      error: (e, _) => AdminLayout(
+        title: 'Exam Types',
+        body: Center(child: Text('Error: $e')),
       ),
       data: (schoolId) {
         final typesAsync = ref.watch(examTypesProvider);
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Exam Types'),
-          ),
+        return AdminLayout(
+          title: 'Exam Types',
           body: typesAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Failed to load: $e')),
             data: (snapshot) {
-              final types = snapshot.docs
-                  .map((d) {
-                    final data = d.data();
-                    final name = (data['name'] ?? '').toString();
-                    return (id: d.id, name: name);
-                  })
-                  .where((t) => t.name.trim().isNotEmpty)
-                  .toList(growable: false)
-                ..sort((a, b) => a.name.compareTo(b.name));
+              final types =
+                  snapshot.docs
+                      .map((d) {
+                        final data = d.data();
+                        final name = (data['name'] ?? '').toString();
+                        return (id: d.id, name: name);
+                      })
+                      .where((t) => t.name.trim().isNotEmpty)
+                      .toList(growable: false)
+                    ..sort((a, b) => a.name.compareTo(b.name));
 
               if (types.isEmpty) {
                 return const Center(
@@ -84,7 +86,8 @@ class ExamTypesScreen extends ConsumerWidget {
                                   ),
                                   actions: [
                                     TextButton(
-                                      onPressed: () => Navigator.pop(ctx, false),
+                                      onPressed: () =>
+                                          Navigator.pop(ctx, false),
                                       child: const Text('Cancel'),
                                     ),
                                     FilledButton(
@@ -135,10 +138,8 @@ class ExamTypesScreen extends ConsumerWidget {
             },
           ),
           floatingActionButton: FloatingActionButton(
-            onPressed: () => _showUpsertDialog(
-              context: context,
-              schoolId: schoolId,
-            ),
+            onPressed: () =>
+                _showUpsertDialog(context: context, schoolId: schoolId),
             child: const Icon(Icons.add),
           ),
         );
@@ -198,16 +199,14 @@ Future<void> _showUpsertDialog({
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(existingId == null ? 'Added' : 'Updated'),
-          ),
+          SnackBar(content: Text(existingId == null ? 'Added' : 'Updated')),
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
       }
     }
   } finally {

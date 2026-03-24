@@ -1,8 +1,10 @@
+// features/school_admin/classes/screens/classes_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:school_app/features/school_admin/classes/providers/classes_provider.dart';
+import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 
 class ClassesScreen extends ConsumerWidget {
   const ClassesScreen({super.key});
@@ -11,13 +13,12 @@ class ClassesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final classesAsync = ref.watch(classesProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Classes"),
-      ),
+    return AdminLayout(
+      title: 'Classes',
       body: classesAsync.when(
         data: (snapshot) {
           final docs = snapshot.docs;
+
           if (docs.isEmpty) {
             return const Center(
               child: Text(
@@ -57,8 +58,7 @@ class ClassesScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Using GoRouter because the app is configured with MaterialApp.router.
-          context.push("/add-class");
+          context.push('/add-class');
         },
         child: const Icon(Icons.add),
       ),
