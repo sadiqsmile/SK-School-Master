@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:excel/excel.dart' as ex;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ExcelImportScreen extends StatefulWidget {
   const ExcelImportScreen({super.key});
@@ -98,32 +99,58 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
     return true;
   }
 
-  Future<void> _importData() async {
-    if (_rows.isEmpty) return;
 
-    if (!_validateHeaders()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid Excel format for selected import type'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
+Future<void> _importData() async {
+  if (_rows.isEmpty) return;
+
+  if (!_validateHeaders()) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Invalid Excel format'),
+      ),
+    );
+    return;
+  }
+
+  setState(() => _isImporting = true);
+
+  try {
+    final headers = _rows.first;
+
+    for (int i = 1; i < _rows.length; i++) {
+      final row = _rows[i];
+
+      final data = <String, dynamic>{};
+
+      for (int j = 0; j < headers.length; j++) {
+        final key = headers[j].toLowerCase().trim();
+        final value = j < row.length ? row[j] : '';
+        data[key] = value;
+      }
+
+      await FirebaseFirestore.instance.collection('students').add({
+        'name': data['name'] ?? '',
+        'class': data['class'] ?? '',
+        'rollNo': data['roll no'] ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
     }
 
-    setState(() => _isImporting = true);
-
-    await Future.delayed(const Duration(seconds: 1));
-
-    setState(() => _isImporting = false);
-
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Students imported successfully'),
+      ),
+    );
+  } catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$_selectedType import ready. Firestore save is next step.'),
-        behavior: SnackBarBehavior.floating,
+        content: Text('Error: $e'),
       ),
     );
   }
+
+  setState(() => _isImporting = false);
+}
 
   @override
   Widget build(BuildContext context) {
