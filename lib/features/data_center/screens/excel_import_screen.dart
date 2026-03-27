@@ -1,4 +1,3 @@
-// features/data_center/screens/excel_import_screen.dart
 import 'dart:typed_data';
 import 'package:excel/excel.dart' as ex;
 import 'package:file_picker/file_picker.dart';
@@ -93,69 +92,65 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
     }
 
     if (_selectedType == 'Teachers') {
-      return headers.contains('name') && headers.contains('subject');
+      return headers.contains('name') &&
+          headers.contains('subject');
     }
 
     return true;
   }
 
-  Future<void> _importData() async {
-    if (_rows.isEmpty) return;
 
-    if (!_validateHeaders()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid Excel format'),
-        ),
-      );
-      return;
-    }
+Future<void> _importData() async {
+  if (_rows.isEmpty) return;
 
-    setState(() => _isImporting = true);
+  if (!_validateHeaders()) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Invalid Excel format'),
+      ),
+    );
+    return;
+  }
 
-    try {
-      final headers = _rows.first;
+  setState(() => _isImporting = true);
 
-      for (int i = 1; i < _rows.length; i++) {
-        final row = _rows[i];
+  try {
+    final headers = _rows.first;
 
-        final data = <String, dynamic>{};
+    for (int i = 1; i < _rows.length; i++) {
+      final row = _rows[i];
 
-        for (int j = 0; j < headers.length; j++) {
-          final key = headers[j].toLowerCase().trim();
-          final value = j < row.length ? row[j] : '';
-          data[key] = value;
-        }
+      final data = <String, dynamic>{};
 
-        final schoolId = "demo_school"; // temporary
-
-        FirebaseFirestore.instance
-            .collection('schools')
-            .doc(schoolId)
-            .collection('students')
-            .add({
-          'name': data['name'] ?? '',
-          'class': data['class'] ?? '',
-          'rollNo': data['roll no'] ?? '',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+      for (int j = 0; j < headers.length; j++) {
+        final key = headers[j].toLowerCase().trim();
+        final value = j < row.length ? row[j] : '';
+        data[key] = value;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Students imported successfully'),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-        ),
-      );
+      await FirebaseFirestore.instance.collection('students').add({
+        'name': data['name'] ?? '',
+        'class': data['class'] ?? '',
+        'rollNo': data['roll no'] ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
     }
 
-    setState(() => _isImporting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Students imported successfully'),
+      ),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: $e'),
+      ),
+    );
   }
+
+  setState(() => _isImporting = false);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -275,8 +270,7 @@ class _ExcelImportScreenState extends State<ExcelImportScreen> {
                                           ? _rows.skip(1).map((row) {
                                               return DataRow(
                                                 cells: row
-                                                    .map((cell) =>
-                                                        DataCell(Text(cell)))
+                                                    .map((cell) => DataCell(Text(cell)))
                                                     .toList(),
                                               );
                                             }).toList()
