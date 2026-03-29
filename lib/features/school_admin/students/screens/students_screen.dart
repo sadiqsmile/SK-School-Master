@@ -84,8 +84,8 @@ class StudentsScreen extends ConsumerWidget {
               final data = snapshot.docs[i].data();
               final docId = snapshot.docs[i].id;
               final name = (data['name'] ?? '').toString();
-              final classId = (data['classId'] ?? '').toString();
-              final section = (data['section'] ?? '').toString();
+              final className = (data['className'] ?? '').toString();
+              final section = (data['sectionName'] ?? '').toString();
               final academicYear = (data['academicYear'] ?? '').toString();
               final status = (data['status'] ?? '').toString();
               final parentName = (data['parentName'] ?? '').toString();
@@ -94,7 +94,7 @@ class StudentsScreen extends ConsumerWidget {
               return ListTile(
                 title: Text(name.isEmpty ? 'Student' : name),
                 subtitle: Text(
-                  '${classId.isEmpty ? 'Class N/A' : classId}${section.isEmpty ? '' : ' - Section $section'}'
+                  '${className.isEmpty ? 'Class N/A' : className}${section.isEmpty ? '' : ' - Section $section'}'
                   '${academicYear.isEmpty ? '' : '  •  $academicYear'}'
                   '${status.toLowerCase() == 'graduated' ? '  •  Graduated' : ''}',
                 ),

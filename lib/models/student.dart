@@ -22,18 +22,20 @@ class Student {
     required this.parentPhone,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'admissionNo': admissionNo,
-      'classId': classId,
-      'section': section,
-      'academicYear': academicYear,
-      'status': status,
-      'parentName': parentName,
-      'parentPhone': parentPhone,
-    };
-  }
+Map<String, dynamic> toMap(String schoolId) {
+  return {
+    'name': name,
+    'admissionNo': admissionNo,
+    'classId': classId,
+    'section': section,
+    'academicYear': academicYear,
+    'status': status,
+    'parentName': parentName,
+    'parentPhone': parentPhone,
+    'schoolId': schoolId, // 🔥 IMPORTANT
+    'createdAt': DateTime.now(),
+  };
+}
 
   factory Student.fromMap(String id, Map<String, dynamic> data) {
     return Student(
