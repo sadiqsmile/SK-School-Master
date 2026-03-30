@@ -9,7 +9,7 @@ import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/features/school_admin/students/providers/students_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 import 'package:school_app/services/parent_account_service.dart';
-import 'package:school_app/services/student_service.dart'; // ✅ IMPORTANT
+// ✅ IMPORTANT
 
 class StudentsScreen extends ConsumerWidget {
   const StudentsScreen({super.key});
@@ -94,14 +94,11 @@ class StudentsScreen extends ConsumerWidget {
               final className = (data['className'] ?? '').toString();
               final section =
                   (data['sectionName'] ?? data['section'] ?? '').toString();
-              final academicYear =
-                  (data['academicYear'] ?? '').toString();
+              final academicYear = (data['academicYear'] ?? '').toString();
               final status = (data['status'] ?? '').toString();
 
-              final parentName =
-                  (data['parentName'] ?? '').toString();
-              final parentPhone =
-                  (data['parentPhone'] ?? '').toString();
+              final parentName = (data['parentName'] ?? '').toString();
+              final parentPhone = (data['parentPhone'] ?? '').toString();
 
               return ListTile(
                 title: Text(name.isEmpty ? 'Student' : name),
@@ -134,28 +131,28 @@ class StudentsScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
-
-                  
-                  
-                   IconButton(
-  icon: const Icon(Icons.delete, color: Colors.red),
-  onPressed: () {
-    _confirmDelete(context, ref, docId); // ✅ NEW
-  },
-),
-
-
-
-
-
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue),
+                      onPressed: () {
+                        context.push('/edit-student', extra: {
+                          'studentId': docId,
+                          'data': data,
+                        });
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        _confirmDelete(context, ref, docId); // ✅ NEW
+                      },
+                    ),
                   ],
                 ),
               );
             },
           );
         },
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
       floatingActionButton: FloatingActionButton(
@@ -166,55 +163,56 @@ class StudentsScreen extends ConsumerWidget {
   }
 
   // 🔴 DELETE FUNCTION
- void _confirmDelete(
-  BuildContext context,
-  WidgetRef ref,
-  String studentId,
-) {
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Delete Student'),
-        content: const Text('Are you sure you want to delete this student?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-
-              try {
-                // 🔥 GET SCHOOL ID
-                final school = await ref.read(currentSchoolProvider.future);
-
-                // ✅ CORRECT DELETE PATH
-                await FirebaseFirestore.instance
-                    .collection('schools')
-                    .doc(school.id)
-                    .collection('students')
-                    .doc(studentId)
-                    .delete();
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Student deleted successfully')),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
-                );
-              }
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
+  void _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    String studentId,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Student'),
+          content: const Text('Are you sure you want to delete this student?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
-          ),
-        ],
-      );
-    },
-  );
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+
+                try {
+                  // 🔥 GET SCHOOL ID
+                  final school = await ref.read(currentSchoolProvider.future);
+
+                  // ✅ CORRECT DELETE PATH
+                  await FirebaseFirestore.instance
+                      .collection('schools')
+                      .doc(school.id)
+                      .collection('students')
+                      .doc(studentId)
+                      .delete();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Student deleted successfully')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              },
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
-} 

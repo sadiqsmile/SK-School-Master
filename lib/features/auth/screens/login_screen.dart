@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:school_app/core/utils/school_storage.dart';
 import 'package:school_app/services/parent_account_service.dart';
-import 'package:school_app/core/utils/firebase_fix.dart';
 import 'package:school_app/features/parent/screens/force_change_password_screen.dart';
 import 'package:school_app/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

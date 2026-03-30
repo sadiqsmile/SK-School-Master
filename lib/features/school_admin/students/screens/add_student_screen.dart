@@ -1,3 +1,4 @@
+// features/school_admin/students/screens/add_student_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -138,7 +139,7 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
                 final docs = snapshot.data!.docs;
 
                 return DropdownButtonFormField<String>(
-                  value: selectedClassId,
+                  initialValue: selectedClassId,
                   decoration: const InputDecoration(labelText: 'Class'),
                   items: docs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
@@ -174,7 +175,7 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
                   final docs = snapshot.data!.docs;
 
                   return DropdownButtonFormField<String>(
-                    value: selectedSection,
+                    initialValue: selectedSection,
                     decoration: const InputDecoration(labelText: 'Section'),
                     items: docs.map((doc) {
                       final data = doc.data() as Map<String, dynamic>;
