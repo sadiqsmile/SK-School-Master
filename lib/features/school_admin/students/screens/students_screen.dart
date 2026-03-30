@@ -9,10 +9,19 @@ import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/features/school_admin/students/providers/students_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 import 'package:school_app/services/parent_account_service.dart';
-// ✅ IMPORTANT
 
-class StudentsScreen extends ConsumerWidget {
+class StudentsScreen extends ConsumerStatefulWidget {
   const StudentsScreen({super.key});
+
+  @override
+  ConsumerState<StudentsScreen> createState() => _StudentsScreenState();
+}
+
+// ✅ FIX: CLOSED CLASS HERE
+class _StudentsScreenState extends ConsumerState<StudentsScreen> {
+  String searchQuery = '';
+  String selectedClass = 'All';
+  String selectedSection = 'All';
 
   // 🔹 RESET PARENT PASSWORD
   Future<void> _resetParentPassword(
@@ -73,7 +82,7 @@ class StudentsScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final studentsAsync = ref.watch(studentsProvider);
 
     return AdminLayout(
@@ -84,75 +93,197 @@ class StudentsScreen extends ConsumerWidget {
             return const Center(child: Text('No students added'));
           }
 
-          return ListView.builder(
-            itemCount: snapshot.docs.length,
-            itemBuilder: (context, i) {
-              final data = snapshot.docs[i].data();
-              final docId = snapshot.docs[i].id;
+          final filteredDocs = snapshot.docs.where((doc) {
+            final data = doc.data();
 
-              final name = (data['name'] ?? '').toString();
-              final className = (data['className'] ?? '').toString();
-              final section =
-                  (data['sectionName'] ?? data['section'] ?? '').toString();
-              final academicYear = (data['academicYear'] ?? '').toString();
-              final status = (data['status'] ?? '').toString();
+            final name = (data['name'] ?? '').toString().toLowerCase();
+            final className = (data['className'] ?? '').toString();
+            final section = (data['sectionName'] ?? data['section'] ?? '').toString();
 
-              final parentName = (data['parentName'] ?? '').toString();
-              final parentPhone = (data['parentPhone'] ?? '').toString();
+            final matchesSearch =
+                name.contains(searchQuery.toLowerCase());
 
-              return ListTile(
-                title: Text(name.isEmpty ? 'Student' : name),
-                subtitle: Text(
-                  '${className.isEmpty ? 'Class N/A' : className}'
-                  '${section.isEmpty ? '' : ' - Section $section'}'
-                  '${academicYear.isEmpty ? '' : '  •  $academicYear'}'
-                  '${status.toLowerCase() == 'graduated' ? '  •  Graduated' : ''}',
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+            final matchesClass =
+                selectedClass == 'All' || className == selectedClass;
+
+            final matchesSection =
+                selectedSection == 'All' || section == selectedSection;
+
+            return matchesSearch && matchesClass && matchesSection;
+          }).toList();
+
+          return Column(
+            children: [
+              // 🏷️ CLASS & SECTION FILTERS
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Row(
                   children: [
-                    if (parentPhone.trim().isNotEmpty)
-                      PopupMenuButton<String>(
-                        onSelected: (value) {
-                          if (value == 'reset_parent') {
-                            _resetParentPassword(
-                              context,
-                              ref,
-                              parentName: parentName,
-                              parentPhone: parentPhone,
-                              studentId: docId,
-                            );
-                          }
+                    // CLASS FILTER
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: selectedClass,
+                        items: ['All', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+                            .map((e) => DropdownMenuItem(
+                                  value: e,
+                                  child: Text('Class $e'),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedClass = value!;
+                          });
                         },
-                        itemBuilder: (context) => const [
-                          PopupMenuItem(
-                            value: 'reset_parent',
-                            child: Text('Reset Parent Password'),
-                          ),
-                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Class',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: () {
-                        context.push('/edit-student', extra: {
-                          'studentId': docId,
-                          'data': data,
-                        });
-                      },
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        _confirmDelete(context, ref, docId); // ✅ NEW
-                      },
+                    const SizedBox(width: 10),
+                    // SECTION FILTER
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: selectedSection,
+                        items: ['All', 'A', 'B', 'C', 'D']
+                            .map((e) => DropdownMenuItem(
+                                  value: e,
+                                  child: Text('Section $e'),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedSection = value!;
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Section',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              );
-            },
+              ),
+              // 🔍 SEARCH BAR
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Search student...',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      searchQuery = value;
+                    });
+                  },
+                ),
+              ),
+
+              // 📋 LIST
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filteredDocs.length,
+                  itemBuilder: (context, i) {
+                    final data = filteredDocs[i].data();
+                    final docId = filteredDocs[i].id;
+
+                    final name = (data['name'] ?? '').toString();
+                    final className = (data['className'] ?? '').toString();
+                    final section =
+                        (data['sectionName'] ?? data['section'] ?? '').toString();
+
+                    final parentName =
+                        (data['parentName'] ?? '').toString();
+                    final parentPhone =
+                        (data['parentPhone'] ?? '').toString();
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            // 👤 Avatar
+                            CircleAvatar(
+                              radius: 25,
+                              backgroundColor: Colors.blue.shade100,
+                              child: Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                style: const TextStyle(fontSize: 20, color: Colors.black),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // 📄 Student Info
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '$className - Section $section',
+                                    style: TextStyle(color: Colors.grey[700]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  if (parentName.isNotEmpty)
+                                    Text(
+                                      'Parent: $parentName',
+                                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            // 🎯 ACTIONS
+                            Column(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.payment, color: Colors.green),
+                                  onPressed: () {
+                                    context.push('/fees', extra: docId);
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: Colors.blue),
+                                  onPressed: () {
+                                    context.push('/edit-student', extra: {
+                                      'studentId': docId,
+                                      'data': data,
+                                    });
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () {
+                                    _confirmDelete(context, ref, docId);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () =>
+            const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
       floatingActionButton: FloatingActionButton(
@@ -173,7 +304,8 @@ class StudentsScreen extends ConsumerWidget {
       builder: (context) {
         return AlertDialog(
           title: const Text('Delete Student'),
-          content: const Text('Are you sure you want to delete this student?'),
+          content:
+              const Text('Are you sure you want to delete this student?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -184,10 +316,9 @@ class StudentsScreen extends ConsumerWidget {
                 Navigator.pop(context);
 
                 try {
-                  // 🔥 GET SCHOOL ID
-                  final school = await ref.read(currentSchoolProvider.future);
+                  final school =
+                      await ref.read(currentSchoolProvider.future);
 
-                  // ✅ CORRECT DELETE PATH
                   await FirebaseFirestore.instance
                       .collection('schools')
                       .doc(school.id)

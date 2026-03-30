@@ -1,3 +1,6 @@
+import 'package:school_app/features/school_admin/fees/screens/fee_list_screen.dart';
+import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
+import 'package:school_app/features/school_admin/fees/screens/add_fee_screen.dart';
 // config/app_router.dart
 import 'package:school_app/features/school_admin/teachers/screens/add_teacher_screen.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +14,7 @@ import 'package:school_app/features/school_admin/teachers/screens/teachers_scree
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:school_app/features/school_admin/students/screens/students_screen.dart';
 import 'package:school_app/features/school_admin/students/screens/add_student_screen.dart';
+import 'package:school_app/features/school_admin/students/screens/edit_student_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/classes_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/add_class_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/sections_screen.dart';
@@ -74,6 +78,20 @@ final appRouter = GoRouter(
 
  
   routes: [
+    GoRoute(
+      path: '/fees',
+      builder: (context, state) {
+        final studentId = state.extra as String;
+        return FeeListScreen(studentId: studentId);
+      },
+    ),
+    GoRoute(
+      path: '/add-fee',
+      builder: (context, state) {
+        final studentId = state.extra as String;
+        return AddFeeScreen(studentId: studentId);
+      },
+    ),
     GoRoute(
       path: '/school-loader',
       builder: (context, state) => const SchoolLoaderScreen(),
@@ -346,7 +364,10 @@ final appRouter = GoRouter(
         child: PromoteStudentsScreen(),
       ),
     ),
-
+    GoRoute(
+      path: '/attendance-report',
+      builder: (context, state) => const AttendanceReportScreen(),
+    ),
     // Teacher routes
     GoRoute(
       path: '/teacher-dashboard',
@@ -431,6 +452,16 @@ final appRouter = GoRouter(
           title: 'Class Risk',
           allowedRoles: const [UserRole.teacher],
           child: ClassRiskScreen(classId: classId, sectionId: sectionId),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/edit-student',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return EditStudentScreen(
+          studentId: data['studentId'],
+          data: Map<String, dynamic>.from(data['data']),
         );
       },
     ),
