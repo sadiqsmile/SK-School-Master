@@ -1,7 +1,11 @@
 import 'package:school_app/features/school_admin/fees/screens/fee_list_screen.dart';
 import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
 import 'package:school_app/features/school_admin/fees/screens/add_fee_screen.dart';
+import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
+
 // config/app_router.dart
+
+
 import 'package:school_app/features/school_admin/teachers/screens/add_teacher_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:school_app/features/auth/screens/auth_gate.dart';
@@ -25,7 +29,7 @@ import 'package:school_app/features/school_admin/fees/screens/fees_screen.dart';
 import 'package:school_app/features/school_admin/announcements/screens/announcements_screen.dart';
 import 'package:school_app/features/school_admin/exams/screens/exam_types_screen.dart';
 import 'package:school_app/features/school_admin/exams/screens/marks_card_templates_screen.dart';
-import 'package:school_app/features/school_admin/reports/screens/attendance_reports_screen.dart';
+import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/exam_reports_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/fee_reports_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/reports_screen.dart';
@@ -312,7 +316,7 @@ final appRouter = GoRouter(
         title: 'Attendance Reports',
         allowedRoles: [UserRole.admin],
         requiredModules: [SchoolModuleKey.attendance],
-        child: AttendanceReportsScreen(),
+        child: AttendanceReportScreen(),
       ),
     ),
     GoRoute(
@@ -364,11 +368,6 @@ final appRouter = GoRouter(
         child: PromoteStudentsScreen(),
       ),
     ),
-    GoRoute(
-      path: '/attendance-report',
-      builder: (context, state) => const AttendanceReportScreen(),
-    ),
-    // Teacher routes
     GoRoute(
       path: '/teacher-dashboard',
       builder: (context, state) => const RoleGuard(

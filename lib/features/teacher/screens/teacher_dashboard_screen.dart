@@ -48,7 +48,7 @@ class TeacherDashboardScreen extends ConsumerWidget {
                   ),
                 ),
                 data: (doc) {
-                  final data = doc.data() ?? const <String, dynamic>{};
+                  final data = doc.data() as Map<String, dynamic>;
                   final name = (data['name'] ?? 'Teacher').toString();
                   final assignments = ref.watch(teacherAssignmentsProvider);
 

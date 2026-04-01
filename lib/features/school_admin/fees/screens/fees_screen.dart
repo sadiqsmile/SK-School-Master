@@ -158,7 +158,7 @@ class _FeeTypesBody extends ConsumerWidget {
                             )
                           else
                             ...feeTypes.map((doc) {
-                              final data = doc.data();
+                              final data = doc.data() as Map<String, dynamic>;
                               final name = (data['name'] ?? '').toString();
 
                               return Padding(

@@ -30,7 +30,7 @@ class ArchivedSchoolsScreen extends ConsumerWidget {
             itemCount: snapshot.docs.length,
             itemBuilder: (context, index) {
               final doc = snapshot.docs[index];
-              final data = doc.data();
+              final data = doc.data() as Map<String, dynamic>;
 
               final name = data['name'] ?? '';
               final logo = data['logo'] ?? '';

@@ -199,7 +199,10 @@ class _CreateAnnouncementScreenState
                       DropdownMenuItem(
                         value: d.id,
                         child: Text(
-                          (d.data()['name'] ?? d.data()['className'] ?? d.id)
+                          (() {
+                            final data = d.data() as Map<String, dynamic>;
+                            return (data['name'] ?? data['className'] ?? d.id);
+                          })()
                               .toString(),
                         ),
                       ),
@@ -244,7 +247,10 @@ class _CreateAnnouncementScreenState
                         DropdownMenuItem(
                           value: d.id,
                           child: Text(
-                            (d.data()['name'] ?? d.id).toString(),
+                            (() {
+                              final data = d.data() as Map<String, dynamic>;
+                              return (data['name'] ?? d.id).toString();
+                            })(),
                           ),
                         ),
                     ],

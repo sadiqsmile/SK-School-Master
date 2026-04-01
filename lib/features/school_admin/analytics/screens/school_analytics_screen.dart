@@ -32,7 +32,7 @@ class SchoolAnalyticsScreen extends ConsumerWidget {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('Failed to load analytics: $e')),
           data: (doc) {
-            final data = doc.data() ?? const <String, dynamic>{};
+            final data = doc.data() as Map<String, dynamic>;
 
             final high = _readInt(data, 'studentsHighRisk');
             final medium = _readInt(data, 'studentsMediumRisk');

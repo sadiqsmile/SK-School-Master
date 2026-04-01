@@ -1,7 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+
+import 'package:school_app/features/school_admin/classes/providers/classes_provider.dart' as classes_stream;
+import 'package:school_app/features/school_admin/classes/providers/sections_provider.dart';
+import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 
 class AttendanceReportScreen extends ConsumerStatefulWidget {
@@ -14,159 +17,268 @@ class AttendanceReportScreen extends ConsumerStatefulWidget {
 
 class _AttendanceReportScreenState
     extends ConsumerState<AttendanceReportScreen> {
-  DateTime selectedDate = DateTime.now();
+  String? _classId;
+  String? _sectionId;
+
+  DateTimeRange _range = DateTimeRange(
+    start: DateTime.now().subtract(const Duration(days: 6)),
+    end: DateTime.now(),
+  );
+
+  Future<_AttendanceReport>? _future;
+
+  String _dateKey(DateTime d) =>
+      "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+
+  String _classKey(String c, String s) => "class_${c}_$s";
+
+  List<String> _getDates() {
+    final days = _range.end.difference(_range.start).inDays;
+    return List.generate(
+        days + 1,
+        (i) => _dateKey(_range.start.add(Duration(days: i))));
+  }
+
+  Future<_AttendanceReport> _buildReport(String schoolId) async {
+    final db = FirebaseFirestore.instance;
+
+    final dates = _getDates();
+    final classKey = _classKey(_classId!, _sectionId!);
+
+    int present = 0, absent = 0, late = 0, leave = 0, total = 0;
+
+    List<_Day> daily = [];
+
+    for (final date in dates) {
+      final doc = await db
+          .collection('schools')
+          .doc(schoolId)
+          .collection('attendance')
+          .doc(date)
+          .collection('meta')
+          .doc(classKey)
+          .get();
+
+      if (!doc.exists) continue;
+
+      final data = doc.data() as Map<String, dynamic>;
+      final c = data['counts'] ?? {};
+
+      int p = c['present'] ?? 0;
+      int a = c['absent'] ?? 0;
+      int l = c['late'] ?? 0;
+      int lv = c['leave'] ?? 0;
+      int t = c['total'] ?? 0;
+
+      present += p;
+      absent += a;
+      late += l;
+      leave += lv;
+      total += t;
+
+      daily.add(_Day(date, p, a, l, lv));
+    }
+
+    double rate = total == 0 ? 0 : (present / total) * 100;
+
+    return _AttendanceReport(
+        present, absent, late, leave, total, rate, daily);
+  }
+
+  void _generate(String schoolId) {
+    if (_classId == null || _sectionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Select class & section")));
+      return;
+    }
+
+    setState(() {
+      _future = _buildReport(schoolId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final schoolAsync = ref.watch(currentSchoolProvider);
+    final classes = ref.watch(classes_stream.classesProvider);
 
-    final dateString = DateFormat('yyyy-MM-dd').format(selectedDate);
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Attendance Report')),
-
+    return AdminLayout(
+      title: "Attendance Reports",
       body: schoolAsync.when(
-        data: (school) {
-          final stream = FirebaseFirestore.instance
-              .collection('schools')
-              .doc(school.id)
-              .collection('attendance')
-              .doc(dateString)
-              .collection('records')
-              .snapshots();
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text("Error: $e")),
+        data: (schoolDoc) {
+          if (schoolDoc.id.isEmpty) {
+            return const Center(child: Text("Invalid school"));
+          }
 
-          return Column(
+          final schoolId = schoolDoc.id;
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              // 📅 DATE PICKER
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              _Card(
+                child: Column(
                   children: [
-                    Text(
-                      DateFormat('dd MMM yyyy').format(selectedDate),
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold),
+                    /// CLASS
+                    classes.when(
+                      data: (snap) => DropdownButtonFormField<String>(
+                        value: _classId,
+                        hint: const Text("Select Class"),
+                        items: snap.docs.map((d) {
+                          final data =
+                              d.data() as Map<String, dynamic>?;
+                          final name =
+                              (data?['name'] ?? d.id).toString();
+
+                          return DropdownMenuItem(
+                            value: d.id,
+                            child: Text(name),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          setState(() {
+                            _classId = v;
+                            _sectionId = null;
+                          });
+                        },
+                      ),
+                      loading: () =>
+                          const CircularProgressIndicator(),
+                      error: (e, _) => Text("$e"),
                     ),
+
+                    const SizedBox(height: 10),
+
+                    /// SECTION
+                    if (_classId == null)
+                      const Text("Select class first")
+                    else
+                      ref.watch(sectionsProvider(_classId!)).when(
+                            data: (snap) =>
+                                DropdownButtonFormField<String>(
+                              value: _sectionId,
+                              hint:
+                                  const Text("Select Section"),
+                              items: snap.docs.map((d) {
+                                final data =
+                                    d.data() as Map<String, dynamic>?;
+                                final name =
+                                    (data?['name'] ?? d.id)
+                                        .toString();
+
+                                return DropdownMenuItem(
+                                  value: d.id,
+                                  child: Text(name),
+                                );
+                              }).toList(),
+                              onChanged: (v) =>
+                                  setState(() => _sectionId = v),
+                            ),
+                            loading: () =>
+                                const CircularProgressIndicator(),
+                            error: (e, _) => Text("$e"),
+                          ),
+
+                    const SizedBox(height: 10),
+
+                    /// DATE
+                    OutlinedButton(
+                      onPressed: () async {
+                        final picked = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setState(() => _range = picked);
+                        }
+                      },
+                      child: Text(
+                          "${_dateKey(_range.start)} → ${_dateKey(_range.end)}"),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    /// BUTTON
                     ElevatedButton(
-                      onPressed: _pickDate,
-                      child: const Text('Select Date'),
-                    )
+                      onPressed: () => _generate(schoolId),
+                      child: const Text("Generate Report"),
+                    ),
                   ],
                 ),
               ),
 
-              // 📊 DATA
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: stream,
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
+              const SizedBox(height: 20),
+
+              /// RESULT
+              if (_future == null)
+                const Text("Generate report")
+              else
+                FutureBuilder<_AttendanceReport>(
+                  future: _future,
+                  builder: (_, snap) {
+                    if (!snap.hasData) {
                       return const Center(
                           child: CircularProgressIndicator());
                     }
 
-                    final docs = snapshot.data!.docs;
-
-                    if (docs.isEmpty) {
-                      return const Center(
-                          child: Text('No attendance found'));
-                    }
-
-                    int present = 0;
-                    int absent = 0;
-
-                    for (var doc in docs) {
-                      if (doc['status'] == 'present') {
-                        present++;
-                      } else {
-                        absent++;
-                      }
-                    }
+                    final r = snap.data!;
 
                     return Column(
                       children: [
-                        // SUMMARY
-                        Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _card('Present', present, Colors.green),
-                            _card('Absent', absent, Colors.red),
-                          ],
-                        ),
-
+                        Text(
+                            "Attendance: ${r.rate.toStringAsFixed(1)}%"),
                         const SizedBox(height: 10),
-
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: docs.length,
-                            itemBuilder: (context, i) {
-                              final data = docs[i];
-                              final status = data['status'];
-
-                              return ListTile(
-                                title: Text(docs[i].id),
-                                trailing: Text(
-                                  status,
-                                  style: TextStyle(
-                                    color: status == 'present'
-                                        ? Colors.green
-                                        : Colors.red,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        )
+                        Text(
+                            "P:${r.present} A:${r.absent} L:${r.late} Lv:${r.leave}"),
+                        const SizedBox(height: 10),
+                        ...r.daily.map((d) => ListTile(
+                              title: Text(d.date),
+                              trailing: Text(
+                                  "P${d.p} A${d.a} L${d.l} Lv${d.lv}"),
+                            ))
                       ],
                     );
                   },
                 ),
-              ),
             ],
           );
         },
-        loading: () =>
-            const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text(e.toString())),
       ),
     );
   }
+}
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime(2024),
-      lastDate: DateTime.now(),
-    );
+class _AttendanceReport {
+  final int present, absent, late, leave, total;
+  final double rate;
+  final List<_Day> daily;
 
-    if (picked != null) {
-      setState(() {
-        selectedDate = picked;
-      });
-    }
-  }
+  _AttendanceReport(this.present, this.absent, this.late,
+      this.leave, this.total, this.rate, this.daily);
+}
 
-  Widget _card(String title, int count, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text(title),
-            const SizedBox(height: 5),
-            Text(
-              '$count',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: color),
-            ),
-          ],
-        ),
+class _Day {
+  final String date;
+  final int p, a, l, lv;
+
+  _Day(this.date, this.p, this.a, this.l, this.lv);
+}
+
+class _Card extends StatelessWidget {
+  final Widget child;
+  const _Card({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
       ),
+      child: child,
     );
   }
 }

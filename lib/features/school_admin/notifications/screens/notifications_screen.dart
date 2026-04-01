@@ -49,7 +49,7 @@ class NotificationsScreen extends ConsumerWidget {
               separatorBuilder: (context, index) => const SizedBox(height: 8),
               itemBuilder: (context, i) {
                 final doc = snap.docs[i];
-                final data = doc.data();
+                final data = doc.data() as Map<String, dynamic>;
 
                 final type = _readString(data, 'type');
                 final title = _readString(data, 'title');

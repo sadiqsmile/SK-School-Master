@@ -164,7 +164,7 @@ final parentPendingHomeworkCountProvider = StreamProvider.autoDispose
           .map((snap) {
         int count = 0;
         for (final doc in snap.docs) {
-          final data = doc.data();
+          final data = doc.data() as Map<String, dynamic>;
           final raw = data['dueDate'];
           DateTime? due;
           if (raw is Timestamp) due = raw.toDate();
@@ -206,7 +206,7 @@ final parentFeesSummaryProvider = StreamProvider.autoDispose
         num pending = 0;
 
         for (final doc in snap.docs) {
-          final data = doc.data();
+          final data = doc.data() as Map<String, dynamic>;
 
           final bal = data['balance'] ?? data['pendingAmount'];
           if (bal is num) {

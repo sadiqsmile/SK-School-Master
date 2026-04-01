@@ -33,7 +33,7 @@ class SchoolsScreen extends ConsumerWidget {
 
         /// FILTER + SEARCH
         final docs = allDocs.where((doc) {
-          final data = doc.data();
+          final data = doc.data() as Map<String, dynamic>;
 
           /// hide archived schools
           if (data['archived'] == true) {
@@ -61,7 +61,7 @@ class SchoolsScreen extends ConsumerWidget {
           separatorBuilder: (context, index) => const SizedBox(height: 10),
           itemBuilder: (context, index) {
             final doc = docs[index];
-            final data = doc.data();
+            final data = doc.data() as Map<String, dynamic>;
 
             final name = _resolveSchoolName(data, doc.id);
             final schoolId = (data['schoolId'] ?? doc.id).toString();

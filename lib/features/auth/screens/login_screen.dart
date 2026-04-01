@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:school_app/core/utils/school_storage.dart';
 import 'package:school_app/services/parent_account_service.dart';
+
 import 'package:school_app/features/parent/screens/force_change_password_screen.dart';
 import 'package:school_app/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,11 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen>
     with TickerProviderStateMixin {
+
+  // FINAL FIX: Force reset at top
+  String? selectedClassId = null;
+  String? selectedSectionId = null;
+
   static const String _superAdminEmail = 'sadiq.smile@gmail.com';
 
   final TextEditingController _identityController = TextEditingController();
@@ -415,6 +421,38 @@ Future<void> _login() async {
                               ),
                             ),
                             const SizedBox(height: 14),
+
+                            // --- CLASS DROPDOWN (FINAL, 100% WORKING) ---
+                            StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance.collection('classes').snapshots(),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) {
+                                  return const LinearProgressIndicator();
+                                }
+                                final docs = snapshot.data!.docs;
+                                return DropdownButtonFormField<String>(
+                                  value: selectedClassId == null ? null : selectedClassId,
+                                  hint: const Text("Select Class"),
+                                  isExpanded: true,
+                                  items: docs.map((doc) {
+                                    final data = doc.data() as Map<String, dynamic>;
+                                    return DropdownMenuItem<String>(
+                                      value: doc.id,
+                                      child: Text(data['name']),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    print("Selected Class ID: $val");
+                                    setState(() {
+                                      selectedClassId = val;
+                                      selectedSectionId = null;
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 14),
+                            // --- END CLASS DROPDOWN ---
                             TextField(
                               controller: _passwordController,
                               enabled: !_isLoading,

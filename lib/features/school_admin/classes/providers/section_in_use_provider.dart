@@ -52,7 +52,7 @@ final sectionInUseProvider = FutureProvider.family
     if (e.code == 'failed-precondition') {
       final q = await studentsCol.where('classId', isEqualTo: classId).get();
       for (final doc in q.docs) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         final s = (data['section'] ?? '').toString().trim();
         if (s.toUpperCase() == sectionId.toUpperCase()) {
           return true;

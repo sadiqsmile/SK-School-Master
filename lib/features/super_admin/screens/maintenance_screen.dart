@@ -580,7 +580,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                               ),
                               error: (e, _) => Text('Error: $e'),
                               data: (doc) {
-                                final data = doc.data();
+                                final data = doc.data() as Map<String, dynamic>;
                                 final gradientColors = _readCurrentThemeHex(
                                   data,
                                 );

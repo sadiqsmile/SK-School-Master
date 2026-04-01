@@ -176,7 +176,7 @@ final attendanceDailyTrendProvider = StreamProvider.autoDispose
   yield* q.snapshots().map((snap) {
     final list = <AttendanceDailyPoint>[];
     for (final doc in snap.docs) {
-      final data = doc.data();
+      final data = doc.data() as Map<String, dynamic>;
       final dateKey = (data['dateKey'] ?? doc.id).toString();
       list.add(
         AttendanceDailyPoint(

@@ -128,7 +128,7 @@ class _HomeworkBody extends StatelessWidget {
                             )
                           else
                             ...recentHomework.map((doc) {
-                              final data = doc.data();
+                              final data = doc.data() as Map<String, dynamic>;
                               final title =
                                   data['title'] ??
                                   data['subject'] ??

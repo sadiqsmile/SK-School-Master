@@ -34,7 +34,7 @@ class ClassesScreen extends ConsumerWidget {
             separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final classId = docs[index].id;
-              final data = docs[index].data();
+              final data = docs[index].data() as Map<String, dynamic>;
               final name = (data['name'] ?? data['className'] ?? 'Class')
                   .toString();
               final section = (data['sectionType'] ?? data['section'] ?? '')

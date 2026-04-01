@@ -96,7 +96,7 @@ class _StudentReportsScreenState extends ConsumerState<StudentReportsScreen> {
                             const Divider(height: 1),
                         itemBuilder: (context, i) {
                           final doc = filtered[i];
-                          final data = doc.data();
+                          final data = doc.data() as Map<String, dynamic>;
                           final name = (data['name'] ?? 'Student').toString();
                           final admission = (data['admissionNo'] ?? '').toString();
                           final classId = (data['classId'] ?? '').toString();
@@ -261,7 +261,7 @@ class _StudentReportDetailScreenState
 
     num pendingFees = 0;
     for (final doc in feeSnap.docs) {
-      final data = doc.data();
+      final data = doc.data() as Map<String, dynamic>;
       final bal = data['balance'] ?? data['pendingAmount'];
       final balNum = _readNum(bal);
       if (balNum > 0) {
@@ -288,7 +288,7 @@ class _StudentReportDetailScreenState
     final todayStart = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
     for (final doc in hwSnap.docs) {
-      final data = doc.data();
+      final data = doc.data() as Map<String, dynamic>;
       final raw = data['dueDate'];
       DateTime? due;
       if (raw is Timestamp) due = raw.toDate();

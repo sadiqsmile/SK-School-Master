@@ -225,7 +225,7 @@ class _SectionsScreenState extends ConsumerState<SectionsScreen> {
             itemCount: snapshot.docs.length,
             itemBuilder: (context, i) {
               final doc = snapshot.docs[i];
-              final data = doc.data();
+              final data = doc.data() as Map<String, dynamic>;
               final name = (data['name'] ?? '').toString();
 
               final inUseAsync = ref.watch(

@@ -85,7 +85,7 @@ class _FeeReportsScreenState extends ConsumerState<FeeReportsScreen> {
 
     final Map<String, ({String classId, String sectionId})> studentClass = {};
     for (final doc in studentsSnap.docs) {
-      final data = doc.data();
+      final data = doc.data() as Map<String, dynamic>;
       final c = (data['classId'] ?? '').toString();
       final s = (data['section'] ?? '').toString();
       if (c.trim().isEmpty || s.trim().isEmpty) continue;
@@ -129,7 +129,7 @@ class _FeeReportsScreenState extends ConsumerState<FeeReportsScreen> {
     final Map<String, _FeeBucket> bySection = {};
 
     for (final doc in feeDocs) {
-      final data = doc.data();
+      final data = doc.data() as Map<String, dynamic>;
       final studentId = (data['studentId'] ?? doc.id).toString();
       final bucket = _interpretFeeDoc(data);
 
@@ -246,7 +246,7 @@ class _FeeReportsScreenState extends ConsumerState<FeeReportsScreen> {
                         data: (snap) {
                           final items = snap.docs
                               .map((d) {
-                                final data = d.data();
+                                final data = d.data() as Map<String, dynamic>;
                                 final name = (data['name'] ?? d.id).toString();
                                 return (id: d.id, name: name);
                               })

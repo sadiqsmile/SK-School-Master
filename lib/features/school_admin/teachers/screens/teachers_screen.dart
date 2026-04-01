@@ -140,7 +140,7 @@ class _TeachersBody extends ConsumerWidget {
                             )
                           else
                             ...recentTeachers.map((doc) {
-                              final data = doc.data();
+                              final data = doc.data() as Map<String, dynamic>;
                               final name = data['name'] ?? 'Teacher';
                               final email = (data['email'] ?? '').toString();
                               return _listRow(
@@ -195,7 +195,7 @@ class _TeachersBody extends ConsumerWidget {
                             )
                           else
                             ...sorted.map((doc) {
-                              final data = doc.data();
+                              final data = doc.data() as Map<String, dynamic>;
                               final teacherId = doc.id;
                               final name = (data['name'] ?? 'Teacher')
                                   .toString();

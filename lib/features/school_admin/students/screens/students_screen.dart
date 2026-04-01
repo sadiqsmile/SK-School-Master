@@ -94,7 +94,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           }
 
           final filteredDocs = snapshot.docs.where((doc) {
-            final data = doc.data();
+            final data = doc.data() as Map<String, dynamic>;
 
             final name = (data['name'] ?? '').toString().toLowerCase();
             final className = (data['className'] ?? '').toString();

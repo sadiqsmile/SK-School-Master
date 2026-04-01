@@ -401,7 +401,7 @@ class _TeacherAttendanceScreenState
                       const Divider(height: 1),
                   itemBuilder: (context, i) {
                     final doc = docs[i];
-                    final data = doc.data();
+                    final data = doc.data() as Map<String, dynamic>;
                     final name = (data['name'] ?? '').toString();
                     final admissionNo = (data['admissionNo'] ?? doc.id).toString();
 
