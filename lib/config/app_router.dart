@@ -1,3 +1,4 @@
+import 'package:school_app/features/school_admin/teachers/screens/assign_teacher_screen.dart';
 import 'package:school_app/features/school_admin/fees/screens/fee_list_screen.dart';
 import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
 import 'package:school_app/features/school_admin/fees/screens/add_fee_screen.dart';
@@ -5,7 +6,7 @@ import 'package:school_app/features/school_admin/attendance/screens/attendance_r
 
 // config/app_router.dart
 
-
+import 'package:school_app/features/school_admin/classes/screens/class_students_screen.dart';
 import 'package:school_app/features/school_admin/teachers/screens/add_teacher_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:school_app/features/auth/screens/auth_gate.dart';
@@ -82,6 +83,23 @@ final appRouter = GoRouter(
 
  
   routes: [
+    GoRoute(
+      path: '/class-students',
+      builder: (context, state) {
+        final data = state.extra as Map;
+        return ClassStudentsScreen(
+          className: data['className'],
+        );
+      },
+    ),
+    
+    GoRoute(
+      path: '/assign-class',
+      builder: (context, state) {
+        final teacherId = state.extra as String;
+        return AssignTeacherScreen(teacherId: teacherId);
+      },
+    ),
     GoRoute(
       path: '/fees',
       builder: (context, state) {

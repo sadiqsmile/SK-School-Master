@@ -1,4 +1,5 @@
 // features/school_admin/students/screens/add_student_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,7 +23,10 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
   final parentPhoneController = TextEditingController();
 
   String? selectedClassId;
+  String? selectedClassName;
+  List<String> sections = [];
   String? selectedSection;
+
   bool _isSaving = false;
 
   @override
@@ -50,7 +54,9 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
       return;
     }
 
-    if (selectedClassId == null || selectedSection == null) {
+    if (selectedClassId == null ||
+        selectedClassName == null ||
+        selectedSection == null) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Select class and section')),
       );
@@ -62,32 +68,15 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
     try {
       final school = await ref.read(currentSchoolProvider.future);
 
-      /// ✅ GET CLASS NAME
-      final classDoc = await FirebaseFirestore.instance
-          .collection('classes')
-          .doc(selectedClassId)
-          .get();
-
-      final className = classDoc.data()?['name'] ?? '';
-
-      /// ✅ GET SECTION NAME
-      final sectionDoc = await FirebaseFirestore.instance
-          .collection('sections')
-          .doc(selectedSection)
-          .get();
-
-      final sectionName = sectionDoc.data()?['name'] ?? '';
-
-      /// ✅ SAVE STUDENT
       await StudentService().addStudent(
         schoolId: school.id,
         data: {
           'name': name,
           'admissionNo': admissionNo,
           'classId': selectedClassId,
-          'className': className,
-          'section': selectedSection,
-          'sectionName': sectionName,
+          'className': selectedClassName!.trim(),
+          'section': selectedSection!.trim(),
+          'classKey': "${selectedClassName!.trim()}_${selectedSection!.trim()}",
           if (parentName.isNotEmpty) 'parentName': parentName,
           if (parentPhone.isNotEmpty) 'parentPhone': parentPhone,
         },
@@ -109,115 +98,124 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final schoolAsync = ref.watch(currentSchoolProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Add Student')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: nameController,
-              inputFormatters: const [UpperCaseTextFormatter()],
-              decoration: const InputDecoration(labelText: 'Student Name'),
-            ),
-            const SizedBox(height: 10),
+      body: schoolAsync.when(
+        data: (school) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                TextField(
+                  controller: nameController,
+                  inputFormatters: const [UpperCaseTextFormatter()],
+                  decoration:
+                      const InputDecoration(labelText: 'Student Name'),
+                ),
+                const SizedBox(height: 10),
 
-            TextField(
-              controller: admissionController,
-              decoration: const InputDecoration(labelText: 'Admission No'),
-            ),
-            const SizedBox(height: 10),
+                TextField(
+                  controller: admissionController,
+                  decoration:
+                      const InputDecoration(labelText: 'Admission No'),
+                ),
+                const SizedBox(height: 10),
 
-            /// CLASS
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('classes').snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const LinearProgressIndicator();
-                }
+                /// ✅ CLASS DROPDOWN (FIXED)
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('schools')
+                      .doc(school.id)
+                      .collection('classes')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const LinearProgressIndicator();
+                    }
 
-                final docs = snapshot.data!.docs;
+                    final docs = snapshot.data!.docs;
 
-                return DropdownButtonFormField<String>(
-                  initialValue: selectedClassId,
-                  decoration: const InputDecoration(labelText: 'Class'),
-                  items: docs.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    return DropdownMenuItem(
-                      value: doc.id,
-                      child: Text(data['name'] ?? ''),
+                    return DropdownButtonFormField<String>(
+                      value: selectedClassId,
+                      hint: const Text("Select Class"),
+                      decoration:
+                          const InputDecoration(labelText: 'Class'),
+                      items: docs.map((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        return DropdownMenuItem(
+                          value: doc.id,
+                          child: Text(data['name'] ?? ''),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        final selectedDoc =
+                            docs.firstWhere((doc) => doc.id == value);
+                        final data =
+                            selectedDoc.data() as Map<String, dynamic>;
+
+                        setState(() {
+                          selectedClassId = value;
+                          selectedClassName = data['name'];
+                          sections =
+                              List<String>.from(data['sections'] ?? []);
+                          selectedSection = null;
+                        });
+                      },
                     );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedClassId = value;
-                      selectedSection = null;
-                    });
                   },
-                );
-              },
+                ),
+
+                const SizedBox(height: 10),
+
+                /// ✅ SECTION DROPDOWN
+                DropdownButtonFormField<String>(
+                  value: selectedSection,
+                  hint: const Text("Select Section"),
+                  decoration:
+                      const InputDecoration(labelText: 'Section'),
+                  items: sections
+                      .map((s) =>
+                          DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() => selectedSection = value);
+                  },
+                ),
+
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: parentNameController,
+                  inputFormatters: const [UpperCaseTextFormatter()],
+                  decoration:
+                      const InputDecoration(labelText: 'Parent Name'),
+                ),
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: parentPhoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration:
+                      const InputDecoration(labelText: 'Parent Phone'),
+                ),
+
+                const SizedBox(height: 20),
+
+                FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? const CircularProgressIndicator()
+                      : const Text('Save Student'),
+                ),
+              ],
             ),
-
-            const SizedBox(height: 10),
-
-            /// SECTION
-            if (selectedClassId != null)
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('sections')
-                    .where('classId', isEqualTo: selectedClassId)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const LinearProgressIndicator();
-                  }
-
-                  final docs = snapshot.data!.docs;
-
-                  return DropdownButtonFormField<String>(
-                    initialValue: selectedSection,
-                    decoration: const InputDecoration(labelText: 'Section'),
-                    items: docs.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      return DropdownMenuItem(
-                        value: doc.id,
-                        child: Text(data['name'] ?? ''),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedSection = value;
-                      });
-                    },
-                  );
-                },
-              ),
-
-            const SizedBox(height: 10),
-
-            TextField(
-              controller: parentNameController,
-              inputFormatters: const [UpperCaseTextFormatter()],
-              decoration: const InputDecoration(labelText: 'Parent Name'),
-            ),
-            const SizedBox(height: 10),
-
-            TextField(
-              controller: parentPhoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'Parent Phone'),
-            ),
-
-            const SizedBox(height: 20),
-
-            FilledButton(
-              onPressed: _isSaving ? null : _save,
-              child: _isSaving
-                  ? const CircularProgressIndicator()
-                  : const Text('Save Student'),
-            ),
-          ],
-        ),
+          );
+        },
+        loading: () =>
+            const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
       ),
     );
   }

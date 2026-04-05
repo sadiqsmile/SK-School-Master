@@ -1,14 +1,10 @@
-// features/school_admin/students/screens/students_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
-import 'package:school_app/features/school_admin/students/providers/students_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
-import 'package:school_app/services/parent_account_service.dart';
 
 class StudentsScreen extends ConsumerStatefulWidget {
   const StudentsScreen({super.key});
@@ -17,144 +13,116 @@ class StudentsScreen extends ConsumerStatefulWidget {
   ConsumerState<StudentsScreen> createState() => _StudentsScreenState();
 }
 
-// ✅ FIX: CLOSED CLASS HERE
 class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   String searchQuery = '';
-  String selectedClass = 'All';
+  String selectedClassName = 'All';
   String selectedSection = 'All';
 
-  // 🔹 RESET PARENT PASSWORD
-  Future<void> _resetParentPassword(
-    BuildContext context,
-    WidgetRef ref, {
-    required String parentName,
-    required String parentPhone,
-    required String studentId,
-  }) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset parent password?'),
-        content: const Text('This will generate a new PIN for the parent.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Reset'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      final school = await ref.read(currentSchoolProvider.future);
-
-      final result = await ParentAccountService().resetParentPassword(
-        schoolId: school.id,
-        phone: parentPhone,
-        parentName: parentName,
-        studentId: studentId,
-      );
-
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.initialPin == null
-                ? 'Parent PIN reset'
-                : 'New PIN: ${result.initialPin}',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
-    }
-  }
+  List<String> availableSections = [];
 
   @override
   Widget build(BuildContext context) {
-    final studentsAsync = ref.watch(studentsProvider);
+    final schoolAsync = ref.watch(currentSchoolProvider);
 
     return AdminLayout(
       title: 'Students',
-      body: studentsAsync.when(
-        data: (snapshot) {
-          if (snapshot.docs.isEmpty) {
-            return const Center(child: Text('No students added'));
-          }
-
-          final filteredDocs = snapshot.docs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-
-            final name = (data['name'] ?? '').toString().toLowerCase();
-            final className = (data['className'] ?? '').toString();
-            final section = (data['sectionName'] ?? data['section'] ?? '').toString();
-
-            final matchesSearch =
-                name.contains(searchQuery.toLowerCase());
-
-            final matchesClass =
-                selectedClass == 'All' || className == selectedClass;
-
-            final matchesSection =
-                selectedSection == 'All' || section == selectedSection;
-
-            return matchesSearch && matchesClass && matchesSection;
-          }).toList();
+      body: schoolAsync.when(
+        data: (school) {
+          final schoolId = school.id;
 
           return Column(
             children: [
-              // 🏷️ CLASS & SECTION FILTERS
+              /// 🔽 FILTERS
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.all(10),
                 child: Row(
                   children: [
-                    // CLASS FILTER
+                    /// 📚 CLASS DROPDOWN
                     Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: selectedClass,
-                        items: ['All', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
-                            .map((e) => DropdownMenuItem(
-                                  value: e,
-                                  child: Text('Class $e'),
-                                ))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedClass = value!;
-                          });
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('schools')
+                            .doc(schoolId)
+                            .collection('classes')
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          final docs = snapshot.data?.docs ?? [];
+
+                          return DropdownButtonFormField<String>(
+                            value: selectedClassName,
+                            items: [
+                              const DropdownMenuItem(
+                                value: 'All',
+                                child: Text('Class All'),
+                              ),
+                              ...docs.map((doc) {
+                                final data =
+                                    doc.data() as Map<String, dynamic>;
+
+                                return DropdownMenuItem(
+                                  value: data['name'],
+                                  child: Text(data['name']),
+                                );
+                              }),
+                            ],
+                            onChanged: (value) {
+                              if (value == null) return;
+
+                              if (value == 'All') {
+                                setState(() {
+                                  selectedClassName = 'All';
+                                  availableSections = [];
+                                  selectedSection = 'All';
+                                });
+                                return;
+                              }
+
+                              final selectedDoc = docs.firstWhere(
+                                (doc) =>
+                                    (doc.data()
+                                            as Map<String, dynamic>)['name'] ==
+                                    value,
+                              );
+
+                              final data = selectedDoc.data()
+                                  as Map<String, dynamic>;
+
+                              setState(() {
+                                selectedClassName = value;
+                                availableSections =
+                                    List<String>.from(data['sections'] ?? []);
+                                selectedSection = 'All';
+                              });
+                            },
+                            decoration: const InputDecoration(
+                              labelText: 'Class',
+                              border: OutlineInputBorder(),
+                            ),
+                          );
                         },
-                        decoration: const InputDecoration(
-                          labelText: 'Class',
-                          border: OutlineInputBorder(),
-                        ),
                       ),
                     ),
+
                     const SizedBox(width: 10),
-                    // SECTION FILTER
+
+                    /// 🅰️ SECTION DROPDOWN
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: selectedSection,
-                        items: ['All', 'A', 'B', 'C', 'D']
-                            .map((e) => DropdownMenuItem(
-                                  value: e,
-                                  child: Text('Section $e'),
-                                ))
-                            .toList(),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 'All',
+                            child: Text('Section All'),
+                          ),
+                          ...availableSections.map((s) =>
+                              DropdownMenuItem(
+                                value: s,
+                                child: Text('Section $s'),
+                              )),
+                        ],
                         onChanged: (value) {
-                          setState(() {
-                            selectedSection = value!;
-                          });
+                          if (value == null) return;
+                          setState(() => selectedSection = value);
                         },
                         decoration: const InputDecoration(
                           labelText: 'Section',
@@ -165,9 +133,10 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                   ],
                 ),
               ),
-              // 🔍 SEARCH BAR
+
+              /// 🔍 SEARCH
               Padding(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: TextField(
                   decoration: const InputDecoration(
                     hintText: 'Search student...',
@@ -175,106 +144,112 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                     border: OutlineInputBorder(),
                   ),
                   onChanged: (value) {
-                    setState(() {
-                      searchQuery = value;
-                    });
+                    setState(() => searchQuery = value);
                   },
                 ),
               ),
 
-              // 📋 LIST
+              const SizedBox(height: 10),
+
+              /// 📋 STUDENT LIST
               Expanded(
-                child: ListView.builder(
-                  itemCount: filteredDocs.length,
-                  itemBuilder: (context, i) {
-                    final data = filteredDocs[i].data();
-                    final docId = filteredDocs[i].id;
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('schools')
+                      .doc(schoolId)
+                      .collection('students')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(
+                          child: CircularProgressIndicator());
+                    }
 
-                    final name = (data['name'] ?? '').toString();
-                    final className = (data['className'] ?? '').toString();
-                    final section =
-                        (data['sectionName'] ?? data['section'] ?? '').toString();
+                    final allDocs = snapshot.data!.docs;
 
-                    final parentName =
-                        (data['parentName'] ?? '').toString();
-                    final parentPhone =
-                        (data['parentPhone'] ?? '').toString();
+                    /// 🔥 FILTER LOGIC (FINAL SAFE)
+                    final docs = allDocs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      elevation: 3,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            // 👤 Avatar
-                            CircleAvatar(
-                              radius: 25,
-                              backgroundColor: Colors.blue.shade100,
+                      final studentClass =
+                          (data['className'] ?? '').toString().trim();
+                      final studentSection =
+                          (data['section'] ?? '').toString().trim();
+                      final name =
+                          (data['name'] ?? '').toString().toLowerCase();
+
+                      final classMatch = selectedClassName == 'All' ||
+                          studentClass == selectedClassName;
+
+                      final sectionMatch = selectedSection == 'All' ||
+                          studentSection == selectedSection;
+
+                      final searchMatch =
+                          name.contains(searchQuery.toLowerCase());
+
+                      return classMatch && sectionMatch && searchMatch;
+                    }).toList();
+
+                    if (docs.isEmpty) {
+                      return const Center(
+                          child: Text("No students added"));
+                    }
+
+                    return ListView.builder(
+                      itemCount: docs.length,
+                      itemBuilder: (context, index) {
+                        final data =
+                            docs[index].data() as Map<String, dynamic>;
+                        final docId = docs[index].id;
+
+                        final name = data['name'] ?? '';
+                        final className = data['className'] ?? '';
+                        final section = data['section'] ?? '';
+                        final parentName = data['parentName'] ?? '';
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            leading: CircleAvatar(
                               child: Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                style: const TextStyle(fontSize: 20, color: Colors.black),
+                                name.isNotEmpty ? name[0] : '?',
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            // 📄 Student Info
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    name,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '$className - Section $section',
-                                    style: TextStyle(color: Colors.grey[700]),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  if (parentName.isNotEmpty)
-                                    Text(
-                                      'Parent: $parentName',
-                                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            // 🎯 ACTIONS
-                            Column(
+                            title: Text(name),
+                            subtitle:
+                                Text('$className - Section $section'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.payment, color: Colors.green),
+                                  icon: const Icon(Icons.edit,
+                                      color: Colors.blue),
                                   onPressed: () {
-                                    context.push('/fees', extra: docId);
+                                    context.push('/edit-student',
+                                        extra: {
+                                          'studentId': docId,
+                                          'data': data,
+                                        });
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
                                   onPressed: () {
-                                    context.push('/edit-student', extra: {
-                                      'studentId': docId,
-                                      'data': data,
-                                    });
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () {
-                                    _confirmDelete(context, ref, docId);
+                                    _confirmDelete(
+                                        context, ref, docId);
                                   },
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
@@ -286,6 +261,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
             const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
+
+      /// ➕ ADD STUDENT
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/add-student'),
         child: const Icon(Icons.add),
@@ -293,57 +270,38 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     );
   }
 
-  // 🔴 DELETE FUNCTION
+  /// 🔴 DELETE
   void _confirmDelete(
-    BuildContext context,
-    WidgetRef ref,
-    String studentId,
-  ) {
+      BuildContext context, WidgetRef ref, String studentId) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete Student'),
-          content:
-              const Text('Are you sure you want to delete this student?'),
-          actions: [
-            TextButton(
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Student'),
+        content:
+            const Text('Are you sure you want to delete this student?'),
+        actions: [
+          TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(context);
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
 
-                try {
-                  final school =
-                      await ref.read(currentSchoolProvider.future);
+              final school =
+                  await ref.read(currentSchoolProvider.future);
 
-                  await FirebaseFirestore.instance
-                      .collection('schools')
-                      .doc(school.id)
-                      .collection('students')
-                      .doc(studentId)
-                      .delete();
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Student deleted successfully')),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
-                }
-              },
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
+              await FirebaseFirestore.instance
+                  .collection('schools')
+                  .doc(school.id)
+                  .collection('students')
+                  .doc(studentId)
+                  .delete();
+            },
+            child: const Text('Delete',
+                style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 }
