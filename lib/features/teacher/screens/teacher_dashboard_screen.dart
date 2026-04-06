@@ -48,9 +48,16 @@ class TeacherDashboardScreen extends ConsumerWidget {
                   ),
                 ),
                 data: (doc) {
+
                   final data = doc.data() as Map<String, dynamic>;
                   final name = (data['name'] ?? 'Teacher').toString();
                   final assignments = ref.watch(teacherAssignmentsProvider);
+
+                  // Debug prints for verification
+                  final teacherId = doc.id;
+                  final assignmentKeys = data['assignmentKeys'];
+                  print("Teacher ID: $teacherId");
+                  print("Assignments: $assignmentKeys");
 
                   return ListView(
                     padding: const EdgeInsets.all(16),
