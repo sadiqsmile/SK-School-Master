@@ -56,16 +56,19 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
 
       final teacherUid = userCredential.user!.uid;
 
-      // 🔥 SAVE IN USERS COLLECTION
+      // 🔥 SAVE IN USERS COLLECTION WITH teacherId
       await FirebaseFirestore.instance
           .collection('users')
           .doc(teacherUid)
           .set({
         "role": selectedRole,
         "schoolId": schoolId,
+        "teacherId": teacherUid, // 🔥 THIS IS THE KEY
+        "name": name,
+        "email": email,
       });
 
-      // 🔥 SAVE IN TEACHERS COLLECTION
+      // 🔥 SAVE IN TEACHERS COLLECTION WITH teacherId
       await FirebaseFirestore.instance
           .collection('schools')
           .doc(schoolId)
@@ -76,6 +79,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
         "email": email,
         "phone": phone,
         "role": selectedRole,
+        "teacherId": teacherUid,
         "assignmentKeys": [],
         "createdAt": FieldValue.serverTimestamp(),
       });

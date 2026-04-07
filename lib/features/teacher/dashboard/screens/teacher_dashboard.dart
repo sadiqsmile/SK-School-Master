@@ -7,6 +7,7 @@ class TeacherDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print("🔥 CORRECT DASHBOARD RUNNING");
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
@@ -43,64 +44,42 @@ class TeacherDashboard extends StatelessWidget {
           final schoolId = userData['schoolId'];
           final teacherId = userData['teacherId'];
 
-          /// 🔥 IMPORTANT DEBUG
-          print("School ID: $schoolId");
-          print("Teacher ID: $teacherId");
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text("UID: ${user.uid}"),
+              Text("SchoolID: $schoolId"),
+              Text("TeacherID: $teacherId"),
 
-          return StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('schools')
-                .doc(schoolId)
-                .collection('teachers')
-                .doc(teacherId)
-                .snapshots(),
-            builder: (context, teacherSnapshot) {
-              if (!teacherSnapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+              const SizedBox(height: 20),
 
-              if (!teacherSnapshot.data!.exists) {
-                return const Center(
-                  child: Text("Teacher not found ❌"),
-                );
-              }
+              FutureBuilder(
+                future: FirebaseFirestore.instance
+                    .collection('schools')
+                    .doc(schoolId)
+                    .collection('teachers')
+                    .doc(teacherId)
+                    .get(),
+                builder: (context, teacherSnapshot) {
+                  if (!teacherSnapshot.hasData) {
+                    return const CircularProgressIndicator();
+                  }
 
-              final teacherData =
-                  teacherSnapshot.data!.data() as Map<String, dynamic>;
+                  if (!teacherSnapshot.data!.exists) {
+                    return const Text("❌ Teacher doc NOT FOUND");
+                  }
 
-              final assignments =
-                  List<String>.from(teacherData['assignmentKeys'] ?? []);
+                  final data =
+                      teacherSnapshot.data!.data() as Map<String, dynamic>;
 
-              /// 🔥 DEBUG
-              print("Assignments: $assignments");
-
-              if (assignments.isEmpty) {
-                return const Center(
-                  child: Text("No classes assigned"),
-                );
-              }
-
-              return ListView.builder(
-                itemCount: assignments.length,
-                itemBuilder: (context, index) {
-                  final key = assignments[index];
-
-                  /// Split Class 5_A
-                  final parts = key.split('_');
-                  final className = parts[0];
-                  final section = parts.length > 1 ? parts[1] : '';
-
-                  return ListTile(
-                    leading: const Icon(Icons.class_),
-                    title: Text(className),
-                    subtitle: Text("Section $section"),
-                    onTap: () {
-                      // later: open attendance
-                    },
+                  return Column(
+                    children: [
+                      Text("Assignments: ${data['assignmentKeys']}")
+                    ],
                   );
                 },
-              );
-            },
+              ),
+            ],
           );
         },
       ),

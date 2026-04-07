@@ -1,27 +1,151 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:school_app/features/teacher/attendance/screens/teacher_attendance_screen.dart';
+class AttendanceScreen extends StatefulWidget {
+  final String className;
+  final String section;
 
-/// Backward-compatible wrapper for the Teacher Attendance feature.
-///
-/// This matches the tutorial-style API: (classId, section) and internally
-/// forwards to the Smart Attendance implementation.
-class AttendanceScreen extends ConsumerWidget {
   const AttendanceScreen({
     super.key,
-    required this.classId,
+    required this.className,
     required this.section,
   });
 
-  final String classId;
-  final String section;
+  @override
+  State<AttendanceScreen> createState() => _AttendanceScreenState();
+}
+
+class _AttendanceScreenState extends State<AttendanceScreen> {
+  Map<String, bool> attendance = {};
+  bool isSaving = false;
+
+  Future<String> _getSchoolId() async {
+    final user = FirebaseAuth.instance.currentUser!;
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    return doc['schoolId'];
+  }
+
+  Future<void> _saveAttendance() async {
+    setState(() => isSaving = true);
+
+    final schoolId = await _getSchoolId();
+    final today = DateTime.now().toIso8601String().split('T')[0];
+
+    await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(schoolId)
+        .collection('attendance')
+        .add({
+      'className': widget.className,
+      'section': widget.section,
+      'date': today,
+      'students': attendance,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    if (!mounted) return;
+
+    setState(() => isSaving = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Attendance Saved ✅")),
+    );
+
+    Navigator.pop(context);
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return TeacherAttendanceScreen(
-      classId: classId,
-      sectionId: section,
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("${widget.className} - ${widget.section}"),
+      ),
+      body: FutureBuilder(
+        future: _getSchoolId(),
+        builder: (context, schoolSnapshot) {
+          if (!schoolSnapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final schoolId = schoolSnapshot.data as String;
+
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('schools')
+                .doc(schoolId)
+                .collection('students')
+                .where('className', isEqualTo: widget.className)
+                .where('section', isEqualTo: widget.section)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final students = snapshot.data!.docs;
+
+              if (students.isEmpty) {
+                return const Center(child: Text("No students found"));
+              }
+
+              return Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: students.length,
+                      itemBuilder: (context, index) {
+                        final doc = students[index];
+                        final name = doc['name'];
+
+                        attendance.putIfAbsent(doc.id, () => true);
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          child: ListTile(
+                            title: Text(name),
+                            trailing: Switch(
+                              value: attendance[doc.id]!,
+                              onChanged: (val) {
+                                setState(() {
+                                  attendance[doc.id] = val;
+                                });
+                              },
+                              activeColor: Colors.green,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isSaving ? null : _saveAttendance,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          backgroundColor: const Color(0xff6366F1),
+                        ),
+                        child: isSaving
+                            ? const CircularProgressIndicator(color: Colors.white)
+                            : const Text("Save Attendance"),
+                      ),
+                    ),
+                  )
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

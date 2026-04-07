@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:school_app/providers/current_school_provider.dart';
 
 class TeachersScreen extends ConsumerWidget {
   const TeachersScreen({super.key});
@@ -115,8 +117,38 @@ class TeachersScreen extends ConsumerWidget {
 
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () {
-                              // TODO: reset password
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text("Reset Assignment"),
+                                  content: const Text("Remove all assigned classes?"),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      child: const Text("Reset"),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm != true) return;
+
+                              final school = await ref.read(currentSchoolProvider.future);
+                              await FirebaseFirestore.instance
+                                  .collection('schools')
+                                  .doc(school.id)
+                                  .collection('teachers')
+                                  .doc(teacherId)
+                                  .update({
+                                'assignmentKeys': [],
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Assignments cleared")),
+                              );
                             },
                             child: const Text("Reset"),
                           ),
