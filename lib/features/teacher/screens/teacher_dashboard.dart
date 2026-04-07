@@ -1,5 +1,5 @@
-import 'attendance_screen.dart';
-import 'attendance_history_screen.dart';
+import 'attendance_screen.dart' as att;
+import 'attendance_history_screen.dart' as hist;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -88,7 +88,7 @@ class TeacherDashboard extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => AttendanceScreen(
+                            builder: (_) => att.AttendanceScreen(
                               className: className,
                               section: section,
                             ),
@@ -102,7 +102,7 @@ class TeacherDashboard extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => AttendanceHistoryScreen(
+                                builder: (_) => hist.AttendanceHistoryScreen(
                                   className: className,
                                   section: section,
                                 ),
