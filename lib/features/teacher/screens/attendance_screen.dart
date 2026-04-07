@@ -35,12 +35,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     final schoolId = await _getSchoolId();
     final today = DateTime.now().toIso8601String().split('T')[0];
+    final docId = "${widget.className}_${widget.section}_$today";
 
     await FirebaseFirestore.instance
         .collection('schools')
         .doc(schoolId)
         .collection('attendance')
-        .add({
+        .doc(docId)
+        .set({
       'className': widget.className,
       'section': widget.section,
       'date': today,
