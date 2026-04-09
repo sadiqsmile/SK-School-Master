@@ -203,11 +203,61 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
 /// ================= STUDENT LIST =================
 
 class _StudentList extends ConsumerWidget {
+        Widget _buildPieChart(int present, int absent, int total) {
+          if (total == 0) return const SizedBox();
+          return Container(
+            height: 180,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: PieChart(
+              PieChartData(
+                sections: [
+                  PieChartSectionData(
+                    value: present.toDouble(),
+                    color: Colors.green,
+                    title: 'P',
+                  ),
+                  PieChartSectionData(
+                    value: absent.toDouble(),
+                    color: Colors.red,
+                    title: 'A',
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      Color _getToggleColor(String? status) {
+        // You can add _isHoliday logic if needed
+        switch (status) {
+          case 'P':
+            return Colors.green;
+          case 'A':
+            return Colors.red;
+          case 'Holiday':
+            return Colors.orange;
+          default:
+            return Colors.grey;
+        }
+      }
+    void _toggleStudent(int i) {
+      final current = studentList[i]['status'];
+      if (current == null) {
+        onStatusChanged(i, 'P');
+      } else if (current == 'P') {
+        onStatusChanged(i, 'A');
+      } else {
+        onStatusChanged(i, null);
+      }
+    }
   final String classId;
   final String sectionId;
   final List<Map<String, dynamic>> studentList;
   final Function(List<Map<String, dynamic>>) onInit;
-  final Function(int, String) onStatusChanged;
+  final Function(int, String?) onStatusChanged;
 
   const _StudentList({
     required this.classId,
@@ -239,10 +289,10 @@ class _StudentList extends ConsumerWidget {
         if (studentList.isEmpty) {
           final list = filtered.map((doc) {
             final d = doc.data();
-            return {
-              "name": d['name'] ?? 'No Name',
-              "status": "Present",
-            };
+              return {
+                "name": d['name'] ?? 'No Name',
+                "status": null, // Default to unmarked (grey)
+              };
           }).toList();
 
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -264,15 +314,12 @@ class _StudentList extends ConsumerWidget {
 
         return Column(
           children: [
-
-            /// TOP ACTIONS
+            // TOP ACTIONS
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-
                 Row(
                   children: [
-
                     ElevatedButton(
                       onPressed: () {
                         for (int i = 0; i < studentList.length; i++) {
@@ -281,9 +328,7 @@ class _StudentList extends ConsumerWidget {
                       },
                       child: const Text("All Present"),
                     ),
-
                     const SizedBox(width: 10),
-
                     ElevatedButton(
                       onPressed: () {
                         for (int i = 0; i < studentList.length; i++) {
@@ -294,7 +339,6 @@ class _StudentList extends ConsumerWidget {
                     ),
                   ],
                 ),
-
                 Row(
                   children: [
                     _count("P", present, Colors.green),
@@ -304,167 +348,45 @@ class _StudentList extends ConsumerWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
-
-            /// PIE CHART (RESTORED)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SizedBox(
-                height: 150,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text("Attendance"),
-                        Text(
-                          "${presentPercent.toStringAsFixed(1)}%",
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(width: 30),
-
-                    SizedBox(
-                      width: 110,
-                      height: 110,
-                      child: PieChart(
-                        PieChartData(
-                          centerSpaceRadius: 30,
-                          sections: [
-                            PieChartSectionData(
-                              value: present.toDouble(),
-                              color: Colors.green,
-                              title:
-                                  "${presentPercent.toStringAsFixed(0)}%",
-                            ),
-                            PieChartSectionData(
-                              value: absent.toDouble(),
-                              color: Colors.red,
-                              title:
-                                  "${absentPercent.toStringAsFixed(0)}%",
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            // Modern Pie Chart
+            _buildPieChart(present, absent, studentList.length),
+            const SizedBox(height: 10),
+            // Present/Absent counts
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("P = $present", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                const SizedBox(width: 16),
+                Text("A = $absent", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+              ],
             ),
-
             const SizedBox(height: 10),
-
-            /// LIST
+            // LIST
             Expanded(
               child: ListView.builder(
                 itemCount: studentList.length,
                 itemBuilder: (context, i) {
                   final s = studentList[i];
-
                   return Card(
                     child: ListTile(
                       title: Text(s['name']),
-
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-
-                          /// TOGGLE
-                          GestureDetector(
-                            onTap: s['status'] == "Holiday"
-                                ? null
-                                : () {
-                                    onStatusChanged(
-                                      i,
-                                      s['status'] == "Present"
-                                          ? "Absent"
-                                          : "Present",
-                                    );
-                                  },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              width: 70,
-                              height: 34,
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: s['status'] == "Holiday"
-                                    ? Colors.grey.shade300
-                                    : (s['status'] == "Present"
-                                        ? Colors.green
-                                        : Colors.red),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Align(
-                                alignment: s['status'] == "Present"
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: Container(
-                                  width: 26,
-                                  height: 26,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      s['status'] == "Present" ? "P" : "A",
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                      trailing: GestureDetector(
+                        onTap: () => _toggleStudent(i),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _getToggleColor(s['status']),
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: Text(
+                            s['status'] ?? '-',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-
-                          const SizedBox(width: 8),
-
-                          /// HOLIDAY
-                          GestureDetector(
-                            onTap: () {
-                              if (s['status'] == "Holiday") {
-                                onStatusChanged(i, "Present");
-                              } else {
-                                onStatusChanged(i, "Holiday");
-                              }
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: s['status'] == "Holiday"
-                                    ? Colors.blue
-                                    : Colors.grey.shade200,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  "H",
-                                  style: TextStyle(
-                                    color: s['status'] == "Holiday"
-                                        ? Colors.white
-                                        : Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   );

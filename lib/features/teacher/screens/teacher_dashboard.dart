@@ -1,5 +1,4 @@
-import 'attendance_screen.dart' as att;
-import 'attendance_history_screen.dart' as hist;
+import 'attendance_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -83,40 +82,17 @@ class TeacherDashboard extends StatelessWidget {
                       leading: const Icon(Icons.class_),
                       title: Text(className),
                       subtitle: Text("Section $section"),
-                      // 👉 NORMAL CLICK → MARK ATTENDANCE
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => att.AttendanceScreen(
+                            builder: (_) => AttendanceScreen(
                               className: className,
                               section: section,
                             ),
                           ),
                         );
                       },
-                      // 👉 MENU BUTTON
-                      trailing: PopupMenuButton<String>(
-                        onSelected: (value) {
-                          if (value == 'history') {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => hist.AttendanceHistoryScreen(
-                                  className: className,
-                                  section: section,
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'history',
-                            child: Text("View History"),
-                          ),
-                        ],
-                      ),
                     ),
                   );
                 },

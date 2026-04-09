@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'edit_attendance_screen.dart';
 
 class AttendanceHistoryScreen extends StatefulWidget {
   final String className;

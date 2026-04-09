@@ -27,10 +27,10 @@ class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadAttendance();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadAttendance() async {
     final doc = await FirebaseFirestore.instance
         .collection('schools')
         .doc(widget.schoolId)
@@ -38,10 +38,15 @@ class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
         .doc(widget.docId)
         .get();
 
+    if (!doc.exists) {
+      setState(() => loading = false);
+      return;
+    }
+
     final data = doc.data() as Map<String, dynamic>;
 
     setState(() {
-      attendance = Map<String, bool>.from(data['students']);
+      attendance = Map<String, bool>.from(data['students'] ?? {});
       loading = false;
     });
   }
@@ -72,13 +77,15 @@ class _EditAttendanceScreenState extends State<EditAttendanceScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Edit Attendance")),
+      appBar: AppBar(
+        title: Text("${widget.className} - ${widget.section}"),
+      ),
       body: ListView(
         children: attendance.keys.map((id) {
           return ListTile(
             title: Text(id),
             trailing: Switch(
-              value: attendance[id]!,
+              value: attendance[id] ?? false,
               onChanged: (val) {
                 setState(() {
                   attendance[id] = val;
