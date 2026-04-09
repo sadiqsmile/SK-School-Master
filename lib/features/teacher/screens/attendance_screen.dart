@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import 'package:fl_chart/fl_chart.dart';
 
 class AttendanceScreen extends StatefulWidget {
@@ -19,106 +18,9 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
-
-  Widget _legend(String title, int value, Color color) {
-    return Row(
-      children: [
-        CircleAvatar(radius: 6, backgroundColor: color),
-        const SizedBox(width: 6),
-        Text("$title ($value)"),
-      ],
-    );
-  }
-
-  Widget _buildPieChart(int present, int absent) {
-    final total = present + absent;
-    if (total == 0) return const SizedBox();
-    return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-          )
-        ],
-      ),
-      child: Column(
-        children: [
-          const Text(
-            "Attendance Overview",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 180,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 50,
-                    sections: [
-                      PieChartSectionData(
-                        value: present.toDouble(),
-                        color: Colors.green,
-                        title: '',
-                      ),
-                      PieChartSectionData(
-                        value: absent.toDouble(),
-                        color: Colors.red,
-                        title: '',
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "${((present / total) * 100).toStringAsFixed(0)}%",
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Text("Present"),
-                  ],
-                )
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _legend("Present", present, Colors.green),
-              _legend("Absent", absent, Colors.red),
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-    Color _getColor(String? status) {
-      if (isHoliday) return Colors.orange;
-      switch (status) {
-        case 'P':
-          return Colors.green;
-        case 'A':
-          return Colors.red;
-        default:
-          return Colors.grey;
-      }
-    }
   Map<String, String?> attendance = {};
-  bool isHoliday = false;
   bool isSaving = false;
+  bool isHoliday = false;
 
   Future<String> _getSchoolId() async {
     final user = FirebaseAuth.instance.currentUser!;
@@ -130,6 +32,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return doc['schoolId'];
   }
 
+  /// ---------------- SAVE ----------------
   Future<void> _confirmSave() async {
     final total = attendance.length;
     final present = attendance.values.where((e) => e == 'P').length;
@@ -193,6 +96,157 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     Navigator.pop(context);
   }
 
+  /// ---------------- PIE CHART (FIX 2) ----------------
+  Widget _buildPieChart(int present, int absent, int totalStudents) {
+    if (isHoliday) {
+      return _holidayCard();
+    }
+    if (totalStudents == 0) {
+      return _emptyCard();
+    }
+    double presentPercent = (present / totalStudents) * 100;
+    double absentPercent = (absent / totalStudents) * 100;
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
+      decoration: _glassDecoration(),
+      child: Row(
+        children: [
+          /// LEFT SIDE COUNTS
+          Column(
+            children: [
+              Text("P = $present",
+                  style: const TextStyle(
+                      color: Colors.green, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Text("A = $absent",
+                  style: const TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(width: 20),
+          /// PIE CHART
+          Expanded(
+            child: SizedBox(
+              height: 160,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  PieChart(
+                    PieChartData(
+                      centerSpaceRadius: 45,
+                      sections: [
+                        PieChartSectionData(
+                          value: present.toDouble(),
+                          color: Colors.green,
+                          title: "${presentPercent.toStringAsFixed(0)}%",
+                          radius: 50,
+                        ),
+                        PieChartSectionData(
+                          value: absent.toDouble(),
+                          color: Colors.red,
+                          title: "${absentPercent.toStringAsFixed(0)}%",
+                          radius: 50,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    "${presentPercent.toStringAsFixed(0)}%",
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.bold),
+                  )
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Glass effect (FIX 3) ---
+  BoxDecoration _glassDecoration() {
+    return BoxDecoration(
+      color: Colors.white.withOpacity(0.7),
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 10,
+        )
+      ],
+    );
+  }
+
+  // --- Holiday card (FIX 4) ---
+  Widget _holidayCard() {
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(20),
+      decoration: _glassDecoration(),
+      child: const Column(
+        children: [
+          Text("Holiday",
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          SizedBox(height: 10),
+          Text("H",
+              style: TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange)),
+        ],
+      ),
+    );
+  }
+
+  // --- Empty card for 0 students ---
+  Widget _emptyCard() {
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(20),
+      decoration: _glassDecoration(),
+      child: const Center(
+        child: Text("No attendance marked yet"),
+      ),
+    );
+  }
+
+  /// ---------------- REAL TOGGLE (FIX 6) ----------------
+  Widget _buildSwitch(String? status, VoidCallback onTap) {
+    final isPresent = status == 'P';
+    return GestureDetector(
+      onTap: isHoliday ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 70,
+        height: 32,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            colors: status == null
+                ? [Colors.grey, Colors.grey]
+                : isPresent
+                    ? [Colors.green, Colors.greenAccent]
+                    : [Colors.red, Colors.redAccent],
+          ),
+        ),
+        child: AnimatedAlign(
+          duration: const Duration(milliseconds: 300),
+          alignment: isPresent ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+                color: Colors.white, shape: BoxShape.circle),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -223,54 +277,87 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
               final students = snapshot.data!.docs;
 
-              if (students.isEmpty) {
-                return const Center(child: Text("No students found"));
+              for (var s in students) {
+                attendance.putIfAbsent(s.id, () => null);
               }
 
-              int present = attendance.values.where((e) => e == 'P').length;
-              int absent = attendance.values.where((e) => e == 'A').length;
-              return Column(
+                int totalStudents = attendance.length;
+                int present = attendance.values.where((e) => e == 'P').length;
+                int absent = attendance.values.where((e) => e == 'A').length;
+                int unmarked = totalStudents - (present + absent);
+                double presentPercent = totalStudents == 0 ? 0 : (present / totalStudents) * 100;
+                double absentPercent = totalStudents == 0 ? 0 : (absent / totalStudents) * 100;
+
+                return Column(
                 children: [
+                  /// Buttons
                   Padding(
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                isHoliday = false;
-                                for (var key in attendance.keys) {
-                                  attendance[key] = 'P';
-                                }
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF22C55E), Color(0xFF4ADE80)],
+                              ),
+                              borderRadius: BorderRadius.circular(30),
                             ),
-                            child: const Text("Present All"),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(30),
+                              onTap: () {
+                                setState(() {
+                                  isHoliday = false;
+                                  for (var key in attendance.keys) {
+                                    attendance[key] = 'P';
+                                  }
+                                });
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 14),
+                                child: Center(
+                                  child: Text("Present All", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                isHoliday = true;
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFF59E42), Color(0xFFFDE68A)],
+                              ),
+                              borderRadius: BorderRadius.circular(30),
                             ),
-                            child: const Text("Holiday"),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(30),
+                              onTap: () {
+                                setState(() {
+                                  isHoliday = true;
+                                  for (var key in attendance.keys) {
+                                    attendance[key] = null;
+                                  }
+                                });
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 14),
+                                child: Center(
+                                  child: Text("Holiday", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  // Pie chart
-                  _buildPieChart(present, absent),
-                  // Show counts
+
+                  /// Pie Chart
+                  _buildPieChart(present, absent, totalStudents),
+
+                  /// Counts (add unmarked)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(
@@ -278,9 +365,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       children: [
                         Text("P = $present", style: const TextStyle(color: Colors.green)),
                         Text("A = $absent", style: const TextStyle(color: Colors.red)),
+                        Text("- = $unmarked", style: const TextStyle(color: Colors.grey)),
                       ],
                     ),
                   ),
+
+                  /// List
                   Expanded(
                     child: ListView.builder(
                       itemCount: students.length,
@@ -288,16 +378,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         final doc = students[index];
                         final name = doc['name'];
 
-                        attendance.putIfAbsent(doc.id, () => null);
-
                         return Card(
                           margin: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
                           child: ListTile(
                             title: Text(name),
-                            trailing: GestureDetector(
-                              onTap: () {
-                                if (isHoliday) return;
+                            trailing: _buildSwitch(
+                              attendance[doc.id],
+                              () {
                                 setState(() {
                                   final current = attendance[doc.id];
                                   if (current == null) {
@@ -309,17 +397,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                                   }
                                 });
                               },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: _getColor(attendance[doc.id]),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  attendance[doc.id] ?? '-',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
                             ),
                           ),
                         );
@@ -327,22 +404,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ),
                   ),
 
+                  /// Save Button (premium look)
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: isSaving ? null : _confirmSave,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          backgroundColor: const Color(0xff6366F1),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xff6366F1), Color(0xff818CF8)],
                         ),
-                        child: isSaving
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text("Save Attendance"),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(30),
+                        onTap: isSaving ? null : _confirmSave,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Center(
+                            child: isSaving
+                                ? const CircularProgressIndicator(color: Colors.white)
+                                : const Text("Save Attendance", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
                       ),
                     ),
-                  )
+                  ),
                 ],
               );
             },
