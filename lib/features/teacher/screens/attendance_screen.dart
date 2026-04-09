@@ -19,23 +19,58 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen> {
   Map<String, bool> attendance = {};
   bool isSaving = false;
+  bool loading = true;
+  String schoolId = "";
 
-  Future<String> _getSchoolId() async {
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
     final user = FirebaseAuth.instance.currentUser!;
-    final doc = await FirebaseFirestore.instance
+    final userDoc = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .get();
 
-    return doc['schoolId'];
+    schoolId = userDoc['schoolId'];
+
+    await _loadExistingAttendance();
+
+    setState(() {
+      loading = false;
+    });
+  }
+
+  Future<void> _loadExistingAttendance() async {
+    final today = DateTime.now().toIso8601String().split('T')[0];
+
+    final docId =
+        "${widget.className}_${widget.section}_$today";
+
+    final doc = await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(schoolId)
+        .collection('attendance')
+        .doc(docId)
+        .get();
+
+    if (doc.exists) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      attendance = Map<String, bool>.from(data['students']);
+    }
   }
 
   Future<void> _saveAttendance() async {
     setState(() => isSaving = true);
 
-    final schoolId = await _getSchoolId();
     final today = DateTime.now().toIso8601String().split('T')[0];
-    final docId = "${widget.className}_${widget.section}_$today";
+
+    final docId =
+        "${widget.className}_${widget.section}_$today";
 
     await FirebaseFirestore.instance
         .collection('schools')
@@ -50,8 +85,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    if (!mounted) return;
-
     setState(() => isSaving = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -63,88 +96,85 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text("${widget.className} - ${widget.section}"),
       ),
-      body: FutureBuilder(
-        future: _getSchoolId(),
-        builder: (context, schoolSnapshot) {
-          if (!schoolSnapshot.hasData) {
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('schools')
+            .doc(schoolId)
+            .collection('students')
+            .where('className', isEqualTo: widget.className)
+            .where('section', isEqualTo: widget.section)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final schoolId = schoolSnapshot.data as String;
+          final students = snapshot.data!.docs;
 
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('schools')
-                .doc(schoolId)
-                .collection('students')
-                .where('className', isEqualTo: widget.className)
-                .where('section', isEqualTo: widget.section)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+          if (students.isEmpty) {
+            return const Center(child: Text("No students found"));
+          }
 
-              final students = snapshot.data!.docs;
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  itemCount: students.length,
+                  itemBuilder: (context, index) {
+                    final doc = students[index];
+                    final name = doc['name'];
 
-              if (students.isEmpty) {
-                return const Center(child: Text("No students found"));
-              }
+                    // ✅ Default = ABSENT (false)
+                    attendance.putIfAbsent(doc.id, () => false);
 
-              return Column(
-                children: [
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: students.length,
-                      itemBuilder: (context, index) {
-                        final doc = students[index];
-                        final name = doc['name'];
-
-                        attendance.putIfAbsent(doc.id, () => true);
-
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          child: ListTile(
-                            title: Text(name),
-                            trailing: Switch(
-                              value: attendance[doc.id]!,
-                              onChanged: (val) {
-                                setState(() {
-                                  attendance[doc.id] = val;
-                                });
-                              },
-                              activeColor: Colors.green,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: isSaving ? null : _saveAttendance,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          backgroundColor: const Color(0xff6366F1),
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      child: ListTile(
+                        title: Text(name),
+                        trailing: Switch(
+                          value: attendance[doc.id]!,
+                          onChanged: (val) {
+                            setState(() {
+                              attendance[doc.id] = val;
+                            });
+                          },
+                          activeColor: Colors.green,
                         ),
-                        child: isSaving
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text("Save Attendance"),
                       ),
+                    );
+                  },
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isSaving ? null : _saveAttendance,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      backgroundColor: const Color(0xff6366F1),
                     ),
-                  )
-                ],
-              );
-            },
+                    child: isSaving
+                        ? const CircularProgressIndicator(
+                            color: Colors.white)
+                        : const Text("Save Attendance"),
+                  ),
+                ),
+              )
+            ],
           );
         },
       ),
