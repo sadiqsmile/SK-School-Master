@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'student_history_screen.dart';
+import 'monthly_analytics_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final String className;
@@ -72,25 +74,29 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     final schoolId = await _getSchoolId();
     final today = DateTime.now().toIso8601String().split('T')[0];
 
+    /// UNIQUE DOC ID
+    final docId = "${widget.className}_${widget.section}_$today";
+
     await FirebaseFirestore.instance
         .collection('schools')
         .doc(schoolId)
         .collection('attendance')
-        .add({
+        .doc(docId)
+        .set({
       'className': widget.className,
       'section': widget.section,
       'date': today,
       'students': attendance,
       'isHoliday': isHoliday,
-      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
-
-    if (!mounted) return;
 
     setState(() => isSaving = false);
 
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Attendance Saved ✅")),
+      const SnackBar(content: Text("Attendance Saved / Updated ✅")),
     );
 
     Navigator.pop(context);
@@ -215,31 +221,35 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   /// ---------------- REAL TOGGLE (FIX 6) ----------------
   Widget _buildSwitch(String? status, VoidCallback onTap) {
     final isPresent = status == 'P';
+
     return GestureDetector(
       onTap: isHoliday ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         width: 70,
-        height: 32,
+        height: 34,
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(30),
           gradient: LinearGradient(
             colors: status == null
-                ? [Colors.grey, Colors.grey]
+                ? [Colors.grey.shade400, Colors.grey.shade500]
                 : isPresent
-                    ? [Colors.green, Colors.greenAccent]
-                    : [Colors.red, Colors.redAccent],
+                    ? [Color(0xFF22C55E), Color(0xFF4ADE80)]
+                    : [Color(0xFFEF4444), Color(0xFFF87171)],
           ),
         ),
         child: AnimatedAlign(
           duration: const Duration(milliseconds: 300),
-          alignment: isPresent ? Alignment.centerRight : Alignment.centerLeft,
+          alignment:
+              isPresent ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
-            width: 24,
-            height: 24,
+            width: 26,
+            height: 26,
             decoration: const BoxDecoration(
-                color: Colors.white, shape: BoxShape.circle),
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
           ),
         ),
       ),
@@ -250,8 +260,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
         title: Text("${widget.className} - ${widget.section}"),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            onPressed: () async {
+              final schoolId = await _getSchoolId();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MonthlyAnalyticsScreen(
+                    schoolId: schoolId,
+                    className: widget.className,
+                    section: widget.section,
+                  ),
+                ),
+              );
+            },
+          )
+        ],
       ),
       body: FutureBuilder(
         future: _getSchoolId(),
@@ -378,11 +410,25 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         final doc = students[index];
                         final name = doc['name'];
 
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: _glassDecoration(),
                           child: ListTile(
+                            tileColor: Colors.transparent,
                             title: Text(name),
+                            onTap: () async {
+                              final schoolId = await _getSchoolId();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => StudentHistoryScreen(
+                                    studentId: doc.id,
+                                    studentName: name,
+                                    schoolId: schoolId,
+                                  ),
+                                ),
+                              );
+                            },
                             trailing: _buildSwitch(
                               attendance[doc.id],
                               () {
@@ -410,7 +456,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     child: Container(
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xff6366F1), Color(0xff818CF8)],
+                          colors: [Color(0xFF6366F1), Color(0xFF06B6D4)],
                         ),
                         borderRadius: BorderRadius.circular(30),
                       ),
