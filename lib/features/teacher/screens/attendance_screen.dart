@@ -3,8 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'student_history_screen.dart';
-import 'monthly_analytics_screen.dart';
+
 import 'attendance_calendar_screen.dart';
+import 'analytics_dashboard_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final String className;
@@ -34,8 +35,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String _getDayName() {
     final now = DateTime.now();
     const days = [
-      "Sunday","Monday","Tuesday","Wednesday",
-      "Thursday","Friday","Saturday"
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday"
     ];
     return days[now.weekday % 7];
   }
@@ -101,9 +107,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         builder: (_) => AlertDialog(
           title: const Text("Warning"),
           content: Text(
-            isHoliday
-                ? "Holiday selected"
-                : "All students are Present",
+            isHoliday ? "Holiday selected" : "All students are Present",
           ),
           actions: [
             TextButton(
@@ -190,6 +194,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ],
           ),
           const SizedBox(width: 20),
+
           /// PIE CHART
           Expanded(
             child: SizedBox(
@@ -252,8 +257,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       decoration: _glassDecoration(),
       child: const Column(
         children: [
-          Text("Holiday",
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          Text("Holiday", style: TextStyle(fontWeight: FontWeight.bold)),
           SizedBox(height: 10),
           Text("H",
               style: TextStyle(
@@ -300,8 +304,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ),
         child: AnimatedAlign(
           duration: const Duration(milliseconds: 300),
-          alignment:
-              isPresent ? Alignment.centerRight : Alignment.centerLeft,
+          alignment: isPresent ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
             width: 26,
             height: 26,
@@ -343,13 +346,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.bar_chart),
+            icon: const Icon(Icons.analytics),
             onPressed: () async {
               final schoolId = await _getSchoolId();
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => MonthlyAnalyticsScreen(
+                  builder: (_) => AnalyticsDashboardScreen(
                     schoolId: schoolId,
                     className: widget.className,
                     section: widget.section,
@@ -396,14 +399,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               int present = attendance.values.where((e) => e == 'P').length;
               int absent = attendance.values.where((e) => e == 'A').length;
               int unmarked = totalStudents - (present + absent);
-              double presentPercent = totalStudents == 0 ? 0 : (present / totalStudents) * 100;
-              double absentPercent = totalStudents == 0 ? 0 : (absent / totalStudents) * 100;
+              double presentPercent =
+                  totalStudents == 0 ? 0 : (present / totalStudents) * 100;
+              double absentPercent =
+                  totalStudents == 0 ? 0 : (absent / totalStudents) * 100;
 
               return Column(
                 children: [
                   /// Date + Day UI
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -437,6 +443,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       ),
                     ),
                   ),
+
                   /// Edit Mode Banner
                   if (isEditing)
                     Container(
@@ -451,6 +458,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
+
                   /// Buttons
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -477,7 +485,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                               child: const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 14),
                                 child: Center(
-                                  child: Text("Present All", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  child: Text("Present All",
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold)),
                                 ),
                               ),
                             ),
@@ -505,7 +516,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                               child: const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 14),
                                 child: Center(
-                                  child: Text("Holiday", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  child: Text("Holiday",
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold)),
                                 ),
                               ),
                             ),
@@ -524,9 +538,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("P = $present", style: const TextStyle(color: Colors.green)),
-                        Text("A = $absent", style: const TextStyle(color: Colors.red)),
-                        Text("- = $unmarked", style: const TextStyle(color: Colors.grey)),
+                        Text("P = $present",
+                            style: const TextStyle(color: Colors.green)),
+                        Text("A = $absent",
+                            style: const TextStyle(color: Colors.red)),
+                        Text("- = $unmarked",
+                            style: const TextStyle(color: Colors.grey)),
                       ],
                     ),
                   ),
@@ -540,7 +557,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                         final name = doc['name'];
 
                         return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: _glassDecoration(),
                           child: ListTile(
                             tileColor: Colors.transparent,
@@ -601,10 +619,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           child: Center(
                             child: isSaving
-                                ? const CircularProgressIndicator(color: Colors.white)
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
                                 : Text(
-                                    isEditing ? "Update Attendance" : "Save Attendance",
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    isEditing
+                                        ? "Update Attendance"
+                                        : "Save Attendance",
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold),
                                   ),
                           ),
                         ),
