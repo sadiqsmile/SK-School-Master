@@ -35,6 +35,8 @@ dependencies:
   image_picker: ^0.8.7+4
   firebase_storage: ^12.4.10
 
+  table_calendar: ^3.0.9
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

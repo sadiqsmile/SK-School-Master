@@ -44,50 +44,48 @@ class StudentHistoryScreen extends StatelessWidget {
           int absent = 0;
           int holiday = 0;
 
-          List<Map<String, dynamic>> records = [];
+          Map<String, Map<String, dynamic>> uniqueRecords = {};
 
           for (var doc in docs) {
             final data = doc.data() as Map<String, dynamic>;
-            final students =
-                Map<String, dynamic>.from(data['students'] ?? {});
+            final students = Map<String, dynamic>.from(data['students'] ?? {});
+            final date = data['date'];
+            final isHoliday = data['isHoliday'] ?? false;
+
             final raw = students[studentId];
 
             String? status;
+            if (raw == true) status = 'P';
+            else if (raw == false) status = 'A';
+            else status = raw?.toString();
 
-            if (raw == true) {
-              status = 'P';
-            } else if (raw == false) {
-              status = 'A';
-            } else {
-              status = raw?.toString();
-            }
+            // skip empty
+            if (!isHoliday && status == null) continue;
 
-            final isHoliday = data['isHoliday'] ?? false;
-
-            if (isHoliday) {
-              holiday++;
-              records.add({
-                'date': data['date'],
-                'status': 'H'
-              });
-              continue;
-            }
-
-            if (status == null) continue;
-
-            totalDays++;
-
-            if (status == 'P') present++;
-            if (status == 'A') absent++;
-
-            records.add({
-              'date': data['date'],
-              'status': status,
-            });
+            // keep ONLY latest entry per date
+            uniqueRecords[date] = {
+              'date': date,
+              'status': isHoliday ? 'H' : status,
+            };
           }
 
-          double percent =
-              totalDays == 0 ? 0 : (present / totalDays) * 100;
+          List<Map<String, dynamic>> records = uniqueRecords.values.toList();
+          records.sort((a, b) => b['date'].compareTo(a['date']));
+
+          // Recalculate stats
+          for (var item in records) {
+            if (item['status'] == 'H') {
+              holiday++;
+            } else if (item['status'] == 'P') {
+              present++;
+              totalDays++;
+            } else if (item['status'] == 'A') {
+              absent++;
+              totalDays++;
+            }
+          }
+
+          double percent = totalDays == 0 ? 0 : (present / totalDays) * 100;
 
           return Column(
             children: [

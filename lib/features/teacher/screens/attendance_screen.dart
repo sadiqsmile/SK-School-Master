@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'student_history_screen.dart';
 import 'monthly_analytics_screen.dart';
+import 'attendance_calendar_screen.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final String className;
@@ -23,6 +24,52 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   Map<String, String?> attendance = {};
   bool isSaving = false;
   bool isHoliday = false;
+  bool isLoaded = false;
+  bool isEditing = false;
+  String _getFormattedDate() {
+    final now = DateTime.now();
+    return "${now.day}/${now.month}/${now.year}";
+  }
+
+  String _getDayName() {
+    final now = DateTime.now();
+    const days = [
+      "Sunday","Monday","Tuesday","Wednesday",
+      "Thursday","Friday","Saturday"
+    ];
+    return days[now.weekday % 7];
+  }
+
+  Future<void> _loadTodayAttendance(String schoolId) async {
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final docId = "${widget.className}_${widget.section}_$today";
+    final doc = await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(schoolId)
+        .collection('attendance')
+        .doc(docId)
+        .get();
+    if (doc.exists) {
+      final data = doc.data()!;
+      final saved = Map<String, dynamic>.from(data['students']);
+      Map<String, String?> converted = {};
+      saved.forEach((key, value) {
+        if (value == true) {
+          converted[key] = 'P';
+        } else if (value == false) {
+          converted[key] = 'A';
+        } else {
+          converted[key] = value.toString();
+        }
+      });
+      setState(() {
+        attendance = converted;
+        isHoliday = data['isHoliday'] ?? false;
+        isLoaded = true;
+        isEditing = true; // 🔥
+      });
+    }
+  }
 
   Future<String> _getSchoolId() async {
     final user = FirebaseAuth.instance.currentUser!;
@@ -36,6 +83,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   /// ---------------- SAVE ----------------
   Future<void> _confirmSave() async {
+    print("Confirm Save Triggered");
+
+    if (attendance.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No attendance to save")),
+      );
+      return;
+    }
+
     final total = attendance.length;
     final present = attendance.values.where((e) => e == 'P').length;
 
@@ -46,7 +102,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           title: const Text("Warning"),
           content: Text(
             isHoliday
-                ? "You marked this day as Holiday"
+                ? "Holiday selected"
                 : "All students are Present",
           ),
           actions: [
@@ -62,13 +118,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         ),
       );
 
-      if (result != true) return;
+      if (result != true) {
+        print("User cancelled");
+        return;
+      }
     }
 
+    print("Calling Save");
     await _saveAttendance();
   }
 
   Future<void> _saveAttendance() async {
+    print("Saving to Firestore...");
     setState(() => isSaving = true);
 
     final schoolId = await _getSchoolId();
@@ -98,8 +159,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Attendance Saved / Updated ✅")),
     );
-
-    Navigator.pop(context);
   }
 
   /// ---------------- PIE CHART (FIX 2) ----------------
@@ -268,6 +327,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: const Icon(Icons.calendar_month),
+            onPressed: () async {
+              final schoolId = await _getSchoolId();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AttendanceCalendarScreen(
+                    schoolId: schoolId,
+                    className: widget.className,
+                    section: widget.section,
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.bar_chart),
             onPressed: () async {
               final schoolId = await _getSchoolId();
@@ -309,19 +384,73 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
               final students = snapshot.data!.docs;
 
+              if (!isLoaded) {
+                _loadTodayAttendance(schoolId);
+              }
+
               for (var s in students) {
                 attendance.putIfAbsent(s.id, () => null);
               }
 
-                int totalStudents = attendance.length;
-                int present = attendance.values.where((e) => e == 'P').length;
-                int absent = attendance.values.where((e) => e == 'A').length;
-                int unmarked = totalStudents - (present + absent);
-                double presentPercent = totalStudents == 0 ? 0 : (present / totalStudents) * 100;
-                double absentPercent = totalStudents == 0 ? 0 : (absent / totalStudents) * 100;
+              int totalStudents = attendance.length;
+              int present = attendance.values.where((e) => e == 'P').length;
+              int absent = attendance.values.where((e) => e == 'A').length;
+              int unmarked = totalStudents - (present + absent);
+              double presentPercent = totalStudents == 0 ? 0 : (present / totalStudents) * 100;
+              double absentPercent = totalStudents == 0 ? 0 : (absent / totalStudents) * 100;
 
-                return Column(
+              return Column(
                 children: [
+                  /// Date + Day UI
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today, color: Colors.white),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _getFormattedDate(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                _getDayName(),
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                  /// Edit Mode Banner
+                  if (isEditing)
+                    Container(
+                      margin: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        "Editing today's attendance",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   /// Buttons
                   Padding(
                     padding: const EdgeInsets.all(12),
@@ -462,13 +591,21 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       ),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(30),
-                        onTap: isSaving ? null : _confirmSave,
+                        onTap: isSaving
+                            ? null
+                            : () {
+                                print('Button Clicked');
+                                _confirmSave();
+                              },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           child: Center(
                             child: isSaving
                                 ? const CircularProgressIndicator(color: Colors.white)
-                                : const Text("Save Attendance", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                : Text(
+                                    isEditing ? "Update Attendance" : "Save Attendance",
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
                           ),
                         ),
                       ),
