@@ -10,6 +10,10 @@ environment:
 
 
 dependencies:
+  extended_image: ^8.2.0
+  image: ^4.1.7
+  path_provider: ^2.1.2
+  flutter_image_compress: ^2.3.0
   file_picker: ^8.1.2
   excel: ^4.0.6
   syncfusion_flutter_xlsio: ^29.2.11
@@ -32,7 +36,7 @@ dependencies:
   cloud_firestore: ^5.6.12
   cloud_functions: ^5.6.2
   shared_preferences: ^2.2.2
-  image_picker: ^0.8.7+4
+  image_picker: ^1.0.7
   firebase_storage: ^12.4.10
 
   table_calendar: ^3.0.9

@@ -1,3 +1,4 @@
+import 'package:school_app/features/teacher/screens/teacher_profile_screen.dart';
 import 'package:school_app/features/school_admin/teachers/screens/assign_teacher_screen.dart';
 import 'package:school_app/features/school_admin/fees/screens/fee_list_screen.dart';
 import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
@@ -481,6 +482,10 @@ final appRouter = GoRouter(
           data: Map<String, dynamic>.from(data['data']),
         );
       },
+    ),
+    GoRoute(
+      path: '/teacher/profile',
+      builder: (context, state) => const TeacherProfileScreen(),
     ),
   ],
 );

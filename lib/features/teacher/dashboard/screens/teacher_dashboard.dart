@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+// ✅ ADD THIS IMPORT
+import 'package:go_router/go_router.dart';
+import 'package:school_app/features/teacher/screens/teacher_profile_screen.dart';
+
 import 'package:school_app/features/teacher/screens/analytics_dashboard_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_calendar_screen.dart';
-
 import 'package:school_app/features/teacher/screens/student_history_screen.dart';
 
 class TeacherDashboard extends StatefulWidget {
@@ -30,7 +34,6 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     loadTeacherData();
   }
 
-  /// 🔥 LOAD TEACHER DATA
   Future<void> loadTeacherData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -59,27 +62,22 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     if (data != null) {
       teacherName = data['name'] ?? "";
 
-      /// 🔥 FIX: GET CLASS & SECTION FROM assignmentKeys
       final keys = List<String>.from(data['assignmentKeys'] ?? []);
 
       if (keys.isNotEmpty) {
-        final key = keys.first; // Example: "Class 7_A"
-        final parts = key.split('_'); // ["Class 7", "A"]
+        final key = keys.first;
+        final parts = key.split('_');
         if (parts.length == 2) {
-          className = parts[0].replaceAll("Class ", "").trim(); // → "7"
-          section = parts[1].trim(); // → "A"
+          className = parts[0].replaceAll("Class ", "").trim();
+          section = parts[1].trim();
         }
       }
-      print("CLASS: $className");
-      print("SECTION: $section");
     }
 
     await loadTodayAttendance();
-
     setState(() {});
   }
 
-  /// 🔥 LOAD TODAY ATTENDANCE
   Future<void> loadTodayAttendance() async {
     if (schoolId.isEmpty || className.isEmpty) return;
 
@@ -106,47 +104,56 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     absent = students.values.where((e) => e == 'A').length;
   }
 
-  /// 🔥 PROFILE HEADER
+  /// 🔥 UPDATED PROFILE HEADER (CLICKABLE)
   Widget profileHeader() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.person),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque, // 🔥 IMPORTANT FIX
+      onTap: () {
+        print("Profile tapped"); // debug
+
+        // ✅ GoRouter navigation
+        context.push('/teacher/profile');
+      },
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
           ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                teacherName,
-                style: const TextStyle(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            const CircleAvatar(
+              radius: 30,
+              backgroundColor: Colors.white,
+              child: Icon(Icons.person),
+            ),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  teacherName,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
-                    fontWeight: FontWeight.bold),
-              ),
-              Text(
-                email,
-                style: const TextStyle(color: Colors.white70),
-              ),
-            ],
-          )
-        ],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  email,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }
 
-  /// 🔥 TODAY CARD
   Widget todayCard() {
     int total = present + absent;
     double percent = total == 0 ? 0 : (present / total) * 100;
@@ -168,7 +175,9 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           Text(
             total == 0 ? "No Data" : "${percent.toStringAsFixed(0)}%",
             style: const TextStyle(
-                fontSize: 26, fontWeight: FontWeight.bold),
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 10),
           Row(
@@ -183,7 +192,6 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     );
   }
 
-  /// 🔥 BUTTON
   Widget actionButton(String title, IconData icon, VoidCallback onTap) {
     return Expanded(
       child: GestureDetector(
