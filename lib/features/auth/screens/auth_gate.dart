@@ -14,7 +14,7 @@ import '../../super_admin/screens/super_admin_dashboard.dart';
 import '../../school_admin/dashboard/screens/school_admin_dashboard.dart';
 import '../../parent/screens/force_change_password_screen.dart';
 import '../../parent/screens/parent_shell.dart';
-import '../../teacher/screens/teacher_dashboard.dart';
+import '../../teacher/dashboard/screens/teacher_dashboard.dart';
 import '../../teacher/screens/teacher_force_change_password_screen.dart';
 import '../../mentor/screens/mentor_dashboard_screen.dart';
 

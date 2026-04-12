@@ -153,92 +153,96 @@ class _AttendanceCalendarScreenState
               child: CircularProgressIndicator(),
             ),
 
-          /// 📊 RESULT CARD
+          /// 📊 RESULT CARD (always clickable, even on holiday)
           if (selectedData != null)
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF06B6D4)],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                  )
-                ],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    selectedData!['date'],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+            GestureDetector(
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditAttendanceScreen(
+                      schoolId: widget.schoolId,
+                      className: widget.className,
+                      section: widget.section,
+                      date: selectedData!['date'],
                     ),
                   ),
-
-                  const SizedBox(height: 10),
-
-                  if (selectedData!['holiday'] == true)
-                    const Text(
-                      "Holiday",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                );
+                if (result == true) {
+                  setState(() {
+                    selectedData = null;
+                  });
+                  _loadSelectedDay(selectedDay!);
+                }
+              },
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
                     )
-                  else ... [
+                  ],
+                ),
+                child: Column(
+                  children: [
                     Text(
-                      "${selectedData!['percent'].toStringAsFixed(0)}%",
+                      selectedData!['date'],
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      selectedData!['holiday'] == true
+                          ? "Holiday"
+                          : "${selectedData!['percent'].toStringAsFixed(0)}%",
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 26,
+                        fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    if (selectedData!['holiday'] == true)
+                      const Text(
+                        "H",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
                     const Text(
                       "Attendance",
                       style: TextStyle(color: Colors.white70),
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _statBox("P", selectedData!['present'], Colors.green),
-                        _statBox("A", selectedData!['absent'], Colors.red),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EditAttendanceScreen(
-                              schoolId: widget.schoolId,
-                              className: widget.className,
-                              section: widget.section,
-                              date: selectedData!['date'],
+                    if (selectedData!['holiday'] != true)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Text(
+                            "P = ${selectedData!['present']}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        );
-                        if (result == true) {
-                          setState(() {
-                            selectedData = null;
-                          });
-                          _loadSelectedDay(selectedDay!);
-                        }
-                      },
-                      child: const Text("Edit Attendance"),
-                    ),
+                          Text(
+                            "A = ${selectedData!['absent']}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
-                ],
+                ),
               ),
             ),
         ],

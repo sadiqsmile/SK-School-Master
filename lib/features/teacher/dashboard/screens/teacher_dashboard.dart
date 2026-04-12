@@ -1,87 +1,284 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:school_app/features/teacher/screens/analytics_dashboard_screen.dart';
+import 'package:school_app/features/teacher/screens/attendance_screen.dart';
+import 'package:school_app/features/teacher/screens/attendance_calendar_screen.dart';
 
-class TeacherDashboard extends StatelessWidget {
+import 'package:school_app/features/teacher/screens/student_history_screen.dart';
+
+class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    print("🔥 CORRECT DASHBOARD RUNNING");
-    final user = FirebaseAuth.instance.currentUser;
+  State<TeacherDashboard> createState() => _TeacherDashboardState();
+}
 
-    if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text("Not logged in")),
-      );
+class _TeacherDashboardState extends State<TeacherDashboard> {
+  String teacherName = "";
+  String email = "";
+  String schoolId = "";
+  String className = "";
+  String section = "";
+
+  int present = 0;
+  int absent = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    loadTeacherData();
+  }
+
+  /// 🔥 LOAD TEACHER DATA
+  Future<void> loadTeacherData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    email = user.email ?? "";
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    final userData = userDoc.data();
+    if (userData == null) return;
+
+    schoolId = userData['schoolId'] ?? "";
+    final teacherId = userData['teacherId'];
+
+    final teacherDoc = await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(schoolId)
+        .collection('teachers')
+        .doc(teacherId)
+        .get();
+
+    final data = teacherDoc.data();
+    if (data != null) {
+      teacherName = data['name'] ?? "";
+
+      /// 🔥 FIX: GET CLASS & SECTION FROM assignmentKeys
+      final keys = List<String>.from(data['assignmentKeys'] ?? []);
+
+      if (keys.isNotEmpty) {
+        final key = keys.first; // Example: "Class 7_A"
+        final parts = key.split('_'); // ["Class 7", "A"]
+        if (parts.length == 2) {
+          className = parts[0].replaceAll("Class ", "").trim(); // → "7"
+          section = parts[1].trim(); // → "A"
+        }
+      }
+      print("CLASS: $className");
+      print("SECTION: $section");
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Teacher Dashboard"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
-          ),
-        ],
+    await loadTodayAttendance();
+
+    setState(() {});
+  }
+
+  /// 🔥 LOAD TODAY ATTENDANCE
+  Future<void> loadTodayAttendance() async {
+    if (schoolId.isEmpty || className.isEmpty) return;
+
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final docId = "${className}_${section}_$today";
+
+    final doc = await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(schoolId)
+        .collection('attendance')
+        .doc(docId)
+        .get();
+
+    if (!doc.exists) {
+      present = 0;
+      absent = 0;
+      return;
+    }
+
+    final data = doc.data() as Map<String, dynamic>;
+    final students = Map<String, dynamic>.from(data['students'] ?? {});
+
+    present = students.values.where((e) => e == 'P').length;
+    absent = students.values.where((e) => e == 'A').length;
+  }
+
+  /// 🔥 PROFILE HEADER
+  Widget profileHeader() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
+        ),
+        borderRadius: BorderRadius.circular(20),
       ),
-      body: FutureBuilder(
-        future: FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get(),
-        builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final userData =
-              userSnapshot.data!.data() as Map<String, dynamic>;
-
-          final schoolId = userData['schoolId'];
-          final teacherId = userData['teacherId'];
-
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.white,
+            child: Icon(Icons.person),
+          ),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("UID: ${user.uid}"),
-              Text("SchoolID: $schoolId"),
-              Text("TeacherID: $teacherId"),
-
-              const SizedBox(height: 20),
-
-              FutureBuilder(
-                future: FirebaseFirestore.instance
-                    .collection('schools')
-                    .doc(schoolId)
-                    .collection('teachers')
-                    .doc(teacherId)
-                    .get(),
-                builder: (context, teacherSnapshot) {
-                  if (!teacherSnapshot.hasData) {
-                    return const CircularProgressIndicator();
-                  }
-
-                  if (!teacherSnapshot.data!.exists) {
-                    return const Text("❌ Teacher doc NOT FOUND");
-                  }
-
-                  final data =
-                      teacherSnapshot.data!.data() as Map<String, dynamic>;
-
-                  return Column(
-                    children: [
-                      Text("Assignments: ${data['assignmentKeys']}")
-                    ],
-                  );
-                },
+              Text(
+                teacherName,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
+              ),
+              Text(
+                email,
+                style: const TextStyle(color: Colors.white70),
               ),
             ],
-          );
-        },
+          )
+        ],
+      ),
+    );
+  }
+
+  /// 🔥 TODAY CARD
+  Widget todayCard() {
+    int total = present + absent;
+    double percent = total == 0 ? 0 : (present / total) * 100;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          Text(
+            "Today Attendance",
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            total == 0 ? "No Data" : "${percent.toStringAsFixed(0)}%",
+            style: const TextStyle(
+                fontSize: 26, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              Text("P: $present", style: const TextStyle(color: Colors.green)),
+              Text("A: $absent", style: const TextStyle(color: Colors.red)),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  /// 🔥 BUTTON
+  Widget actionButton(String title, IconData icon, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 28),
+              const SizedBox(height: 8),
+              Text(title),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Teacher Dashboard")),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            profileHeader(),
+            todayCard(),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                actionButton("Attendance", Icons.check, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AttendanceScreen(
+                        schoolId: schoolId,
+                        className: className,
+                        section: section,
+                      ),
+                    ),
+                  );
+                }),
+                actionButton("Calendar", Icons.calendar_month, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AttendanceCalendarScreen(
+                        schoolId: schoolId,
+                        className: className,
+                        section: section,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+
+            Row(
+              children: [
+                actionButton("Analytics", Icons.analytics, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AnalyticsDashboardScreen(
+                        schoolId: schoolId,
+                        className: className,
+                        section: section,
+                      ),
+                    ),
+                  );
+                }),
+                actionButton("Students", Icons.people, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StudentHistoryScreen(
+                        schoolId: schoolId,
+                        className: className,
+                        section: section,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }

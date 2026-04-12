@@ -6,7 +6,7 @@ import 'package:school_app/features/mentor/screens/mentor_dashboard_screen.dart'
 import 'package:school_app/features/parent/screens/parent_dashboard.dart';
 import 'package:school_app/features/school_admin/dashboard/screens/school_admin_dashboard.dart';
 import 'package:school_app/features/super_admin/screens/super_admin_dashboard.dart';
-import 'package:school_app/features/teacher/screens/teacher_dashboard.dart';
+import 'package:school_app/features/teacher/dashboard/screens/teacher_dashboard.dart';
 import 'package:school_app/providers/current_user_provider.dart';
 
 class RoleBasedRedirectScreen extends ConsumerWidget {

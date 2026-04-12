@@ -109,23 +109,17 @@ class _AttendanceHistoryScreenState
               final data = docs[index];
               final dateStr = data['date'];
               final date = DateTime.parse(dateStr);
-
-              if (selectedDate != null &&
-                  selectedDate!.day != date.day) {
+              if (date.weekday == DateTime.sunday) return const SizedBox();
+              if (selectedDate != null && selectedDate!.day != date.day) {
                 return const SizedBox();
               }
-
-              final students =
-                  Map<String, dynamic>.from(data['students']);
-
+              final students = Map<String, dynamic>.from(data['students']);
               return Card(
                 margin: const EdgeInsets.all(10),
                 child: ExpansionTile(
                   title: Text("Date: $dateStr"),
                   children: students.entries.map((entry) {
-                    final color =
-                        getColor(entry.value, date);
-
+                    final color = getColor(entry.value, date);
                     return ListTile(
                       title: Text(entry.key),
                       trailing: Icon(

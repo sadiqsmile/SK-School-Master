@@ -2,211 +2,59 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class StudentHistoryScreen extends StatelessWidget {
-  final String studentId;
-  final String studentName;
   final String schoolId;
+  final String className;
+  final String section;
 
   const StudentHistoryScreen({
     super.key,
-    required this.studentId,
-    required this.studentName,
     required this.schoolId,
+    required this.className,
+    required this.section,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        title: Text(studentName),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-      ),
-
+      appBar: AppBar(title: const Text("Students")),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('schools')
             .doc(schoolId)
-            .collection('attendance')
-            .orderBy('date', descending: true)
+            .collection('students')
+            .where('className', isEqualTo: className)
+            .where('section', isEqualTo: section)
             .snapshots(),
-
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final docs = snapshot.data!.docs;
+          final students = snapshot.data!.docs;
 
-          int totalDays = 0;
-          int present = 0;
-          int absent = 0;
-          int holiday = 0;
-
-          Map<String, Map<String, dynamic>> uniqueRecords = {};
-
-          for (var doc in docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final students = Map<String, dynamic>.from(data['students'] ?? {});
-            final date = data['date'];
-            final isHoliday = data['isHoliday'] ?? false;
-
-            final raw = students[studentId];
-
-            String? status;
-            if (raw == true) status = 'P';
-            else if (raw == false) status = 'A';
-            else status = raw?.toString();
-
-            // skip empty
-            if (!isHoliday && status == null) continue;
-
-            // keep ONLY latest entry per date
-            uniqueRecords[date] = {
-              'date': date,
-              'status': isHoliday ? 'H' : status,
-            };
+          if (students.isEmpty) {
+            return const Center(child: Text("No students found"));
           }
 
-          List<Map<String, dynamic>> records = uniqueRecords.values.toList();
-          records.sort((a, b) => b['date'].compareTo(a['date']));
+          return ListView.builder(
+            itemCount: students.length,
+            itemBuilder: (context, index) {
+              final doc = students[index];
+              final data = doc.data() as Map<String, dynamic>;
 
-          // Recalculate stats
-          for (var item in records) {
-            if (item['status'] == 'H') {
-              holiday++;
-            } else if (item['status'] == 'P') {
-              present++;
-              totalDays++;
-            } else if (item['status'] == 'A') {
-              absent++;
-              totalDays++;
-            }
-          }
+              final name = data['name'] ?? "No Name";
 
-          double percent = totalDays == 0 ? 0 : (present / totalDays) * 100;
-
-          return Column(
-            children: [
-
-              /// 🔥 SUMMARY CARD
-              Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
+              return ListTile(
+                leading: const CircleAvatar(
+                  child: Icon(Icons.person),
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      "${percent.toStringAsFixed(1)}%",
-                      style: const TextStyle(
-                        fontSize: 26,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Text(
-                      "Attendance",
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                    const SizedBox(height: 12),
-
-                    Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceAround,
-                      children: [
-                        _stat("P", present, Colors.green),
-                        _stat("A", absent, Colors.red),
-                        _stat("H", holiday, Colors.orange),
-                      ],
-                    )
-                  ],
-                ),
-              ),
-
-              /// 🔥 LIST
-              Expanded(
-                child: ListView.builder(
-                  itemCount: records.length,
-                  itemBuilder: (context, index) {
-                    final item = records[index];
-
-                    return Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 6),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color:
-                                Colors.black.withOpacity(0.05),
-                            blurRadius: 8,
-                          )
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today,
-                              size: 18),
-                          const SizedBox(width: 10),
-
-                          Expanded(
-                            child: Text(item['date']),
-                          ),
-
-                          CircleAvatar(
-                            backgroundColor:
-                                _getColor(item['status']),
-                            child: Text(
-                              item['status'],
-                              style: const TextStyle(
-                                  color: Colors.white),
-                            ),
-                          )
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              )
-            ],
+                title: Text(name),
+                subtitle: Text("ID: ${doc.id}"),
+              );
+            },
           );
         },
       ),
     );
-  }
-
-  /// 🔥 small stat widget
-  Widget _stat(String label, int value, Color color) {
-    return Column(
-      children: [
-        Text("$value",
-            style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 18)),
-        Text(label, style: const TextStyle(color: Colors.white)),
-      ],
-    );
-  }
-
-  Color _getColor(String status) {
-    switch (status) {
-      case 'P':
-        return Colors.green;
-      case 'A':
-        return Colors.red;
-      case 'H':
-        return Colors.orange;
-      default:
-        return Colors.grey;
-    }
   }
 }

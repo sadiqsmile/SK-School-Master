@@ -44,7 +44,7 @@ import 'package:school_app/features/parent/screens/parent_login_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/teacher_attendance_screen.dart';
 import 'package:school_app/features/teacher/homework/screens/homework_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_class_home_screen.dart';
-import 'package:school_app/features/teacher/screens/teacher_dashboard.dart';
+import 'package:school_app/features/teacher/dashboard/screens/teacher_dashboard.dart';
 import 'package:school_app/features/teacher/screens/teacher_students_screen.dart';
 import 'package:school_app/features/teacher/risk/screens/class_risk_screen.dart';
 
