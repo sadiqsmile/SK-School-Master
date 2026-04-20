@@ -5,12 +5,14 @@ class AttendanceScreen extends StatefulWidget {
   final String schoolId;
   final String className;
   final String section;
+  final String? selectedDate;
 
   const AttendanceScreen({
     super.key,
     required this.schoolId,
     required this.className,
     required this.section,
+    this.selectedDate,
   });
 
   @override
@@ -28,13 +30,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   int absent = 0;
   bool isSaving = false;
 
-  String today = DateTime.now().toIso8601String().split('T')[0];
+  late String today;
 
   bool get isSunday => DateTime.now().weekday == DateTime.sunday;
 
   @override
   void initState() {
     super.initState();
+    today = widget.selectedDate ?? DateTime.now().toIso8601String().split('T')[0];
     loadData();
   }
 

@@ -10,6 +10,7 @@ environment:
 
 
 dependencies:
+
   extended_image: ^8.2.0
   image: ^4.1.7
   path_provider: ^2.1.2

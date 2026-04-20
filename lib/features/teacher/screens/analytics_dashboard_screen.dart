@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'attendance_screen.dart';
 
 class AnalyticsDashboardScreen extends StatefulWidget {
   final String schoolId;
@@ -20,7 +21,28 @@ class AnalyticsDashboardScreen extends StatefulWidget {
 }
 
 class _AnalyticsDashboardScreenState
-    extends State<AnalyticsDashboardScreen> {
+    extends State<AnalyticsDashboardScreen> with SingleTickerProviderStateMixin {
+
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   DateTime selectedMonth =
       DateTime(DateTime.now().year, DateTime.now().month);
@@ -88,109 +110,58 @@ class _AnalyticsDashboardScreenState
                   .where('className', isEqualTo: widget.className)
                   .where('section', isEqualTo: widget.section)
                   .snapshots(),
-              builder: (context, snapshot) {
 
+              builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                Map<String, List<Map<String, dynamic>>> groupedData = {};
-
-                for (var doc in snapshot.data!.docs) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final date = data['date'];
-
-                  groupedData.putIfAbsent(date, () => []);
-                  groupedData[date]!.add(data);
-                }
-
-                List<String> sortedDates = groupedData.keys.toList()
-                  ..sort((a, b) =>
-                      DateTime.parse(a).compareTo(DateTime.parse(b)));
-
-                List<BarChartGroupData> barGroups = [];
-                List<String> labels = [];
-
+                // Totals and chart data must be inside builder for UI updates
+                final docs = snapshot.data!.docs;
                 int totalPresent = 0;
                 int totalAbsent = 0;
                 int totalHoliday = 0;
-
-                int index = 0;
-
-                for (var date in sortedDates) {
-                  final d = DateTime.parse(date);
-
-                  if (d.month != selectedMonth.month ||
-                      d.year != selectedMonth.year) continue;
-
-                  if (d.weekday == DateTime.sunday) continue;
-
-                  final dayDocs = groupedData[date]!;
-
-                  int p = 0;
-                  int a = 0;
-                  bool isHoliday = false;
-
-                  for (var data in dayDocs) {
-                    if (data['isHoliday'] == true) {
-                      isHoliday = true;
-                      break;
-                    }
-                  }
-
-                  if (isHoliday) {
-                    totalHoliday++;
-                    continue;
-                  }
-
-                  for (var data in dayDocs) {
-                    final students =
-                        Map<String, dynamic>.from(data['students'] ?? {});
-
-                    students.forEach((key, value) {
-                      if (value == 'P' || value == true) p++;
-                      if (value == 'A' || value == false) a++;
-                    });
-                  }
-
+                Map<int, double> dailyPercent = {};
+                for (var doc in docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final dateStr = data['date'];
+                  if (dateStr == null) continue;
+                  final parsed = DateTime.tryParse(dateStr);
+                  if (parsed == null) continue;
+                  if (parsed.month != selectedMonth.month) continue;
+                  final students = Map<String, dynamic>.from(data['students'] ?? {});
+                  int p = students.values.where((e) => e == 'P').length;
+                  int a = students.values.where((e) => e == 'A').length;
+                  int h = students.values.where((e) => e == 'H').length;
                   totalPresent += p;
                   totalAbsent += a;
-
+                  totalHoliday += h;
                   int total = p + a;
-                  if (total == 0) continue;
+                  double percent = total == 0 ? 0 : (p / total) * 100;
+                  dailyPercent[parsed.day] = percent;
+                }
+                print("DATA COUNT: "+docs.length.toString());
+                print("DAILY MAP: $dailyPercent");
 
-                  double percent = (p / total) * 100;
+                double overall = dailyPercent.isEmpty
+                    ? 0
+                    : dailyPercent.values.reduce((a, b) => a + b) / dailyPercent.length;
+                print("OVERALL = $overall");
+                _controller.forward(from: 0);
 
-                  barGroups.add(
-                    BarChartGroupData(
-                      x: index,
-                      barRods: [
-                        BarChartRodData(
-                          toY: percent,
-                          color: Colors.blue,
-                          width: 14,
-                        ),
-                      ],
-                    ),
-                  );
-
-                  labels.add("${d.day}");
-                  index++;
+                if (dailyPercent.isEmpty) {
+                  return const Center(child: Text("No chart data"));
                 }
 
-                double overall =
-                    (totalPresent + totalAbsent) == 0
-                        ? 0
-                        : (totalPresent /
-                                (totalPresent + totalAbsent)) *
-                            100;
+                List<int> days = dailyPercent.keys.toList()..sort();
+                List<double> percents = days.map((d) => dailyPercent[d]!).toList();
 
                 return Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
 
-                      /// HEADER
+                      // HEADER with animation (🔥 NEW GRADIENT CONTAINER)
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -201,71 +172,155 @@ class _AnalyticsDashboardScreenState
                         ),
                         child: Column(
                           children: [
-                            Text(
-                              "${overall.toStringAsFixed(1)}%",
-                              style: const TextStyle(
-                                fontSize: 28,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                            /// 🔥 OVERALL %
+                            AnimatedBuilder(
+                              animation: _animation,
+                              builder: (_, __) {
+                                return Text(
+                                  "${(overall * _animation.value).toStringAsFixed(1)}%",
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                );
+                              },
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            /// 🔥 CHART with percent above bar, horizontal scroll, 7 bars visible, premium spacing (SAFE STRUCTURE)
+                            SizedBox(
+                              height: 220,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: List.generate(days.length, (i) {
+                                    final percent = percents[i];
+                                    final day = days[i];
+                                    final date = DateTime(selectedMonth.year, selectedMonth.month, day);
+                                    final isSunday = date.weekday == DateTime.sunday;
+                                    final isHoliday = percent == 0;
+                                    double displayPercent = percent;
+                                    if (isSunday || isHoliday) {
+                                      displayPercent = 100;
+                                    }
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(10),
+                                          onTap: () {
+                                            final selectedDate =
+                                                "${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => AttendanceScreen(
+                                                  className: widget.className,
+                                                  section: widget.section,
+                                                  schoolId: widget.schoolId,
+                                                  selectedDate: selectedDate,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              // % TEXT
+                                              Text(
+                                                "${percent.toStringAsFixed(0)}%",
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 9,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              // BAR
+                                              AnimatedBuilder(
+                                                animation: _animation,
+                                                builder: (context, child) {
+                                                  return Container(
+                                                    height: (displayPercent / 100) * 120 * _animation.value,
+                                                    width: 12,
+                                                    decoration: BoxDecoration(
+                                                      color: isSunday
+                                                          ? Colors.red
+                                                          : isHoliday
+                                                              ? Colors.orange
+                                                              : Colors.white,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                              const SizedBox(height: 6),
+                                              // DAY
+                                              Text(
+                                                "$day",
+                                                style: const TextStyle(color: Colors.white),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ),
                               ),
                             ),
-                            const Text("Overall Attendance",
-                                style:
-                                    TextStyle(color: Colors.white70)),
+
+                            const SizedBox(height: 20),
+
+                            /// 🔥 P A H as button style
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    "P: $totalPresent",
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    "A: $totalAbsent",
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    "H: $totalHoliday",
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
 
                       const SizedBox(height: 20),
 
-                      /// GRAPH
-                      SizedBox(
-                        height: 250,
-                        child: BarChart(
-                          BarChartData(
-                            maxY: 100,
-                            barGroups: barGroups,
-                            borderData: FlBorderData(show: false),
-                            gridData: FlGridData(show: true),
-                            titlesData: FlTitlesData(
-                              leftTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  interval: 20,
-                                  getTitlesWidget:
-                                      (value, meta) =>
-                                          Text("${value.toInt()}%"),
-                                ),
-                              ),
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  getTitlesWidget:
-                                      (value, meta) {
-                                    int i = value.toInt();
-                                    if (i >= labels.length)
-                                      return const SizedBox();
-                                    return Text(labels[i]);
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      /// STATS
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceAround,
-                        children: [
-                          _stat("P", totalPresent, Colors.green),
-                          _stat("A", totalAbsent, Colors.red),
-                          _stat("H", totalHoliday, Colors.orange),
-                        ],
-                      )
+                      // Optionally remove stats row if not needed
                     ],
                   ),
                 );
@@ -283,9 +338,10 @@ class _AnalyticsDashboardScreenState
         Text(
           "$value",
           style: TextStyle(
-              color: color,
-              fontSize: 20,
-              fontWeight: FontWeight.bold),
+            color: color,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         Text(label),
       ],
