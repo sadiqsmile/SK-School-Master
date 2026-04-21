@@ -345,11 +345,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   }
 
   Widget todayCard() {
-    final today =
-        DateTime.now().toIso8601String().split("T")[0];
-
-    final docId =
-        "${className}_${section}_$today";
+    final today = DateTime.now().toIso8601String().split("T")[0];
+    final docId = "${className}_${section}_$today";
 
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
@@ -362,55 +359,70 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         int p = 0;
         int a = 0;
 
-        String title = "Holiday";
-        Color titleColor = Colors.orange;
+        String title = "0%";
+        Color titleColor = textMain();
 
-        final isSunday =
-            DateTime.now().weekday ==
-                DateTime.sunday;
-
-        if (snap.hasData &&
-            snap.data!.exists) {
-          final data = snap.data!.data()
-              as Map<String, dynamic>;
-
-          final students =
-              Map<String, dynamic>.from(
-                  data["students"] ??
-                      {});
-
-          p = students.values
-              .where((e) => e == "P")
-              .length;
-
-          a = students.values
-              .where((e) => e == "A")
-              .length;
-
-          final total = p + a;
-
-          if (total > 0) {
-            final per =
-                ((p / total) * 100)
-                    .round();
-
-            title = "$per%";
-            titleColor =
-                textMain();
-          }
-        }
+        final isSunday = DateTime.now().weekday == DateTime.sunday;
 
         if (isSunday) {
           title = "Sunday";
           titleColor = Colors.yellow;
-          p = 0;
-          a = 0;
+        } else if (snap.hasData && snap.data!.exists) {
+          final data = snap.data!.data() as Map<String, dynamic>;
+
+          // If teacher manually selected holiday
+          if (data["isHoliday"] == true) {
+            title = "Holiday";
+            titleColor = Colors.orange;
+          } else {
+            final students = Map<String, dynamic>.from(data["students"] ?? {});
+
+            String normalize(dynamic v) => v.toString().toLowerCase().trim();
+
+            final values = students.values.map(normalize).toList();
+            final hasData = values.isNotEmpty;
+
+            final allHoliday = hasData &&
+                values.every((v) =>
+                    v.contains("leave") ||
+                    v.contains("holiday") ||
+                    v == "h");
+
+            if (allHoliday) {
+              title = "Holiday";
+              titleColor = Colors.orange;
+              p = 0;
+              a = 0;
+            } else {
+              p = values.where((v) =>
+                  v.contains("present") ||
+                  v == "p").length;
+
+              a = values.where((v) =>
+                  v.contains("absent") ||
+                  v == "a").length;
+
+              final total = p + a;
+
+              if (total > 0) {
+                final percent =
+                    ((p / total) * 100).round();
+
+                title = "$percent%";
+                titleColor = textMain();
+              } else {
+                title = "0%";
+              }
+            }
+          }
+        } else {
+          // No document yet
+          title = "0%";
         }
 
         return glass(
           child: Padding(
-            padding:
-                const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: Column(
               children: [
                 Text(
@@ -419,59 +431,21 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                     color: textSub(),
                   ),
                 ),
-                const SizedBox(
-                    height: 18),
-                TweenAnimationBuilder<
-                    double>(
-                  tween: Tween(
-                    begin: 0,
-                    end: double.tryParse(
-                          title.replaceAll(
-                              "%", ""),
-                        ) ??
-                        0,
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: titleColor,
                   ),
-                  duration:
-                      const Duration(
-                    milliseconds:
-                        800,
-                  ),
-                  builder: (context,
-                      value,
-                      child) {
-                    final t = title
-                            .contains("%")
-                        ? "${value.toInt()}%"
-                        : title;
-
-                    return Text(
-                      t,
-                      style:
-                          TextStyle(
-                        fontSize:
-                            36,
-                        fontWeight:
-                            FontWeight
-                                .bold,
-                        color:
-                            titleColor,
-                      ),
-                    );
-                  },
                 ),
-                const SizedBox(
-                    height: 18),
+                const SizedBox(height: 18),
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment
-                          .spaceEvenly,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    chip(
-                        "P: $p",
-                        Colors.green),
-                    chip(
-                        "A: $a",
-                        Colors.red),
+                    chip("P: $p", Colors.green),
+                    chip("A: $a", Colors.red),
                   ],
                 )
               ],
