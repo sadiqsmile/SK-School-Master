@@ -10,12 +10,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-
+import 'package:school_app/features/teacher/screens/crop_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_calendar_screen.dart';
 import 'package:school_app/features/teacher/screens/analytics_dashboard_screen.dart';
 import 'package:school_app/features/teacher/screens/student_history_screen.dart';
-import 'package:school_app/features/teacher/screens/crop_screen.dart';
+
+
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -26,6 +27,85 @@ class TeacherDashboard extends StatefulWidget {
 
 class _TeacherDashboardState extends State<TeacherDashboard> {
   final ImagePicker _picker = ImagePicker();
+
+  Future<void> pickImage() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
+    );
+
+    if (picked == null) return;
+
+    final bytes = await picked.readAsBytes();
+
+    final cropped = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CropScreen(
+          imageBytes: bytes,
+        ),
+      ),
+    );
+
+    if (cropped == null) return;
+
+    setState(() => isLoading = true);
+
+    try {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child("teacher_profiles")
+          .child("${user.uid}.jpg");
+
+      await ref.putData(
+        Uint8List.fromList(cropped),
+      );
+
+      final url =
+          await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance
+          .collection("schools")
+          .doc(schoolId)
+          .collection("teachers")
+          .doc(user.uid)
+          .set({
+        "photoUrl": url,
+      }, SetOptions(merge: true));
+
+      if (kIsWeb) {
+        setState(() {
+          webImage = cropped;
+        });
+      } else {
+        final dir =
+            await getTemporaryDirectory();
+
+        final file = File(
+            "${dir.path}/profile.jpg");
+
+        await file.writeAsBytes(
+            cropped);
+
+        setState(() {
+          image = file;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content:
+              Text("Error: $e"),
+        ),
+      );
+    }
+
+    setState(() => isLoading = false);
+  }
 
   String teacherName = "";
   String email = "";
@@ -86,128 +166,18 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     if (mounted) setState(() {});
   }
 
-  // ================= THEME =================
   bool get isDark {
     if (themeMode == "dark") return true;
     if (themeMode == "light") return false;
-    return DateTime.now().hour >= 18 ||
-        DateTime.now().hour < 6;
+    return DateTime.now().hour >= 18 || DateTime.now().hour < 6;
   }
 
-  List<Color> bgTheme() {
-    if (isDark) {
-      return [
-        const Color(0xFF050505),
-        const Color(0xFF121212),
-      ];
-    }
+  Color textMain() => isDark ? Colors.white : Colors.black87;
+  Color textSub() => isDark ? Colors.white70 : Colors.black54;
+  Color bg() => isDark ? const Color(0xFF0B0B0B) : const Color(0xFFF4F5F8);
 
-    return [
-      const Color(0xFFF7F8FC),
-      const Color(0xFFEDEFF7),
-    ];
-  }
-
-  Color textMain() =>
-      isDark ? Colors.white : Colors.black87;
-
-  Color textSub() =>
-      isDark ? Colors.white70 : Colors.black54;
-
-  // ================= IMAGE =================
-  Future<void> pickImage() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final picked =
-        await _picker.pickImage(source: ImageSource.gallery);
-
-    if (picked == null) return;
-
-    setState(() => isLoading = true);
-
-    final bytes = await picked.readAsBytes();
-
-    final cropped = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CropScreen(imageBytes: bytes),
-      ),
-    );
-
-    if (cropped == null) {
-      setState(() => isLoading = false);
-      return;
-    }
-
-    if (kIsWeb) {
-      webImage = cropped;
-      await uploadImage(cropped, user.uid);
-    } else {
-      final dir = await getTemporaryDirectory();
-
-      final temp = File("${dir.path}/temp.jpg");
-      await temp.writeAsBytes(cropped);
-
-      final compressed = await compressImage(temp);
-
-      image = compressed;
-
-      final uploadBytes =
-          await compressed.readAsBytes();
-
-      await uploadImage(uploadBytes, user.uid);
-    }
-
-    if (mounted) {
-      setState(() => isLoading = false);
-    }
-  }
-
-  Future<File> compressImage(File file) async {
-    final dir = await getTemporaryDirectory();
-
-    final path =
-        "${dir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg";
-
-    final result =
-        await FlutterImageCompress.compressAndGetFile(
-      file.absolute.path,
-      path,
-      quality: 70,
-      minWidth: 700,
-      minHeight: 700,
-    );
-
-    return result == null ? file : File(result.path);
-  }
-
-  Future<void> uploadImage(
-      Uint8List bytes, String uid) async {
-    final ref = FirebaseStorage.instance
-        .ref()
-        .child("teacher_profiles")
-        .child("$uid.jpg");
-
-    await ref.putData(bytes);
-
-    final url = await ref.getDownloadURL();
-
-    await FirebaseFirestore.instance
-        .collection("schools")
-        .doc(schoolId)
-        .collection("teachers")
-        .doc(uid)
-        .set(
-      {"photoUrl": url},
-      SetOptions(merge: true),
-    );
-  }
-
-  // ================= HELPERS =================
   String greet() {
     final h = DateTime.now().hour;
-
     if (h < 12) return "Good Morning 👋";
     if (h < 17) return "Good Afternoon ☀️";
     return "Good Evening 🌙";
@@ -215,51 +185,28 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
 
   String time12() {
     final now = DateTime.now();
-
     int h = now.hour;
-    final m =
-        now.minute.toString().padLeft(2, '0');
-
-    final suffix =
-        h >= 12 ? "PM" : "AM";
-
+    final m = now.minute.toString().padLeft(2, '0');
+    final suffix = h >= 12 ? "PM" : "AM";
     if (h == 0) h = 12;
     if (h > 12) h -= 12;
-
     return "$h:$m $suffix";
   }
 
-  // ================= UI =================
-  Widget glass({
-    required Widget child,
-  }) {
+  Widget glass({required Widget child}) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: 14,
-          sigmaY: 14,
-        ),
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           decoration: BoxDecoration(
             color: isDark
-                ? Colors.white.withOpacity(0.08)
+                ? Colors.white.withOpacity(0.07)
                 : Colors.white.withOpacity(0.80),
-            borderRadius:
-                BorderRadius.circular(26),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isDark
-                  ? Colors.white12
-                  : Colors.black12,
+              color: isDark ? Colors.white12 : Colors.black12,
             ),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-                color: Colors.black.withOpacity(
-                    isDark ? 0.20 : 0.06),
-              ),
-            ],
           ),
           child: child,
         ),
@@ -267,80 +214,139 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     );
   }
 
-  Widget chip(
-      String text,
-      Color color,
-      ) {
+  Widget chip(String text, Color color) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 8,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       decoration: BoxDecoration(
         color: color,
-        borderRadius:
-            BorderRadius.circular(25),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Text(
         text,
         style: const TextStyle(
           color: Colors.white,
-          fontWeight:
-              FontWeight.bold,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
   }
 
-  Widget menu(
-      IconData icon,
-      String title,
-      VoidCallback onTap,
-      ) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.95, end: 1),
-      duration:
-          const Duration(milliseconds: 400),
-      builder: (context, scale, child) {
-        return Transform.scale(
-          scale: scale,
-          child: child,
-        );
-      },
+  Widget menu(IconData icon, String title, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius:
-            BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: glass(
-          child: Container(
-            padding:
-                const EdgeInsets.all(18),
+          child: Center(
             child: Column(
-              mainAxisAlignment:
-                  MainAxisAlignment
-                      .center,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  icon,
-                  color: textMain(),
-                  size: 30,
-                ),
-                const SizedBox(
-                    height: 12),
+                Icon(icon, size: 30, color: textMain()),
+                const SizedBox(height: 12),
                 Text(
                   title,
                   style: TextStyle(
                     color: textMain(),
-                    fontWeight:
-                        FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
-                ),
+                )
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  void openAttendanceHub() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(28),
+            ),
+          ),
+          child: Wrap(
+            runSpacing: 12,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.check_circle),
+                title: const Text("Quick Attendance"),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AttendanceScreen(
+                        className: className,
+                        section: section,
+                        schoolId: schoolId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_month),
+                title: const Text("Calendar"),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AttendanceCalendarScreen(
+                        className: className,
+                        section: section,
+                        schoolId: schoolId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.bar_chart),
+                title: const Text("Analytics"),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AnalyticsDashboardScreen(
+                        className: className,
+                        section: section,
+                        schoolId: schoolId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.people),
+                title: const Text("Student History"),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StudentHistoryScreen(
+                        className: className,
+                        section: section,
+                        schoolId: schoolId,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -355,69 +361,45 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           .collection("attendance")
           .doc(docId)
           .snapshots(),
-      builder: (context, snap) {
+      builder: (_, snap) {
+        String title = "0%";
         int p = 0;
         int a = 0;
+        Color color = textMain();
 
-        String title = "0%";
-        Color titleColor = textMain();
-
-        final isSunday = DateTime.now().weekday == DateTime.sunday;
-
-        if (isSunday) {
+        if (DateTime.now().weekday == DateTime.sunday) {
           title = "Sunday";
-          titleColor = Colors.yellow;
+          color = Colors.orange;
         } else if (snap.hasData && snap.data!.exists) {
           final data = snap.data!.data() as Map<String, dynamic>;
+          final students =
+              Map<String, dynamic>.from(data["students"] ?? {});
 
-          // If teacher manually selected holiday
-          if (data["isHoliday"] == true) {
+          final vals = students.values
+              .map((e) => e.toString().toLowerCase())
+              .toList();
+
+          final holiday = vals.isNotEmpty &&
+              vals.every((v) =>
+                  v.contains("leave") ||
+                  v.contains("holiday") ||
+                  v == "h");
+
+          if (holiday) {
             title = "Holiday";
-            titleColor = Colors.orange;
+            color = Colors.orange;
           } else {
-            final students = Map<String, dynamic>.from(data["students"] ?? {});
+            p = vals.where((v) =>
+                v.contains("present") || v == "p").length;
 
-            String normalize(dynamic v) => v.toString().toLowerCase().trim();
+            a = vals.where((v) =>
+                v.contains("absent") || v == "a").length;
 
-            final values = students.values.map(normalize).toList();
-            final hasData = values.isNotEmpty;
-
-            final allHoliday = hasData &&
-                values.every((v) =>
-                    v.contains("leave") ||
-                    v.contains("holiday") ||
-                    v == "h");
-
-            if (allHoliday) {
-              title = "Holiday";
-              titleColor = Colors.orange;
-              p = 0;
-              a = 0;
-            } else {
-              p = values.where((v) =>
-                  v.contains("present") ||
-                  v == "p").length;
-
-              a = values.where((v) =>
-                  v.contains("absent") ||
-                  v == "a").length;
-
-              final total = p + a;
-
-              if (total > 0) {
-                final percent =
-                    ((p / total) * 100).round();
-
-                title = "$percent%";
-                titleColor = textMain();
-              } else {
-                title = "0%";
-              }
+            final total = p + a;
+            if (total > 0) {
+              title = "${((p / total) * 100).round()}%";
             }
           }
-        } else {
-          // No document yet
-          title = "0%";
         }
 
         return glass(
@@ -427,22 +409,21 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
               children: [
                 Text(
                   "Today's Attendance",
-                  style: TextStyle(
-                    color: textSub(),
-                  ),
+                  style: TextStyle(color: textSub()),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
                 Text(
                   title,
                   style: TextStyle(
                     fontSize: 36,
                     fontWeight: FontWeight.bold,
-                    color: titleColor,
+                    color: color,
                   ),
                 ),
                 const SizedBox(height: 18),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  mainAxisAlignment:
+                      MainAxisAlignment.spaceEvenly,
                   children: [
                     chip("P: $p", Colors.green),
                     chip("A: $a", Colors.red),
@@ -456,54 +437,52 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     );
   }
 
-  // ================= BUILD =================
   @override
   Widget build(BuildContext context) {
-    final user =
-        FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
-      backgroundColor:
-          bgTheme()[0],
+      backgroundColor: bg(),
 
       appBar: AppBar(
+        centerTitle: true,
         elevation: 0,
-        backgroundColor:
-            Colors.transparent,
-        title: Text(
-          "Dashboard",
-          style: TextStyle(
-            color: textMain(),
-            fontWeight:
-                FontWeight.bold,
+        backgroundColor: Colors.transparent,
+        title: ShaderMask(
+          shaderCallback: (bounds) =>
+              const LinearGradient(
+            colors: [
+              Color(0xFF6366F1),
+              Color(0xFF06B6D4),
+            ],
+          ).createShader(bounds),
+          child: const Text(
+            "SK School Master",
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
           ),
         ),
         actions: [
           PopupMenuButton<String>(
-            icon: Icon(
-              Icons.palette_outlined,
-              color: textMain(),
-            ),
+            icon: Icon(Icons.palette_outlined, color: textMain()),
             onSelected: (v) {
-              setState(() {
-                themeMode = v;
-              });
+              setState(() => themeMode = v);
             },
             itemBuilder: (_) => const [
               PopupMenuItem(
                 value: "light",
-                child:
-                    Text("☀️ Light"),
+                child: Text("☀️ Light"),
               ),
               PopupMenuItem(
                 value: "dark",
-                child:
-                    Text("🌙 Dark"),
+                child: Text("🌙 Dark"),
               ),
               PopupMenuItem(
                 value: "auto",
-                child:
-                    Text("🌈 Auto"),
+                child: Text("🌈 Auto"),
               ),
             ],
           ),
@@ -518,371 +497,196 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
       ),
 
       body: user == null
-          ? const Center(
-              child:
-                  Text("No User"))
+          ? const Center(child: Text("No User"))
           : SingleChildScrollView(
-              padding:
-                  const EdgeInsets.all(
-                      16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
                   Align(
-                    alignment:
-                        Alignment
-                            .centerLeft,
+                    alignment: Alignment.centerLeft,
                     child: Column(
                       crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                          CrossAxisAlignment.start,
                       children: [
                         Text(
                           greet(),
-                          style:
-                              TextStyle(
-                            color:
-                                textMain(),
-                            fontSize:
-                                28,
-                            fontWeight:
-                                FontWeight
-                                    .bold,
+                          style: TextStyle(
+                            color: textMain(),
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(
-                            height:
-                                4),
+                        const SizedBox(height: 4),
                         Text(
                           "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year} • ${time12()}",
-                          style:
-                              TextStyle(
-                            color:
-                                textSub(),
-                          ),
+                          style: TextStyle(color: textSub()),
                         ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(
-                      height: 18),
+                  const SizedBox(height: 18),
 
-                  // HEADER
-                  StreamBuilder<
-                      DocumentSnapshot>(
-                    stream:
-                        FirebaseFirestore
-                            .instance
-                            .collection(
-                                "schools")
-                            .doc(
-                                schoolId)
-                            .collection(
-                                "teachers")
-                            .doc(
-                                user.uid)
-                            .snapshots(),
-                    builder:
-                        (context,
-                            snap) {
-                      String? url;
+                  glass(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Row(
+                        children: [
+                          StreamBuilder<DocumentSnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection("schools")
+                                .doc(schoolId)
+                                .collection("teachers")
+                                .doc(user.uid)
+                                .snapshots(),
+                            builder: (context, snap) {
+                              String? url;
 
-                      if (snap.hasData &&
-                          snap.data!
-                              .exists) {
-                        final d = snap
-                                .data!
-                                .data()
-                            as Map<
-                                String,
-                                dynamic>?;
+                              if (snap.hasData && snap.data!.exists) {
+                                final data = snap.data!.data() as Map<String, dynamic>?;
+                                url = data?["photoUrl"];
+                              }
 
-                        url = d?[
-                            "photoUrl"];
-                      }
+                              ImageProvider? provider;
 
-                      ImageProvider?
-                          provider;
+                              if (webImage != null) {
+                                provider = MemoryImage(webImage!);
+                              } else if (image != null) {
+                                provider = FileImage(image!);
+                              } else if (url != null && url.isNotEmpty) {
+                                provider = NetworkImage(url);
+                              }
 
-                      if (webImage !=
-                          null) {
-                        provider =
-                            MemoryImage(
-                                webImage!);
-                      } else if (image !=
-                          null) {
-                        provider =
-                            FileImage(
-                                image!);
-                      } else if (url !=
-                          null) {
-                        provider =
-                            NetworkImage(
-                                url);
-                      }
-
-                      return glass(
-                        child:
-                            Padding(
-                          padding:
-                              const EdgeInsets.all(
-                                  18),
-                          child:
-                              Row(
-                            children: [
-                              GestureDetector(
-                                onTap:
-                                    pickImage,
-                                child:
-                                    CircleAvatar(
-                                  radius:
-                                      34,
-                                  backgroundColor:
-                                      Colors.white,
-                                  backgroundImage:
-                                      provider,
-                                  child: provider ==
-                                          null
+                              return GestureDetector(
+                                onTap: () => pickImage(),
+                                child: CircleAvatar(
+                                  radius: 32,
+                                  backgroundColor: Colors.white,
+                                  backgroundImage: provider,
+                                  child: provider == null
                                       ? const Icon(
-                                          Icons.person)
+                                          Icons.person,
+                                          color: Colors.grey,
+                                        )
                                       : null,
                                 ),
-                              ),
-                              const SizedBox(
-                                  width:
-                                      14),
-                              Expanded(
-                                child:
-                                    Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      teacherName,
-                                      style:
-                                          TextStyle(
-                                        color:
-                                            textMain(),
-                                        fontWeight:
-                                            FontWeight.bold,
-                                        fontSize:
-                                            22,
-                                      ),
-                                    ),
-                                    Text(
-                                      email,
-                                      style:
-                                          TextStyle(
-                                        color:
-                                            textSub(),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (isLoading)
-                                const CircularProgressIndicator()
-                            ],
+                              );
+                            },
                           ),
-                        ),
-                      );
-                    },
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  teacherName,
+                                  style: TextStyle(
+                                    color: textMain(),
+                                    fontSize: 22,
+                                    fontWeight:
+                                        FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  email,
+                                  style: TextStyle(
+                                    color: textSub(),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
 
-                  const SizedBox(
-                      height: 18),
+                  const SizedBox(height: 18),
 
                   todayCard(),
 
-                  const SizedBox(
-                      height: 18),
+                  const SizedBox(height: 18),
 
                   GridView.count(
-                    crossAxisCount:
-                        2,
-                    shrinkWrap:
-                        true,
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
                     physics:
                         const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing:
-                        14,
-                    mainAxisSpacing:
-                        14,
-                    childAspectRatio:
-                        1.10,
+                    crossAxisSpacing: 14,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: 1.12,
                     children: [
-                      menu(
-                        Icons.check,
-                        "Attendance",
-                            () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) =>
-                                      AttendanceScreen(
-                                className:
-                                    className,
-                                section:
-                                    section,
-                                schoolId:
-                                    schoolId,
-                              ),
+                      menu(Icons.check_circle,
+                          "Attendance", openAttendanceHub),
+                      menu(Icons.schedule,
+                          "Time Table", () {}),
+                      menu(Icons.edit_note,
+                          "Marks", () {}),
+                      menu(Icons.people,
+                          "Students", () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                StudentHistoryScreen(
+                              className: className,
+                              section: section,
+                              schoolId: schoolId,
                             ),
-                          );
-                        },
-                      ),
-                      menu(
-                        Icons.calendar_month,
-                        "Calendar",
-                            () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) =>
-                                      AttendanceCalendarScreen(
-                                className:
-                                    className,
-                                section:
-                                    section,
-                                schoolId:
-                                    schoolId,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      menu(
-                        Icons.bar_chart,
-                        "Analytics",
-                            () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) =>
-                                      AnalyticsDashboardScreen(
-                                className:
-                                    className,
-                                section:
-                                    section,
-                                schoolId:
-                                    schoolId,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      menu(
-                        Icons.people,
-                        "Students",
-                            () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) =>
-                                      StudentHistoryScreen(
-                                className:
-                                    className,
-                                section:
-                                    section,
-                                schoolId:
-                                    schoolId,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      }),
                     ],
                   ),
 
-                  const SizedBox(
-                      height: 120),
+                  const SizedBox(height: 120),
                 ],
               ),
             ),
 
       floatingActionButtonLocation:
-          FloatingActionButtonLocation
-              .endDocked,
+          FloatingActionButtonLocation.endFloat,
 
-      floatingActionButton:
-          FloatingActionButton(
-        backgroundColor:
-            const Color(
-                0xFF6366F1),
-        elevation: 8,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF6366F1),
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) =>
-                  AttendanceScreen(
-                className:
-                    className,
-                section:
-                    section,
-                schoolId:
-                    schoolId,
+              builder: (_) => AttendanceScreen(
+                className: className,
+                section: section,
+                schoolId: schoolId,
               ),
             ),
           );
         },
-        child: const Icon(
-          Icons.check,
-          color: Colors.white,
-        ),
+        child: const Icon(Icons.check),
       ),
 
-      bottomNavigationBar:
-          Container(
-        margin:
-            const EdgeInsets.all(
-                14),
+      bottomNavigationBar: Container(
+        margin: const EdgeInsets.all(14),
         padding:
-            const EdgeInsets.symmetric(
-                vertical:
-                    14),
-        decoration:
-            BoxDecoration(
+            const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
           color: isDark
-              ? const Color(
-                  0xFF1B1B1B)
+              ? const Color(0xFF1B1B1B)
               : Colors.white,
           borderRadius:
-              BorderRadius.circular(
-                  32),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 18,
-              color: Colors.black
-                  .withOpacity(
-                      0.08),
-            )
-          ],
+              BorderRadius.circular(32),
         ),
         child: Row(
           mainAxisAlignment:
-              MainAxisAlignment
-                  .spaceEvenly,
+              MainAxisAlignment.spaceEvenly,
           children: [
             Icon(Icons.home,
-                color: const Color(
-                    0xFF6366F1)),
-            Icon(
-              Icons.bar_chart,
-              color: textMain(),
-            ),
-            Icon(
-              Icons.calendar_today,
-              color: textMain(),
-            ),
-            Icon(
-              Icons.person_outline,
-              color: textMain(),
-            ),
+                color: const Color(0xFF6366F1)),
+            Icon(Icons.bar_chart, color: textMain()),
+            Icon(Icons.calendar_today,
+                color: textMain()),
+            Icon(Icons.person_outline,
+                color: textMain()),
           ],
         ),
       ),
