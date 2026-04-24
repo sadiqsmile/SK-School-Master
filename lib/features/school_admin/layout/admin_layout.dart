@@ -1,21 +1,19 @@
-// features/school_admin/layout/admin_layout.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:school_app/core/search/global_search_dialog.dart';
 import 'package:school_app/core/widgets/app_drawer.dart';
-import 'package:school_app/providers/core_providers.dart';
+import 'package:school_app/providers/current_school_provider.dart';
 
 class AdminLayout extends ConsumerWidget {
   const AdminLayout({
     super.key,
     required this.body,
-    this.title = 'Dashboard',
+    required this.title,
     this.actions,
     this.floatingActionButton,
     this.floatingActionButtonLocation,
-    this.enableTopbar = true,
   });
 
   final Widget body;
@@ -23,504 +21,447 @@ class AdminLayout extends ConsumerWidget {
   final List<Widget>? actions;
   final Widget? floatingActionButton;
   final FloatingActionButtonLocation? floatingActionButtonLocation;
-  final bool enableTopbar;
 
-  static const Color _bgColor = Color(0xFFF4F7FB);
-  static const Color _cardColor = Colors.white;
-  static const Color _textColor = Color(0xFF0F172A);
-  static const Color _subtleTextColor = Color(0xFF64748B);
-  static const Color _borderColor = Color(0xFFE2E8F0);
-
-  bool _isDesktop(double width) => width >= 1100;
-  bool _isTablet(double width) => width >= 700 && width < 1100;
-
-  _PageStyle _pageStyleForTitle(String title) {
-    switch (title) {
-      case 'Dashboard':
-        return const _PageStyle(
-          icon: Icons.space_dashboard_rounded,
-          startColor: Color(0xFF94A3B8),
-          endColor: Color(0xFF64748B),
-        );
-      case 'Teachers':
-        return const _PageStyle(
-          icon: Icons.badge_rounded,
-          startColor: Color(0xFF0EA5E9),
-          endColor: Color(0xFF06B6D4),
-        );
-      case 'Students':
-        return const _PageStyle(
-          icon: Icons.groups_rounded,
-          startColor: Color(0xFFEC4899),
-          endColor: Color(0xFF8B5CF6),
-        );
-      case 'Classes':
-        return const _PageStyle(
-          icon: Icons.meeting_room_rounded,
-          startColor: Color(0xFFF59E0B),
-          endColor: Color(0xFFF97316),
-        );
-      case 'Attendance':
-        return const _PageStyle(
-          icon: Icons.fact_check_rounded,
-          startColor: Color(0xFF10B981),
-          endColor: Color(0xFF22C55E),
-        );
-      case 'Homework':
-        return const _PageStyle(
-          icon: Icons.menu_book_rounded,
-          startColor: Color(0xFF6366F1),
-          endColor: Color(0xFF3B82F6),
-        );
-
-      case 'Fees':
-      case 'Fee Types':
-        return const _PageStyle(
-          icon: Icons.account_balance_wallet_rounded,
-          startColor: Color(0xFF14B8A6),
-          endColor: Color(0xFF06B6D4),
-        );
-
-      case 'Announcements':
-        return const _PageStyle(
-          icon: Icons.campaign_rounded,
-          startColor: Color(0xFFF97316),
-          endColor: Color(0xFFEF4444),
-        );
-      case 'Exam Types':
-        return const _PageStyle(
-          icon: Icons.quiz_rounded,
-          startColor: Color(0xFFEAB308),
-          endColor: Color(0xFFF59E0B),
-        );
-      case 'Marks Card Templates':
-        return const _PageStyle(
-          icon: Icons.description_rounded,
-          startColor: Color(0xFF64748B),
-          endColor: Color(0xFF475569),
-        );
-      case 'Reports':
-        return const _PageStyle(
-          icon: Icons.insert_chart_rounded,
-          startColor: Color(0xFF06B6D4),
-          endColor: Color(0xFF2563EB),
-        );
-      case 'Analytics':
-        return const _PageStyle(
-          icon: Icons.analytics_rounded,
-          startColor: Color(0xFF8B5CF6),
-          endColor: Color(0xFF6366F1),
-        );
-      case 'Module Control':
-        return const _PageStyle(
-          icon: Icons.tune_rounded,
-          startColor: Color(0xFF475569),
-          endColor: Color(0xFF334155),
-        );
-      case 'Promote Students':
-        return const _PageStyle(
-          icon: Icons.trending_up_rounded,
-          startColor: Color(0xFF22C55E),
-          endColor: Color(0xFF16A34A),
-        );
-      default:
-        return const _PageStyle(
-          icon: Icons.circle_rounded,
-          startColor: Color(0xFF94A3B8),
-          endColor: Color(0xFF64748B),
-        );
-    }
-  }
+  static const bg = Color(0xFFF5F7FB);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.of(context).size.width;
-    final isDesktop = _isDesktop(width);
-    final isTablet = _isTablet(width);
-    final pageStyle = _pageStyleForTitle(title);
+    final desktop = width >= 1100;
+    final mobile = width < 700;
 
-    final content = Container(
-      color: _bgColor,
-      child: Column(
-        children: [
-          if (enableTopbar)
-            _TopBar(
-              title: title,
-              pageStyle: pageStyle,
-              actions: actions,
-              isDesktop: isDesktop,
-              onSearch: () => GlobalSearchDialog.open(context),
-              onNotifications: () => context.go('/school-admin/notifications'),
-              onLogout: () async {
-                await ref.read(authServiceProvider).signOut();
-                if (context.mounted) context.go('/');
-              },
-            ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: isDesktop
-                      ? 1480
-                      : (isTablet ? 1100 : double.infinity),
-                ),
+    final schoolAsync = ref.watch(currentSchoolProvider);
+
+    return schoolAsync.when(
+      data: (school) {
+        final data = school.data() ?? {};
+
+        final schoolName =
+            (data['name'] ?? 'School').toString();
+
+        final logo =
+            (data['logo'] ?? '').toString();
+
+        final email =
+            (data['email'] ?? '').toString();
+
+        final page = _pageData(title);
+
+        final bodyWidget = Container(
+          color: bg,
+          child: Column(
+            children: [
+              mobile
+                  ? _MobileHeader(
+                      schoolName: schoolName,
+                      email: email,
+                      logo: logo,
+                      page: page,
+                    )
+                  : _TopBar(page: page),
+              Expanded(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isDesktop ? 20 : 14,
-                    vertical: isDesktop ? 20 : 14,
-                  ),
+                  padding: const EdgeInsets.all(16),
                   child: body,
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
 
-    if (isDesktop) {
-      return Scaffold(
-        backgroundColor: _bgColor,
-        body: Row(
-          children: [
-            Container(
-              width: 248,
-              decoration: const BoxDecoration(
-                color: _cardColor,
-                border: Border(right: BorderSide(color: _borderColor)),
-              ),
-              child: const SafeArea(child: AppDrawer()),
-            ),
-            Expanded(child: content),
-          ],
-        ),
-        floatingActionButton: floatingActionButton,
-        floatingActionButtonLocation: floatingActionButtonLocation,
-      );
-    }
-
-    final isDashboard = title == 'Dashboard';
-
-    return Scaffold(
-      backgroundColor: _bgColor,
-      drawer: isDashboard ? const AppDrawer() : null,
-      drawerEdgeDragWidth: 24,
-      appBar: enableTopbar
-          ? AppBar(
-              toolbarHeight: 66,
-              elevation: 0,
-              scrolledUnderElevation: 0,
-              backgroundColor: _cardColor,
-              surfaceTintColor: _cardColor,
-              automaticallyImplyLeading: false,
-              leadingWidth: 52,
-              leading: isDashboard
-                  ? Builder(
-                      builder: (context) => IconButton(
-                        tooltip: 'Menu',
-                        onPressed: () => Scaffold.of(context).openDrawer(),
-                        icon: const Icon(
-                          Icons.menu_rounded,
-                          color: _textColor,
-                          size: 22,
-                        ),
-                      ),
-                    )
-                  : IconButton(
-                      tooltip: 'Back',
-                      onPressed: () => context.go('/school-admin'),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: _textColor,
-                        size: 20,
-                      ),
-                    ),
-              titleSpacing: 4,
-              title: Row(
-                children: [
-                  if (!isDashboard) ...[
-                    _TitleIcon(style: pageStyle),
-                    const SizedBox(width: 10),
-                  ],
-                  Expanded(
-                    child: Text(
-                      isDashboard ? 'Dashboard' : title,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: _textColor,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 18,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
+        if (desktop) {
+          return Scaffold(
+            body: Row(
+              children: [
+                SizedBox(
+                  width: 250,
+                  child: _SidebarWrapper(
+                    schoolName: schoolName,
+                    email: email,
+                    logo: logo,
                   ),
-                ],
-              ),
-              actions: isDashboard
-                  ? [
-                      if (actions != null) ...actions!,
-                      IconButton(
-                        tooltip: 'Search',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => GlobalSearchDialog.open(context),
-                        icon: const Icon(
-                          Icons.search_rounded,
-                          color: _textColor,
-                          size: 21,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Notifications',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () =>
-                            context.go('/school-admin/notifications'),
-                        icon: const Icon(
-                          Icons.notifications_none_rounded,
-                          color: _textColor,
-                          size: 21,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: PopupMenuButton<String>(
-                          tooltip: 'Profile',
-                          icon: const Icon(
-                            Icons.account_circle_outlined,
-                            color: _textColor,
-                            size: 22,
-                          ),
-                          onSelected: (v) async {
-                            if (v == 'logout') {
-                              await ref.read(authServiceProvider).signOut();
-                              if (context.mounted) context.go('/');
-                            }
-                          },
-                          itemBuilder: (context) => const [
-                            PopupMenuItem(
-                              value: 'logout',
-                              child: Text('Logout'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ]
-                  : null,
-            )
-          : null,
-      body: content,
-      floatingActionButton: floatingActionButton,
-      floatingActionButtonLocation: floatingActionButtonLocation,
+                ),
+                Expanded(child: bodyWidget),
+              ],
+            ),
+            floatingActionButton: floatingActionButton,
+            floatingActionButtonLocation:
+                floatingActionButtonLocation,
+          );
+        }
+
+        return Scaffold(
+          drawer: const AppDrawer(),
+          body: SafeArea(child: bodyWidget),
+          floatingActionButton: floatingActionButton,
+          floatingActionButtonLocation:
+              floatingActionButtonLocation,
+        );
+      },
+      loading: () => const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (e, _) => Scaffold(
+        body: Center(child: Text('$e')),
+      ),
     );
   }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.title,
-    required this.pageStyle,
-    required this.actions,
-    required this.isDesktop,
-    required this.onSearch,
-    required this.onNotifications,
-    required this.onLogout,
+class _SidebarWrapper extends StatelessWidget {
+  const _SidebarWrapper({
+    required this.schoolName,
+    required this.email,
+    required this.logo,
   });
 
-  final String title;
-  final _PageStyle pageStyle;
-  final List<Widget>? actions;
-  final bool isDesktop;
-  final VoidCallback onSearch;
-  final VoidCallback onNotifications;
-  final Future<void> Function() onLogout;
-
-  static const Color _cardColor = Colors.white;
-  static const Color _textColor = Color(0xFF0F172A);
-  static const Color _subtleTextColor = Color(0xFF64748B);
-  static const Color _borderColor = Color(0xFFE2E8F0);
+  final String schoolName;
+  final String email;
+  final String logo;
 
   @override
   Widget build(BuildContext context) {
-    final isDashboard = title == 'Dashboard';
-
     return Container(
-      height: 74,
-      padding: const EdgeInsets.symmetric(horizontal: 22),
-      decoration: const BoxDecoration(
-        color: _cardColor,
-        border: Border(bottom: BorderSide(color: _borderColor)),
-      ),
-      child: Row(
+      color: Colors.white,
+      child: Column(
         children: [
-          Expanded(
+          Container(
+            padding: const EdgeInsets.all(14),
             child: Row(
               children: [
-                if (!isDashboard) ...[
-                  _TitleIcon(style: pageStyle),
-                  const SizedBox(width: 12),
-                ],
+                CircleAvatar(
+                  radius: 22,
+                  backgroundImage: logo.isNotEmpty
+                      ? NetworkImage(logo)
+                      : null,
+                  child: logo.isEmpty
+                      ? const Icon(Icons.school)
+                      : null,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
                       Text(
-                        title,
+                        schoolName,
+                        maxLines: 1,
+                        overflow:
+                            TextOverflow.ellipsis,
                         style: const TextStyle(
-                          color: _textColor,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 17,
+                          fontWeight:
+                              FontWeight.w700,
                         ),
                       ),
-                      if (isDesktop)
-                        const Text(
-                          'Manage your school operations from one place',
-                          style: TextStyle(
-                            color: _subtleTextColor,
-                            fontSize: 12,
-                          ),
+                      Text(
+                        email,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
                         ),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          if (actions != null) ...actions!,
-          _TopbarIconButton(
-            tooltip: 'Search',
-            icon: Icons.search_rounded,
-            onTap: onSearch,
-          ),
-          const SizedBox(width: 8),
-          _TopbarIconButton(
-            tooltip: 'Notifications',
-            icon: Icons.notifications_none_rounded,
-            onTap: onNotifications,
-          ),
-          const SizedBox(width: 12),
-          PopupMenuButton<String>(
-            tooltip: 'Profile',
-            offset: const Offset(0, 42),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            onSelected: (v) async {
-              if (v == 'logout') {
-                await onLogout();
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'logout', child: Text('Logout')),
-            ],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _borderColor),
-              ),
-              child: const Row(
-                children: [
-                  Icon(
-                    Icons.account_circle_outlined,
-                    color: _textColor,
-                    size: 20,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Admin',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: _subtleTextColor,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const Divider(height: 1),
+          const Expanded(child: AppDrawer()),
         ],
       ),
     );
   }
 }
 
-class _TitleIcon extends StatelessWidget {
-  const _TitleIcon({required this.style});
+class _TopBar extends StatelessWidget {
+  const _TopBar({
+    required this.page,
+  });
 
-  final _PageStyle style;
+  final _PageMeta page;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        gradient: LinearGradient(colors: [style.startColor, style.endColor]),
-        boxShadow: [
-          BoxShadow(
-            color: style.startColor.withOpacity(0.22),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+      height: 72,
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: page.color,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              page.icon,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          Text(
+            page.label,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF111827),
+            ),
+          ),
+
+          const Spacer(),
+
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.search),
+          ),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.notifications_none),
           ),
         ],
       ),
-      child: Icon(style.icon, color: Colors.white, size: 18),
     );
   }
 }
 
-class _TopbarIconButton extends StatelessWidget {
-  const _TopbarIconButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onTap,
+class _MobileHeader extends StatelessWidget {
+  const _MobileHeader({
+    required this.schoolName,
+    required this.email,
+    required this.logo,
+    required this.page,
   });
 
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  static const Color _borderColor = Color(0xFFE2E8F0);
-  static const Color _textColor = Color(0xFF0F172A);
+  final String schoolName;
+  final String email;
+  final String logo;
+  final _PageMeta page;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Ink(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _borderColor),
+    return Container(
+      color: Colors.white,
+      padding:
+          const EdgeInsets.fromLTRB(
+        12,
+        12,
+        12,
+        12,
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundImage: logo.isNotEmpty
+                    ? NetworkImage(logo)
+                    : null,
+                child: logo.isEmpty
+                    ? const Icon(Icons.school)
+                    : null,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Column(
+                  children: [
+                    Text(
+                      schoolName,
+                      maxLines: 1,
+                      overflow:
+                          TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight:
+                            FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      email,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          child: Icon(icon, color: _textColor, size: 20),
-        ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Builder(
+                builder: (context) =>
+                    IconButton(
+                  onPressed: () =>
+                      Scaffold.of(context)
+                          .openDrawer(),
+                  icon:
+                      const Icon(Icons.menu),
+                ),
+              ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: page.color,
+                  borderRadius:
+                      BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  page.icon,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  page.label,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight:
+                        FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () =>
+                    GlobalSearchDialog.open(
+                        context),
+                icon:
+                    const Icon(Icons.search),
+              ),
+              IconButton(
+                onPressed: () {},
+                icon: const Icon(
+                  Icons.notifications_none,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _PageStyle {
-  const _PageStyle({
-    required this.icon,
-    required this.startColor,
-    required this.endColor,
-  });
-
+class _PageMeta {
   final IconData icon;
-  final Color startColor;
-  final Color endColor;
+  final Color color;
+  final String label;
+
+  const _PageMeta(
+    this.icon,
+    this.color,
+    this.label,
+  );
+}
+
+_PageMeta _pageData(String title) {
+  final t = title.toLowerCase();
+
+  if (t.contains('dashboard')) {
+    return const _PageMeta(
+      Icons.dashboard_customize_rounded,
+      Color(0xFF3B82F6),
+      'Dashboard',
+    );
+  }
+
+  if (t.contains('teacher')) {
+    return const _PageMeta(
+      Icons.badge_rounded,
+      Color(0xFF0EA5E9),
+      'Teachers',
+    );
+  }
+
+  if (t.contains('student')) {
+    return const _PageMeta(
+      Icons.groups_rounded,
+      Color(0xFF8B5CF6),
+      'Students',
+    );
+  }
+
+  if (t.contains('class')) {
+    return const _PageMeta(
+      Icons.meeting_room_rounded,
+      Color(0xFFF59E0B),
+      'Classes',
+    );
+  }
+
+  if (t.contains('attendance')) {
+    return const _PageMeta(
+      Icons.fact_check_rounded,
+      Color(0xFF22C55E),
+      'Attendance',
+    );
+  }
+
+  if (t.contains('homework')) {
+    return const _PageMeta(
+      Icons.menu_book_rounded,
+      Color(0xFF6366F1),
+      'Homework',
+    );
+  }
+
+  if (t.contains('fee')) {
+    return const _PageMeta(
+      Icons.account_balance_wallet_rounded,
+      Color(0xFF06B6D4),
+      'Fees',
+    );
+  }
+
+  if (t.contains('announcement')) {
+    return const _PageMeta(
+      Icons.campaign_rounded,
+      Color(0xFFEF4444),
+      'Announcements',
+    );
+  }
+
+  if (t.contains('exam')) {
+    return const _PageMeta(
+      Icons.quiz_rounded,
+      Color(0xFFEAB308),
+      'Exam Types',
+    );
+  }
+
+  if (t.contains('report')) {
+    return const _PageMeta(
+      Icons.insert_chart_rounded,
+      Color(0xFF2563EB),
+      'Reports',
+    );
+  }
+
+  if (t.contains('analytic')) {
+    return const _PageMeta(
+      Icons.analytics_rounded,
+      Color(0xFF7C3AED),
+      'Analytics',
+    );
+  }
+
+  return const _PageMeta(
+    Icons.grid_view_rounded,
+    Color(0xFF3B82F6),
+    'Dashboard',
+  );
 }
