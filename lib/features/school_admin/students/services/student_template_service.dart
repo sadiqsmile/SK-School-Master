@@ -102,7 +102,7 @@ class StudentTemplateService {
       sheet.getRangeByIndex(r + 2, 3).setText((row['className'] ?? '').toString());
       sheet.getRangeByIndex(r + 2, 4).setText((row['section'] ?? '').toString());
       sheet.getRangeByIndex(r + 2, 5).setText((row['type'] ?? '').toString());
-      sheet.getRangeByIndex(r + 2, 6).setText((row['dob'] ?? '').toString());
+     sheet.getRangeByIndex(r + 2, 6).setText( _formatDob(row['dob']),);
       sheet.getRangeByIndex(r + 2, 7).setText((row['gender'] ?? '').toString());
       sheet.getRangeByIndex(r + 2, 8).setText((row['bloodGroup'] ?? '').toString());
       sheet.getRangeByIndex(r + 2, 9).setText((row['mess'] ?? '').toString());
@@ -124,4 +124,21 @@ class StudentTemplateService {
       'students_export.xlsx',
     );
   }
+
+static String _formatDob(dynamic value) {
+  if (value == null) return '';
+
+  final raw = value.toString().trim();
+
+  try {
+    final dt = DateTime.parse(raw);
+
+    return "${dt.day.toString().padLeft(2, '0')}-"
+        "${dt.month.toString().padLeft(2, '0')}-"
+        "${dt.year}";
+  } catch (_) {
+    return raw;
+  }
+}
+
 }

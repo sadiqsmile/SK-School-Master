@@ -144,21 +144,31 @@ final appRouter = GoRouter(
         child: MaintenanceScreen(),
       ),
     ),
+    
+    
     GoRoute(
       path: '/school-admin',
-      builder: (context, state) => const RoleGuard(
-        title: 'School Admin',
-        allowedRoles: [UserRole.admin],
-        child: SchoolAdminDashboard(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'School Admin',
+          allowedRoles: [UserRole.admin],
+          child: SchoolAdminDashboard(),
+        ),
       ),
     ),
+
+
+
+    
     GoRoute(
       path: '/school-admin/teachers',
-      builder: (context, state) => const RoleGuard(
-        title: 'Teachers',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.teachers],
-        child: TeachersScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Teachers',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.teachers],
+          child: TeachersScreen(),
+        ),
       ),
     ),
     GoRoute(
@@ -172,11 +182,13 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/school-admin/students',
-      builder: (context, state) => const RoleGuard(
-        title: 'Students',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.students],
-        child: StudentsScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Students',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.students],
+          child: StudentsScreen(),
+        ),
       ),
     ),
     GoRoute(
@@ -190,11 +202,13 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/school-admin/classes',
-      builder: (context, state) => const RoleGuard(
-        title: 'Classes',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.students],
-        child: ClassesScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Classes',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.students],
+          child: ClassesScreen(),
+        ),
       ),
     ),
     GoRoute(
@@ -230,38 +244,46 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/school-admin/attendance',
-      builder: (context, state) => const RoleGuard(
-        title: 'Attendance',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.attendance],
-        child: AttendanceScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Attendance',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.attendance],
+          child: AttendanceScreen(),
+        ),
       ),
     ),
     GoRoute(
       path: '/school-admin/homework',
-      builder: (context, state) => const RoleGuard(
-        title: 'Homework',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.homework],
-        child: HomeworkScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Homework',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.homework],
+          child: HomeworkScreen(),
+        ),
       ),
     ),
     GoRoute(
       path: '/school-admin/fees',
-      builder: (context, state) => const RoleGuard(
-        title: 'Fees',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.fees],
-        child: FeesScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Fees',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.fees],
+          child: FeesScreen(),
+        ),
       ),
     ),
     GoRoute(
       path: '/school-admin/announcements',
-      builder: (context, state) => const RoleGuard(
-        title: 'Announcements',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.messages],
-        child: AnnouncementsScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Announcements',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.messages],
+          child: AnnouncementsScreen(),
+        ),
       ),
     ),
     GoRoute(

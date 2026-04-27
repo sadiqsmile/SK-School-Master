@@ -38,8 +38,10 @@ class StudentImportService {
   "name": row[1]?.value?.toString() ?? "",
   "className": row[2]?.value?.toString() ?? "",
   "section": row[3]?.value?.toString() ?? "",
-  "dayHostel": row[4]?.value?.toString() ?? "",
-  "dob": row[5]?.value?.toString() ?? "",
+  
+ "type": row[4]?.value?.toString().trim() ?? "",
+"dob": _formatExcelDate(row[5]?.value),
+
   "gender": row[6]?.value?.toString() ?? "",
   "bloodGroup": row[7]?.value?.toString() ?? "",
   "mess": row[8]?.value?.toString() ?? "",
@@ -56,4 +58,24 @@ class StudentImportService {
 
     return rows;
   }
+
+static String _formatExcelDate(dynamic value) {
+  if (value == null) return '';
+
+  final raw = value.toString().trim();
+
+  final number = double.tryParse(raw);
+
+  if (number != null) {
+    final date = DateTime(1899, 12, 30)
+        .add(Duration(days: number.toInt()));
+
+    return "${date.day.toString().padLeft(2, '0')}-"
+        "${date.month.toString().padLeft(2, '0')}-"
+        "${date.year}";
+  }
+
+  return raw;
+}
+
 }
