@@ -251,4 +251,55 @@ class StudentService {
 
     return normalized;
   }
+
+  // ==========================================================
+  // ONE-TIME DATA MIGRATION
+  // Fixes old boolean-format records (hostel: true, bus: true)
+  // to the current string-format (type:'hostel', mess:'yes', transport:'no')
+  // Safe to run multiple times – only updates docs that need it.
+  // ==========================================================
+  Future<int> migrateOldStudentData({required String schoolId}) async {
+    final ref = _db
+        .collection('schools')
+        .doc(schoolId)
+        .collection('students');
+
+    final snapshot = await ref.get();
+    int fixed = 0;
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final updates = <String, dynamic>{};
+
+      final hostelBool = data['hostel'];
+      final busBool = data['bus'];
+
+      // Only migrate docs that still use the old boolean fields
+      if (hostelBool == true) {
+        updates['type'] = 'hostel';
+        updates['mess'] = 'yes';
+        updates['transport'] = 'no'; // hostel students don't take bus
+        updates['hostel'] = FieldValue.delete(); // remove legacy field
+        if (busBool != null) updates['bus'] = FieldValue.delete();
+      } else if (hostelBool == false) {
+        // Day scholar with old boolean fields
+        updates['type'] = 'day';
+        updates['hostel'] = FieldValue.delete();
+        // Preserve bus value, convert to string
+        if (busBool == true) {
+          updates['transport'] = 'yes';
+        } else if (busBool == false) {
+          updates['transport'] = 'no';
+        }
+        if (busBool != null) updates['bus'] = FieldValue.delete();
+      }
+
+      if (updates.isNotEmpty) {
+        await doc.reference.update(updates);
+        fixed++;
+      }
+    }
+
+    return fixed; // returns count of updated docs
+  }
 }

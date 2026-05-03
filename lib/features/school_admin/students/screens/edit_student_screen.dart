@@ -25,17 +25,35 @@ class _EditStudentScreenState extends ConsumerState<EditStudentScreen> {
   late TextEditingController parentNameController;
   late TextEditingController parentPhoneController;
 
+  late bool isHostel;
+  late bool isMess;
+  late bool isBus;
+
   @override
   void initState() {
     super.initState();
 
     nameController = TextEditingController(text: widget.data['name'] ?? '');
-
     parentNameController =
         TextEditingController(text: widget.data['parentName'] ?? '');
-
     parentPhoneController =
         TextEditingController(text: widget.data['parentPhone'] ?? '');
+
+    final hostelVal = (widget.data['type'] ?? widget.data['residence'] ?? '')
+        .toString().trim().toLowerCase();
+    isHostel = hostelVal == 'hostel' || hostelVal == 'h';
+
+    final messVal = (widget.data['mess'] ?? '').toString().trim().toLowerCase();
+    isMess = messVal == 'yes' || messVal == 'y' || messVal == '1' || messVal == 'true';
+
+    final transVal = (widget.data['transport'] ?? '').toString().trim().toLowerCase();
+    isBus = transVal == 'yes' || transVal == 'y' || transVal == '1' || transVal == 'true';
+
+    // Enforce rule on load: if hostel, mess must be true and bus false
+    if (isHostel) {
+      isMess = true;
+      isBus = false;
+    }
   }
 
   @override
@@ -71,6 +89,47 @@ class _EditStudentScreenState extends ConsumerState<EditStudentScreen> {
                 ),
                 keyboardType: TextInputType.phone,
               ),
+              const SizedBox(height: 16),
+
+              // ── Hostel / Mess / Bus ──────────────────────────────
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Column(
+                    children: [
+                      CheckboxListTile(
+                        title: const Text('Hostel'),
+                        value: isHostel,
+                        onChanged: (v) {
+                          setState(() {
+                            isHostel = v!;
+                            if (isHostel) {
+                              isMess = true;
+                              isBus = false;
+                            }
+                          });
+                        },
+                      ),
+                      CheckboxListTile(
+                        title: const Text('Mess'),
+                        value: isMess,
+                        onChanged: isHostel
+                            ? null
+                            : (v) => setState(() => isMess = v!),
+                      ),
+                      CheckboxListTile(
+                        title: const Text('Bus / Transport'),
+                        value: isBus,
+                        onChanged: isHostel
+                            ? null
+                            : (v) => setState(() => isBus = v!),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _updateStudent,
@@ -98,6 +157,9 @@ class _EditStudentScreenState extends ConsumerState<EditStudentScreen> {
         'name': nameController.text.trim(),
         'parentName': parentNameController.text.trim(),
         'parentPhone': parentPhoneController.text.trim(),
+        'type': isHostel ? 'hostel' : 'day',
+        'mess': (isHostel ? true : isMess) ? 'yes' : 'no',
+        'transport': (isHostel ? false : isBus) ? 'yes' : 'no',
       });
 
       if (!context.mounted) return;

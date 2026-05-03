@@ -27,6 +27,10 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
   List<String> sections = [];
   String? selectedSection;
 
+  bool isHostel = false;
+  bool isMess = false;
+  bool isBus = false;
+
   bool _isSaving = false;
 
   @override
@@ -79,6 +83,9 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
           'classKey': "${selectedClassName!.trim()}_${selectedSection!.trim()}",
           if (parentName.isNotEmpty) 'parentName': parentName,
           if (parentPhone.isNotEmpty) 'parentPhone': parentPhone,
+          'type': isHostel ? 'hostel' : 'day',
+          'mess': (isHostel ? true : isMess) ? 'yes' : 'no',
+          'transport': (isHostel ? false : isBus) ? 'yes' : 'no',
         },
       );
 
@@ -199,6 +206,47 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
                   keyboardType: TextInputType.phone,
                   decoration:
                       const InputDecoration(labelText: 'Parent Phone'),
+                ),
+
+                const SizedBox(height: 16),
+
+                // ── Hostel / Mess / Bus ──────────────────────────────
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Column(
+                      children: [
+                        CheckboxListTile(
+                          title: const Text('Hostel'),
+                          value: isHostel,
+                          onChanged: (v) {
+                            setState(() {
+                              isHostel = v!;
+                              if (isHostel) {
+                                isMess = true;
+                                isBus = false;
+                              }
+                            });
+                          },
+                        ),
+                        CheckboxListTile(
+                          title: const Text('Mess'),
+                          value: isMess,
+                          onChanged: isHostel
+                              ? null
+                              : (v) => setState(() => isMess = v!),
+                        ),
+                        CheckboxListTile(
+                          title: const Text('Bus / Transport'),
+                          value: isBus,
+                          onChanged: isHostel
+                              ? null
+                              : (v) => setState(() => isBus = v!),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 20),

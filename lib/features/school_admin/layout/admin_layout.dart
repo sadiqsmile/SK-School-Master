@@ -11,6 +11,7 @@ class AdminLayout extends ConsumerWidget {
   final Widget? body;
   final Widget? child;
   final Widget? floatingActionButton;
+  final VoidCallback? onSettingsPressed;
 
   const AdminLayout({
     super.key,
@@ -18,6 +19,7 @@ class AdminLayout extends ConsumerWidget {
     this.body,
     this.child,
     this.floatingActionButton,
+    this.onSettingsPressed,
   });
 
   @override
@@ -212,18 +214,35 @@ Widget _webTopHeader(WidgetRef ref) {
         const SizedBox(width: 10),
         _iconBtn(Icons.notifications_none_rounded),
         const SizedBox(width: 12),
-        const CircleAvatar(
-          radius: 16,
-          backgroundColor: Color(0xFFE0ECFF),
-          child: Text(
-            'AD',
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFF2563EB),
-              fontWeight: FontWeight.w600,
+        if (onSettingsPressed != null)
+          Container(
+            height: 40,
+            width: 40,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.settings_outlined, size: 20, color: Color(0xFF374151)),
+              onPressed: onSettingsPressed,
+              tooltip: 'Settings',
+              padding: EdgeInsets.zero,
+            ),
+          )
+        else
+          const CircleAvatar(
+            radius: 16,
+            backgroundColor: Color(0xFFE0ECFF),
+            child: Text(
+              'AD',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF2563EB),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-        ),
       ],
     ),
   );

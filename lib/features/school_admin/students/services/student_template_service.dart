@@ -64,6 +64,7 @@ class StudentTemplateService {
 
   static Future<void> exportStudentsExcel({
     required List<Map<String, dynamic>> studentsData,
+    String fileName = 'Students',
   }) async {
     final workbook = xls.Workbook();
     final sheet = workbook.worksheets[0];
@@ -121,8 +122,96 @@ class StudentTemplateService {
 
     await saveExcelFile(
       bytes,
-      'students_export.xlsx',
+      '$fileName.xlsx',
     );
+  }
+
+  static const _colWidths = {
+    'SL NO': 6.0,
+    'Name': 25.0,
+    'Class': 8.0,
+    'Section': 10.0,
+    'Hostel/Day': 14.0,
+    'D.O.B': 15.0,
+    'Blood Group': 14.0,
+    'Mess': 10.0,
+    'Transport': 12.0,
+    'Gender': 10.0,
+    'Parent Name': 25.0,
+    'Parent Phone': 18.0,
+    'Address': 20.0,
+    'Academic Year': 16.0,
+    'Admission No': 18.0,
+  };
+
+  static const _centerCols = {
+    'SL NO', 'Class', 'Section', 'Hostel/Day', 'Mess', 'Transport', 'Gender',
+  };
+
+  static Future<void> exportCustomExcel({
+    required List<String> headers,
+    required List<List<dynamic>> rows,
+    required String fileName,
+    String title = '',
+  }) async {
+    final workbook = xls.Workbook();
+    final sheet = workbook.worksheets[0];
+    final colCount = headers.length;
+
+    // ── Row 1: merged title (when provided) ──────────────────────────
+    final int headerRow = title.isNotEmpty ? 2 : 1;
+    if (title.isNotEmpty) {
+      sheet.getRangeByIndex(1, 1, 1, colCount).merge();
+      final titleCell = sheet.getRangeByIndex(1, 1);
+      titleCell.setText(title);
+      titleCell.cellStyle.bold = true;
+      titleCell.cellStyle.fontSize = 14;
+      titleCell.cellStyle.hAlign = xls.HAlignType.left;
+      titleCell.cellStyle.vAlign = xls.VAlignType.center;
+      sheet.getRangeByIndex(1, 1).rowHeight = 22;
+    }
+
+    // ── Column header row ─────────────────────────────────────────────
+    for (int c = 0; c < colCount; c++) {
+      final cell = sheet.getRangeByIndex(headerRow, c + 1);
+      cell.setText(headers[c]);
+      cell.cellStyle.bold = true;
+      cell.cellStyle.backColor = '#D9D9D9';
+      cell.cellStyle.hAlign = xls.HAlignType.center;
+      cell.cellStyle.vAlign = xls.VAlignType.center;
+      cell.cellStyle.borders.all.lineStyle = xls.LineStyle.thin;
+    }
+
+    // ── Data rows ─────────────────────────────────────────────────────
+    for (int r = 0; r < rows.length; r++) {
+      for (int c = 0; c < rows[r].length; c++) {
+        final cell = sheet.getRangeByIndex(headerRow + 1 + r, c + 1);
+        final val = rows[r][c];
+        if (val is int || val is double) {
+          cell.setNumber(val.toDouble());
+        } else {
+          cell.setText(val.toString());
+        }
+        final colName = c < headers.length ? headers[c] : '';
+        cell.cellStyle.hAlign = _centerCols.contains(colName)
+            ? xls.HAlignType.center
+            : xls.HAlignType.left;
+        cell.cellStyle.vAlign = xls.VAlignType.center;
+        cell.cellStyle.borders.all.lineStyle = xls.LineStyle.thin;
+      }
+    }
+
+    // ── Column widths ─────────────────────────────────────────────────
+    for (int c = 0; c < colCount; c++) {
+      final w = _colWidths[headers[c]];
+      if (w != null) {
+        sheet.getRangeByIndex(1, c + 1).columnWidth = w;
+      }
+    }
+
+    final bytes = workbook.saveAsStream();
+    workbook.dispose();
+    await saveExcelFile(bytes, '$fileName.xlsx');
   }
 
 static String _formatDob(dynamic value) {
