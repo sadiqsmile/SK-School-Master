@@ -3,6 +3,16 @@ import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 
 class StudentImportService {
+
+    static Future<List<PlatformFile>> pickMultipleImages() async {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null) return [];
+      return result.files;
+    }
   static Future<List<Map<String, dynamic>>> pickAndReadExcel() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,

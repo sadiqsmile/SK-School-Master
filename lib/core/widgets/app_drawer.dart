@@ -307,7 +307,7 @@ class _Tile extends ConsumerWidget {
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFEFF4FF) : Colors.transparent,
+          color: active ? const Color(0xFFE8ECF8) : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(

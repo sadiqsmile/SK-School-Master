@@ -51,12 +51,12 @@ class AdminLayout extends ConsumerWidget {
                   child: Row(
                     children: [
                       Container(
-                        width: 255,
+                        width: 240,
                         decoration: const BoxDecoration(
                           color: Colors.white,
                           border: Border(
                             right: BorderSide(
-                              color: Color(0xFFE6EAF2),
+                              color: Color(0xFFE5E7EB),
                             ),
                           ),
                         ),
@@ -66,9 +66,18 @@ class AdminLayout extends ConsumerWidget {
 Expanded(
   child: Container(
     color: const Color(0xFFF5F7FB),
-    alignment: Alignment.topLeft,
-    padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-    child: page,
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 1200,
+          minHeight: double.infinity,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: page,
+        ),
+      ),
+    ),
   ),
 ),
 
@@ -202,8 +211,19 @@ Widget _webTopHeader(WidgetRef ref) {
         _iconBtn(Icons.search_rounded),
         const SizedBox(width: 10),
         _iconBtn(Icons.notifications_none_rounded),
-        const SizedBox(width: 10),
-        _iconBtn(Icons.person_rounded),
+        const SizedBox(width: 12),
+        const CircleAvatar(
+          radius: 16,
+          backgroundColor: Color(0xFFE0ECFF),
+          child: Text(
+            'AD',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF2563EB),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ],
     ),
   );
@@ -211,14 +231,14 @@ Widget _webTopHeader(WidgetRef ref) {
 
 Widget _iconBtn(IconData icon) {
   return Container(
-    height: 42,
-    width: 42,
+    height: 40,
+    width: 40,
     decoration: BoxDecoration(
-      color: const Color(0xFFF8FAFC),
-      borderRadius: BorderRadius.circular(12),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(10),
       border: Border.all(color: const Color(0xFFE5E7EB)),
     ),
-    child: Icon(icon, size: 20),
+    child: Icon(icon, size: 18),
   );
 }
 }

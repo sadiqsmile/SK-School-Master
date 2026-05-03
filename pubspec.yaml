@@ -41,6 +41,8 @@ dependencies:
   firebase_storage: ^12.4.10
 
   table_calendar: ^3.0.9
+  google_fonts: ^6.2.1
+  cached_network_image: ^3.3.1
 
 dev_dependencies:
   flutter_test:

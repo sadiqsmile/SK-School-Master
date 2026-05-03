@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/current_school_provider.dart';
@@ -9,6 +13,17 @@ import 'package:school_app/providers/current_school_provider.dart';
 import '../services/student_import_service.dart';
 import '../services/student_template_service.dart';
 import '../services/student_service.dart';
+
+const _titleStyle = TextStyle(
+  fontSize: 15.5,
+  fontWeight: FontWeight.w500,
+  color: Color(0xFF111827),
+);
+
+const _subtitleStyle = TextStyle(
+  fontSize: 12.5,
+  color: Color(0xFF6B7280),
+);
 
 class StudentsScreen extends ConsumerStatefulWidget {
   const StudentsScreen({super.key});
@@ -110,9 +125,11 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
 
               // Responsive layout: Stack for mobile, Column for web
               if (MediaQuery.of(context).size.width < 600) {
-                // 📱 MOBILE (KEEP EXISTING STACK CODE)
-                return Stack(
-                  children: [
+                // 📱 MOBILE
+                return Container(
+                  color: const Color(0xFFF5F7FB),
+                  child: Stack(
+                    children: [
                     SingleChildScrollView(
                       child: Column(
                         children: [
@@ -157,55 +174,100 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                   children: [
                                     Row(
                                       children: [
-                                        Expanded(
-                                          child: SizedBox(
-                                            height: 44,
-                                            child: ElevatedButton.icon(
-                                              onPressed: () => _showExportPopup(context, students.length, students),
-                                              icon: const Icon(Icons.download, size: 18),
-                                              label: const Text('Export'),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: SizedBox(
-                                            height: 44,
-                                            child: ElevatedButton.icon(
-                                              onPressed: importing ? null : () => _importStudents(context, school.id),
-                                              icon: const Icon(Icons.upload_file, size: 18),
-                                              label: const Text('Import'),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: SizedBox(
-                                            height: 44,
-                                            child: ElevatedButton.icon(
-                                              onPressed: () => context.push('/add-student'),
-                                              icon: const Icon(Icons.person_add, size: 18),
-                                              label: const Text('Add'),
-                                            ),
-                                          ),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            _actionBtn(Icons.download, 'Export', () => _showExportPopup(context, students.length, students)),
+                                            _actionBtn(Icons.upload_file, 'Import', importing ? null : () => _importStudents(context, school.id)),
+                                            _actionBtn(Icons.person_add, 'Add', () => context.push('/add-student')),
+                                            _actionBtn(Icons.photo_library, 'Upload', () => _uploadBulkPhotos(context, school.id)),
+                                          ],
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(child: _groupDropdown()),
-                                        const SizedBox(width: 8),
-                                        Expanded(child: _classDropdown(filteredClassList)),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(child: _sectionDropdown(filteredSectionList)),
-                                        const SizedBox(width: 8),
-                                        Expanded(child: _searchField()),
-                                      ],
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: _inputBox(
+                                              DropdownButton<String>(
+                                                value: selectedGroup,
+                                                underline: const SizedBox(),
+                                                isExpanded: true,
+                                                items: const ['All', 'Nursery', 'Primary School', 'Middle School', 'High School', 'College']
+                                                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                                    .toList(),
+                                                onChanged: (v) {
+                                                  if (v == null) return;
+                                                  setState(() {
+                                                    selectedGroup = v;
+                                                    selectedClass = 'All';
+                                                    selectedSection = 'All';
+                                                  });
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: _inputBox(
+                                              DropdownButton<String>(
+                                                value: selectedClass,
+                                                underline: const SizedBox(),
+                                                isExpanded: true,
+                                                items: ['All', ...filteredClassList]
+                                                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                                    .toList(),
+                                                onChanged: selectedGroup == 'All' ? null : (v) {
+                                                  if (v == null) return;
+                                                  setState(() {
+                                                    selectedClass = v;
+                                                    selectedSection = 'All';
+                                                  });
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: _inputBox(
+                                              DropdownButton<String>(
+                                                value: selectedSection,
+                                                underline: const SizedBox(),
+                                                isExpanded: true,
+                                                items: ['All', ...filteredSectionList]
+                                                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                                    .toList(),
+                                                onChanged: selectedClass == 'All' ? null : (v) {
+                                                  if (v == null) return;
+                                                  setState(() => selectedSection = v);
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: _inputBox(
+                                              TextField(
+                                                decoration: const InputDecoration(
+                                                  hintText: 'Search...',
+                                                  border: InputBorder.none,
+                                                  icon: Icon(Icons.search, size: 18),
+                                                ),
+                                                onChanged: (v) => setState(() => search = v),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 );
@@ -296,12 +358,20 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                                     ListTile(
                                                       leading: Text(
                                                         '${i + 1}.',
-                                                        style: const TextStyle(
-                                                          fontWeight: FontWeight.bold,
+                                                        style: GoogleFonts.inter(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.w500,
                                                           color: Colors.grey,
                                                         ),
                                                       ),
-                                                      title: Text(name),
+                                                      title: Text(
+                                                        name,
+                                                        style: GoogleFonts.inter(
+                                                          fontSize: 15.5,
+                                                          fontWeight: FontWeight.w400,
+                                                          color: const Color(0xFF111827),
+                                                        ),
+                                                      ),
                                                     ),
                                                     const Divider(
                                                       height: 1,
@@ -321,13 +391,16 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                       ),
                     ),
                   ],
-                );
+                ),  // end Stack
+                );  // end Container
               }
               // 💻 WEB (OPTIMIZED MINIMAL LAYOUT)
-              return Column(
+              return Container(
+                color: const Color(0xFFF5F7FB),
+                child: Column(
                 children: [
                   _studentsHeroCard(students),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       Expanded(
@@ -358,36 +431,140 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
                   // Filters and controls
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _smallBtn('Export', Icons.download, () => _showExportPopup(context, students.length, students)),
-                      const SizedBox(width: 8),
-                      _smallBtn('Import', Icons.upload_file, importing ? null : () => _importStudents(context, school.id)),
-                      const SizedBox(width: 8),
-                      _smallBtn('Add', Icons.person_add, () => context.push('/add-student')),
-                      const SizedBox(width: 16),
                       Expanded(child: _searchField()),
+                      const SizedBox(width: 12),
+                      Row(
+                        children: [
+                          _actionBtn(Icons.download, 'Export', () => _showExportPopup(context, students.length, students)),
+                          const SizedBox(width: 8),
+                          _actionBtn(Icons.upload_file, 'Import', importing ? null : () => _importStudents(context, school.id)),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () => context.push('/add-student'),
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Add'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _actionBtn(Icons.photo_library, 'Upload', () => _uploadBulkPhotos(context, school.id)),
+                        ],
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _groupDropdown()),
-                      const SizedBox(width: 10),
-                      Expanded(child: _classDropdown(filteredClassList)),
-                      const SizedBox(width: 10),
-                      Expanded(child: _sectionDropdown(filteredSectionList)),
-                    ],
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _inputBox(
+                            DropdownButton<String>(
+                              value: selectedGroup,
+                              underline: const SizedBox(),
+                              isExpanded: true,
+                              items: const ['All', 'Nursery', 'Primary School', 'Middle School', 'High School', 'College']
+                                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v == null) return;
+                                setState(() {
+                                  selectedGroup = v;
+                                  selectedClass = 'All';
+                                  selectedSection = 'All';
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _inputBox(
+                            DropdownButton<String>(
+                              value: selectedClass,
+                              underline: const SizedBox(),
+                              isExpanded: true,
+                              items: ['All', ...filteredClassList]
+                                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                  .toList(),
+                              onChanged: selectedGroup == 'All' ? null : (v) {
+                                if (v == null) return;
+                                setState(() {
+                                  selectedClass = v;
+                                  selectedSection = 'All';
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _inputBox(
+                            DropdownButton<String>(
+                              value: selectedSection,
+                              underline: const SizedBox(),
+                              isExpanded: true,
+                              items: ['All', ...filteredSectionList]
+                                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                  .toList(),
+                              onChanged: selectedClass == 'All' ? null : (v) {
+                                if (v == null) return;
+                                setState(() => selectedSection = v);
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _inputBox(
+                            TextField(
+                              decoration: const InputDecoration(
+                                hintText: 'Search...',
+                                border: InputBorder.none,
+                                icon: Icon(Icons.search, size: 18),
+                              ),
+                              onChanged: (v) => setState(() => search = v),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
                   // Web student list (optimized, minimal, per-row expansion, improved UI)
                   Expanded(
-                    child: students.isEmpty
-                        ? const Center(child: Text('No students found'))
-                        : ListView.builder(
-                            cacheExtent: 800,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: students.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No students found',
+                                style: TextStyle(color: Color(0xFF6B7280)),
+                              ),
+                            )
+                          : ListView.builder(
+                              cacheExtent: 800,
                             itemCount: students.length,
                             itemBuilder: (context, i) {
                               final doc = students[i];
@@ -402,18 +579,20 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                   final isOpen = openId == doc.id;
                                   return Column(
                                     children: [
-                                      InkWell(
-                                        onTap: () {
-                                          _openStudentId.value = isOpen ? null : doc.id;
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                          // 🎨 BACKGROUND COLOR (LIGHT + FAST)
-                                          color: isOpen
-                                              ? const Color(0xFFEDE9FE) // selected
-                                              : (i % 2 == 0
-                                                  ? const Color(0xFFF8FAFC) // zebra
-                                                  : Colors.white),
+                                      MouseRegion(
+                                        cursor: SystemMouseCursors.click,
+                                        child: InkWell(
+                                          onTap: () {
+                                            _openStudentId.value = isOpen ? null : doc.id;
+                                          },
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                            decoration: BoxDecoration(
+                                              color: isOpen
+                                                  ? const Color(0xFFE8ECF8)
+                                                  : (i % 2 == 0 ? Colors.white : const Color(0xFFF9FAFB)),
+                                            ),
                                           child: Row(
                                             children: [
                                               // 🔢 SERIAL
@@ -421,11 +600,60 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                                 width: 30,
                                                 child: Text(
                                                   '${i + 1}',
-                                                  style: TextStyle(
-                                                    fontWeight: isOpen ? FontWeight.bold : FontWeight.normal,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.grey,
                                                   ),
                                                 ),
                                               ),
+                                              // 👤 AVATAR
+                                              SizedBox(
+                                                width: 32,
+                                                height: 32,
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(50),
+                                                  child: (d['photoUrl'] != null && d['photoUrl'] != '')
+                                                      ? CachedNetworkImage(
+                                                          imageUrl: d['photoUrl'],
+                                                          fit: BoxFit.cover,
+                                                          placeholder: (context, url) => Container(
+                                                            color: const Color(0xFFEDE9FE),
+                                                            child: const Center(
+                                                              child: SizedBox(
+                                                                width: 12,
+                                                                height: 12,
+                                                                child: CircularProgressIndicator(strokeWidth: 2),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          errorWidget: (context, url, error) => Container(
+                                                            color: const Color(0xFFEDE9FE),
+                                                            child: Center(
+                                                              child: Text(
+                                                                name.isNotEmpty ? name[0] : '?',
+                                                                style: const TextStyle(
+                                                                  color: Color(0xFF4F46E5),
+                                                                  fontWeight: FontWeight.w500,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        )
+                                                      : Container(
+                                                          color: const Color(0xFFEDE9FE),
+                                                          child: Center(
+                                                            child: Text(
+                                                              name.isNotEmpty ? name[0] : '?',
+                                                              style: const TextStyle(
+                                                                color: Color(0xFF4F46E5),
+                                                                fontWeight: FontWeight.w500,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
                                               // 📄 NAME + CLASS
                                               Expanded(
                                                 child: Column(
@@ -433,16 +661,14 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                                   children: [
                                                     Text(
                                                       name,
-                                                      style: TextStyle(
-                                                        fontWeight: isOpen ? FontWeight.bold : FontWeight.w500,
-                                                      ),
+                                                      style: isOpen
+                                                          ? _titleStyle.copyWith(fontWeight: FontWeight.w600)
+                                                          : _titleStyle,
                                                     ),
+                                                    const SizedBox(height: 2),
                                                     Text(
                                                       '$className - $section',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors.grey,
-                                                      ),
+                                                      style: _subtitleStyle,
                                                     ),
                                                   ],
                                                 ),
@@ -450,10 +676,10 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                               // 🔽 ARROW
                                               Icon(
                                                 isOpen ? Icons.expand_less : Icons.expand_more,
-                                                size: 18,
-                                                color: isOpen ? Colors.deepPurple : Colors.grey,
+                                                color: Colors.grey,
                                               ),
                                             ],
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -464,7 +690,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                           child: Row(
                                             children: [
                                               IconButton(
-                                                icon: const Icon(Icons.edit, color: Colors.blue),
+                                                icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.blue),
                                                 onPressed: () {
                                                   context.push('/edit-student', extra: {
                                                     'studentId': doc.id,
@@ -473,7 +699,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                                 },
                                               ),
                                               IconButton(
-                                                icon: const Icon(Icons.delete, color: Colors.red),
+                                                icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
                                                 onPressed: () async {
                                                   await _deleteStudent(
                                                     context,
@@ -486,16 +712,21 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                             ],
                                           ),
                                         ),
-                                      const Divider(height: 1),
+                                      const Divider(
+                                        height: 1,
+                                        color: Color(0xFFE5E7EB),
+                                      ),
                                     ],
                                   );
                                 },
                               );
                             },
-                          ),
-                  ),
+                          ),  // end ListView
+                    ),  // end Container
+                  ),  // end Expanded
                 ],
-              );
+              ),  // end Column
+              );  // end Container
             },
           );
         },
@@ -623,6 +854,59 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _uploadBulkPhotos(BuildContext context, String schoolId) async {
+    final files = await StudentImportService.pickMultipleImages();
+    if (files.isEmpty) return;
+
+    int uploaded = 0;
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    for (final file in files) {
+      final name = file.name.replaceAll(RegExp(r'\.[^/.]+$'), '');
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('schools')
+            .doc(schoolId)
+            .collection('students')
+            .where('name', isEqualTo: name)
+            .limit(1)
+            .get();
+
+        if (snapshot.docs.isEmpty) continue;
+
+        final ref = FirebaseStorage.instance
+            .ref('schools/$schoolId/photos/$name.jpg');
+        final compressedBytes = await FlutterImageCompress.compressWithList(
+          file.bytes!,
+          minWidth: 300,
+          minHeight: 300,
+          quality: 60,
+        );
+        await ref.putData(compressedBytes);
+        final url = await ref.getDownloadURL();
+
+        await snapshot.docs.first.reference.update({'photoUrl': url});
+        uploaded++;
+      } catch (e) {
+        debugPrint('Upload error: $e');
+      }
+    }
+
+    if (mounted) Navigator.pop(context);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Uploaded $uploaded photos')),
+      );
     }
   }
 
@@ -892,77 +1176,39 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     IconData icon,
     Color color,
   ) {
-    final mobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 18,
-        vertical: 18,
-      ),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            color,
-            color.withOpacity(.82),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(.20),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
           ),
         ],
       ),
-      
-      
-
-child: Column(
-  mainAxisAlignment: MainAxisAlignment.center,
-  children: [
-
-    // 🔹 ICON + LABEL
-    Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          color: Colors.white,
-          size: mobile ? 14 : 18,
-        ),
-        const SizedBox(width: 6),
-       
-       
-       Text(
-  title,
-  style: TextStyle(
-    color: Colors.white.withOpacity(0.95),
-    fontSize: mobile ? 12 : 14,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.3,
-  ),
-),
-
-
-      ],
-    ),
-
-    const SizedBox(height: 6),
-
-    // 🔹 VALUE
-    Text(
-      value,
-      style: TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w800,
-        fontSize: mobile ? 18 : 26,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF111827),
+            ),
+          ),
+        ],
       ),
-    ),
-  ],
-),
-     
     );
   }
 
@@ -980,24 +1226,33 @@ child: Column(
     }
   }
 
-  Widget _smallBtn(String text, IconData icon, VoidCallback? onTap) {
-    return SizedBox(
-      height: 42,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF5B21B6),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey.shade300),
-          ),
+  Widget _actionBtn(IconData icon, String label, VoidCallback? onTap) {
+    return ElevatedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+          side: const BorderSide(color: Color(0xFFE5E7EB)),
         ),
-        onPressed: onTap,
-        icon: Icon(icon, size: 20),
-        label: Text(text),
       ),
+    );
+  }
+
+  Widget _inputBox(Widget child) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: child,
     );
   }
 
@@ -1084,83 +1339,47 @@ child: Column(
 //_________________________________________________________________________________________
 //mini hero card inside the big hero card__________________________________________________
 
- Widget _heroMiniCard(
-  String title,
-  String value,
-  IconData icon,
-  bool mobile,
-   Color color,
-) {
-  return Container(
-    padding: EdgeInsets.symmetric(
-      horizontal: 6,
-      vertical: mobile ? 4 : 10,
-    ),
-
-
-
-//   decoration: BoxDecoration(
-//   borderRadius: BorderRadius.circular(16),
-//   border: Border.all(color: Colors.white.withOpacity(.08)),
-//   color: Colors.white.withOpacity(0.05), // 👈 ADD THIS
-//   gradient: LinearGradient(
-//     colors: [
-//       color.withOpacity(0.35),
-//       color.withOpacity(0.15),
-//     ],
-//     begin: Alignment.topLeft,
-//     end: Alignment.bottomRight,
-//   ),
-// ),
-    
-decoration: BoxDecoration(
-  borderRadius: BorderRadius.circular(16),
-  color: color, // ✅ solid color
-),
-
-
-
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // 🔹 ICON + TITLE (same line)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 16),
-            const SizedBox(width: 4),
-           
-           Text(
-  title,
-  style: TextStyle(
-    color: Colors.white.withOpacity(0.95),
-    fontSize: mobile ? 12 : 13, // 🔼 slightly bigger
-    fontWeight: FontWeight.w600, // 🔥 bold
-    letterSpacing: 0.3, // 👌 clean spacing
-  ),
-),
-
-
-
-
+  Widget _topChip(IconData icon, String label, int value, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(left: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.25),
+            color.withValues(alpha: 0.10),
           ],
         ),
-
-        const SizedBox(height: 3),
-
-        // 🔹 VALUE
-    Text(
-  value,
-  style: TextStyle(
-    color: Colors.white,
-    fontSize: mobile ? 18 : 20,
-    fontWeight: FontWeight.w800,
-  ),
-),
-      ],
-    ),
-  );
-}
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            value.toString(),
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 //___________________________________________________________________________________________
 //student hero card with quick stats-----------------------------------------------
@@ -1229,133 +1448,73 @@ Widget _studentsHeroCard(List docs) {
   }).length;
 
 
-  final mobile =
-      MediaQuery.of(context).size.width < 600;
-
-final cards = [
-  _heroMiniCard('Hostel', '$hostel', Icons.apartment, mobile, const Color(0xFF4F46E5)), // Indigo
-  _heroMiniCard('Day', '$dayScholar', Icons.home, mobile, const Color(0xFF2563EB)), // Blue
-  _heroMiniCard('Girls', '$girls', Icons.girl, mobile, const Color(0xFFEC4899)), // Pink
-  _heroMiniCard('Boys', '$boys', Icons.boy, mobile, const Color(0xFF06B6D4)), // Cyan
-  _heroMiniCard('Mess', '$messYes', Icons.restaurant, mobile, const Color.fromRGBO(255, 16, 185, 129)), // Amber
-  _heroMiniCard('Bus', '$transportYes', Icons.directions_bus, mobile, const Color.fromARGB(245, 238, 204, 10)), // Green
-];
-
   return Container(
-    width: double.infinity,
-    padding:
-        const EdgeInsets.fromLTRB(20, 12, 20, 20),
+    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
     decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
       gradient: const LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
         colors: [
-          Color(0xFF5B5CEB),
-          Color(0xFF4F7CF7),
+          Color(0xFFF8FAFF),
+          Color(0xFFEFF3FF),
         ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
-      borderRadius: BorderRadius.circular(26),
+      boxShadow: [
+        BoxShadow(
+          color: Color(0x0F000000),
+          blurRadius: 20,
+          offset: Offset(0, 10),
+        ),
+      ],
     ),
-
-    // 🔥 FINAL CORRECT STRUCTURE
-    child: mobile
-        ? Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Students Dashboard',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight:
-                      FontWeight.w800,
-                ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Students Dashboard',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF111827),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Premium analytics & quick stats',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'Premium analytics & quick stats',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B7280),
               ),
-              const SizedBox(height: 8),
-
-              GridView.builder(
-                shrinkWrap: true,
-                physics:
-                    const NeverScrollableScrollPhysics(),
-                itemCount: cards.length,
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 1.3,
-                ),
-                itemBuilder: (_, i) =>
-                    cards[i],
+            ),
+          ],
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _topChip(Icons.bed, 'Hostel', hostel, const Color(0xFF4F46E5)),
+                  _topChip(Icons.home, 'Day', dayScholar, const Color(0xFF2563EB)),
+                  _topChip(Icons.female, 'Girls', girls, const Color(0xFFEC4899)),
+                  _topChip(Icons.male, 'Boys', boys, const Color(0xFF06B6D4)),
+                  _topChip(Icons.restaurant, 'Mess', messYes, const Color(0xFF059669)),
+                  _topChip(Icons.directions_bus, 'Bus', transportYes, const Color(0xFFF59E0B)),
+                ],
               ),
-            ],
-          )
-
-        // 🔥 WEB FIXED
-        : Row(
-            crossAxisAlignment:
-                CrossAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 250,
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Students Dashboard',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight:
-                            FontWeight.w800,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      'Premium analytics & quick stats',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-
-
-
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 20),
-
-            Expanded(
-  child: Center(
-    child: Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 10,
-      runSpacing: 10,
-      children: cards
-          .map((e) => SizedBox(
-                width: 140,
-                child: e,
-              ))
-          .toList(),
-    ),
-  ),
-),
-
-            
-            ],
+            ),
           ),
+        ),
+      ],
+    ),
   );
 }
     }

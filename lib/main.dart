@@ -22,6 +22,23 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       routerConfig: appRouter,
+      theme: ThemeData(
+        scaffoldBackgroundColor: const Color(0xFFF9FAFB),
+        primaryColor: const Color(0xFF4F46E5),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          iconTheme: IconThemeData(color: Colors.black),
+          titleTextStyle: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        cardColor: Colors.white,
+        dividerColor: const Color(0xFFE5E7EB),
+      ),
     );
   }
 }
+
