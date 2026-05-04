@@ -4,6 +4,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:school_app/config/app_router.dart';
 import 'firebase_options.dart';
 
+final GlobalKey<ScaffoldMessengerState> messengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -20,8 +25,20 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
+      scaffoldMessengerKey: messengerKey,
       debugShowCheckedModeBanner: false,
       routerConfig: appRouter,
+      builder: (context, child) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: TextScaler.linear(
+              media.textScaler.scale(1.0).clamp(0.9, 1.1),
+            ),
+          ),
+          child: child!,
+        );
+      },
       theme: ThemeData(
         scaffoldBackgroundColor: const Color(0xFFF9FAFB),
         primaryColor: const Color(0xFF4F46E5),

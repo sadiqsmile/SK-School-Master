@@ -52,8 +52,11 @@ import 'package:school_app/features/teacher/risk/screens/class_risk_screen.dart'
 import 'package:school_app/core/rbac/role_guard.dart';
 import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/models/user_role.dart';
+import 'package:school_app/main.dart' show navigatorKey;
+import 'package:school_app/features/school_admin/students/screens/restore_students_screen.dart';
 
 final appRouter = GoRouter(
+  navigatorKey: navigatorKey,
   initialLocation: '/school-loader',
 
   /// 🔥 ADD THIS BLOCK (VERY IMPORTANT)
@@ -503,6 +506,13 @@ final appRouter = GoRouter(
           studentId: data['studentId'],
           data: Map<String, dynamic>.from(data['data']),
         );
+      },
+    ),
+    GoRoute(
+      path: '/restore-students',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return RestoreStudentsScreen(schoolId: data['schoolId']);
       },
     ),
     GoRoute(

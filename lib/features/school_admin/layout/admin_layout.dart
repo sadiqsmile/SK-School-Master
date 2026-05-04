@@ -26,7 +26,7 @@ class AdminLayout extends ConsumerWidget {
  Widget build(BuildContext context, WidgetRef ref) {
     final page = body ?? child ?? const SizedBox();
     final width = MediaQuery.of(context).size.width;
-    final isMobile = width < 760;
+    final isMobile = width < 800;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
@@ -133,6 +133,12 @@ Expanded(
               icon: const Icon(Icons.notifications_none_rounded),
               onPressed: () {},
             ),
+            if (onSettingsPressed != null)
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: onSettingsPressed,
+                tooltip: 'Settings',
+              ),
           ],
         ),
       ),
