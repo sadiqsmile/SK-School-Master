@@ -117,6 +117,7 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
               children: [
                 TextField(
                   controller: nameController,
+                  textCapitalization: TextCapitalization.characters,
                   inputFormatters: const [UpperCaseTextFormatter()],
                   decoration:
                       const InputDecoration(labelText: 'Student Name'),
@@ -125,6 +126,8 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
 
                 TextField(
                   controller: admissionController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: const [UpperCaseTextFormatter()],
                   decoration:
                       const InputDecoration(labelText: 'Admission No'),
                 ),
@@ -195,6 +198,7 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
 
                 TextField(
                   controller: parentNameController,
+                  textCapitalization: TextCapitalization.characters,
                   inputFormatters: const [UpperCaseTextFormatter()],
                   decoration:
                       const InputDecoration(labelText: 'Parent Name'),

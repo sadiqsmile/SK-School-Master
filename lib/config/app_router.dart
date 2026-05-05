@@ -21,6 +21,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:school_app/features/school_admin/students/screens/students_screen.dart';
 import 'package:school_app/features/school_admin/students/screens/add_student_screen.dart';
 import 'package:school_app/features/school_admin/students/screens/edit_student_screen.dart';
+import 'package:school_app/features/school_admin/students/screens/student_profile_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/classes_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/add_class_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/sections_screen.dart';
@@ -495,6 +496,16 @@ final appRouter = GoRouter(
           title: 'Class Risk',
           allowedRoles: const [UserRole.teacher],
           child: ClassRiskScreen(classId: classId, sectionId: sectionId),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/student-profile',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return StudentProfileScreen(
+          studentId: extra['studentId'] as String,
+          schoolId: extra['schoolId'] as String,
         );
       },
     ),

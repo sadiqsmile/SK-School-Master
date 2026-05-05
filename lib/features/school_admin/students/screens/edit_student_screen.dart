@@ -1,8 +1,10 @@
 // features/school_admin/students/screens/edit_student_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:school_app/providers/current_school_provider.dart';
+import 'package:school_app/core/utils/text_formatters.dart';
 
 class EditStudentScreen extends ConsumerStatefulWidget {
   final String studentId;
@@ -68,6 +70,8 @@ class _EditStudentScreenState extends ConsumerState<EditStudentScreen> {
             children: [
               TextFormField(
                 controller: nameController,
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: const [UpperCaseTextFormatter()],
                 decoration: const InputDecoration(
                   labelText: 'Student Name',
                 ),
@@ -77,6 +81,8 @@ class _EditStudentScreenState extends ConsumerState<EditStudentScreen> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: parentNameController,
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: const [UpperCaseTextFormatter()],
                 decoration: const InputDecoration(
                   labelText: 'Parent Name',
                 ),

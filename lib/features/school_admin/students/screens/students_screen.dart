@@ -20,6 +20,7 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
+import 'package:school_app/core/utils/text_formatters.dart';
 import '../services/template_export_stub.dart'
     if (dart.library.io) '../services/template_export_io.dart'
     if (dart.library.html) '../services/template_export_web.dart';
@@ -264,11 +265,11 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       child: Column(
         children: [
           _buildUndoBar(),
-          _studentsHeroCard(docs),
+          _studentsHeroCard(students),
           const SizedBox(height: 18),
           Row(
             children: [
-              Expanded(child: _dataCard(icon: Icons.group, label: 'Total', value: docs.length.toString(), color: Colors.blue)),
+              Expanded(child: _dataCard(icon: Icons.group, label: 'Total', value: students.length.toString(), color: Colors.blue)),
               const SizedBox(width: 16),
               Expanded(child: _dataCard(icon: Icons.school, label: groupLabel, value: selectedGroup == 'All' ? '-' : groupCount.toString(), color: Colors.purple)),
               const SizedBox(width: 16),
@@ -282,16 +283,9 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 flex: 5,
                 child: TextField(
                   controller: _searchController,
-                  onChanged: (value) {
-                    final upper = value.toUpperCase();
-                    if (value != upper) {
-                      _searchController.value = TextEditingValue(
-                        text: upper,
-                        selection: TextSelection.collapsed(offset: upper.length),
-                      );
-                    }
-                    setState(() => search = upper);
-                  },
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: const [UpperCaseTextFormatter()],
+                  onChanged: (value) => setState(() => search = value),
                   style: const TextStyle(fontSize: 14, letterSpacing: 0.5),
                   decoration: InputDecoration(
                     hintText: 'SEARCH...',
@@ -493,6 +487,13 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                     child: Row(
                                       children: [
                                         IconButton(
+                                          icon: const Icon(Icons.person_outline, size: 18, color: Color(0xFF4F46E5)),
+                                          tooltip: 'View Profile',
+                                          onPressed: () {
+                                            context.push('/student-profile', extra: {'studentId': doc.id, 'schoolId': schoolId});
+                                          },
+                                        ),
+                                        IconButton(
                                           icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.blue),
                                           onPressed: () {
                                             context.push('/edit-student', extra: {'studentId': doc.id, 'data': d});
@@ -597,13 +598,13 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           children: [
             // ── Hero card ──────────────────────────────────────────────────
             _buildUndoBar(),
-            _studentsHeroCard(docs),
+            _studentsHeroCard(students),
             const SizedBox(height: 16),
 
             // ── Stat cards ────────────────────────────────────────────────
             Row(
               children: [
-                Expanded(child: _dataCard(icon: Icons.group, label: 'Total', value: docs.length.toString(), color: Colors.blue)),
+                Expanded(child: _dataCard(icon: Icons.group, label: 'Total', value: students.length.toString(), color: Colors.blue)),
                 const SizedBox(width: 12),
                 Expanded(child: _dataCard(icon: Icons.school, label: groupLabel, value: selectedGroup == 'All' ? '-' : groupCount.toString(), color: Colors.purple)),
                 const SizedBox(width: 12),
@@ -771,7 +772,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   }
 
   Widget _mobileHeader() {
-    final docs = _cDocs;
+    final docs = _cStudents;
     final hostel = docs.where((e) {
       final v = ((e.data() as Map<String, dynamic>)['type'] ?? (e.data() as Map<String, dynamic>)['residence'] ?? '').toString().trim().toLowerCase();
       return v == 'hostel' || v == 'h';
@@ -884,7 +885,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       height: 88,
       child: Row(
         children: [
-          Expanded(child: _statCard(icon: Icons.people_outline, title: 'Total', value: _cDocs.length.toString(), color: Colors.blue.shade50)),
+          Expanded(child: _statCard(icon: Icons.people_outline, title: 'Total', value: _cStudents.length.toString(), color: Colors.blue.shade50)),
           const SizedBox(width: 12),
           Expanded(child: _statCard(icon: Icons.category_outlined, title: shortGroup(_cGroupLabel, true), value: selectedGroup == 'All' ? '0' : _cGroupCount.toString(), color: Colors.purple.shade50)),
           const SizedBox(width: 12),
@@ -945,7 +946,9 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       height: 40,
       child: TextField(
         controller: _searchController,
-        onChanged: (v) => setState(() => search = v.toUpperCase()),
+        textCapitalization: TextCapitalization.characters,
+        inputFormatters: const [UpperCaseTextFormatter()],
+        onChanged: (v) => setState(() => search = v),
         decoration: InputDecoration(
           hintText: 'Search...',
           prefixIcon: const Icon(Icons.search, size: 18),
@@ -1286,7 +1289,10 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            GestureDetector(
+              onTap: () => context.push('/student-profile', extra: {'studentId': doc.id, 'schoolId': schoolId}),
+              child: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            ),
           ],
         ),
       ),
