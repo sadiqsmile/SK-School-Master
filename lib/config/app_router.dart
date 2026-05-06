@@ -55,6 +55,7 @@ import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/models/user_role.dart';
 import 'package:school_app/main.dart' show navigatorKey;
 import 'package:school_app/features/school_admin/students/screens/restore_students_screen.dart';
+import 'package:school_app/features/school_admin/students/screens/bulk_delete_students_screen.dart';
 
 final appRouter = GoRouter(
   navigatorKey: navigatorKey,
@@ -524,6 +525,18 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final data = state.extra as Map<String, dynamic>;
         return RestoreStudentsScreen(schoolId: data['schoolId']);
+      },
+    ),
+    GoRoute(
+      path: '/school-admin/students/bulk-delete',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return RoleGuard(
+          title: 'Bulk Delete Students',
+          allowedRoles: const [UserRole.admin],
+          requiredModules: const [SchoolModuleKey.students],
+          child: BulkDeleteStudentsScreen(schoolId: data['schoolId']),
+        );
       },
     ),
     GoRoute(

@@ -86,8 +86,8 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     _controllersInitialized = true;
   }
 
-  Future<void> _updateStudent() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<bool> _updateStudent() async {
+    if (!_formKey.currentState!.validate()) return false;
     final name = _nameController.text.trim();
     try {
       await FirebaseFirestore.instance
@@ -119,13 +119,40 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
           const SnackBar(content: Text('Student updated')),
         );
       }
+      return true;
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Update failed: $e')),
         );
       }
+      return false;
     }
+  }
+
+  Future<void> _softDeleteStudent() async {
+    final firestore = FirebaseFirestore.instance;
+    final snap = await firestore
+        .collection('schools')
+        .doc(widget.schoolId)
+        .collection('students')
+        .doc(widget.studentId)
+        .get();
+    if (!snap.exists) return;
+    final payload = Map<String, dynamic>.from(snap.data()!)
+      ..['deletedAt'] = FieldValue.serverTimestamp();
+    await firestore
+        .collection('schools')
+        .doc(widget.schoolId)
+        .collection('deleted_students')
+        .doc(widget.studentId)
+        .set(payload);
+    await firestore
+        .collection('schools')
+        .doc(widget.schoolId)
+        .collection('students')
+        .doc(widget.studentId)
+        .delete();
   }
 
   Future<void> _updatePhoto(Map<String, dynamic> data) async {
@@ -191,6 +218,43 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
               name.isNotEmpty ? name : 'Student Profile',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                tooltip: 'Delete Student',
+                onPressed: data.isEmpty
+                    ? null
+                    : () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Delete Student'),
+                            content: const Text(
+                                'Move this student to the recycle bin?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.pop(context, false),
+                                child: const Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red),
+                                onPressed: () =>
+                                    Navigator.pop(context, true),
+                                child: const Text('Delete',
+                                    style: TextStyle(color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true && mounted) {
+                          await _softDeleteStudent();
+                          if (mounted) context.pop();
+                        }
+                      },
+              ),
+            ],
           ),
           body: Center(
             child: ConstrainedBox(
@@ -212,7 +276,8 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                           ? null
                           : () async {
                               if (_isEditing) {
-                                await _updateStudent();
+                                final ok = await _updateStudent();
+                                if (!ok) return; // keep edit mode open on validation failure
                               }
                               setState(() => _isEditing = !_isEditing);
                             },
@@ -514,13 +579,15 @@ class _OverviewTabState extends State<_OverviewTab> {
   @override
   void initState() {
     super.initState();
-    if (widget.isEditing) _initLocalState();
+    _initLocalState(); // always init so view mode shows correct values
   }
 
   @override
   void didUpdateWidget(_OverviewTab old) {
     super.didUpdateWidget(old);
-    if (!old.isEditing && widget.isEditing) _initLocalState();
+    if (old.data != widget.data || (!old.isEditing && widget.isEditing)) {
+      _initLocalState();
+    }
   }
 
   void _initLocalState() {
@@ -571,15 +638,30 @@ class _OverviewTabState extends State<_OverviewTab> {
     final years = _getAcademicYears();
     _selectedAcademicYear = years.contains(rawAY) ? rawAY : null;
 
-    // Facilities
+    // Facilities — primary: boolean keys; fallback: old string format
     final data = widget.data;
-    final hostelVal = (data['type'] ?? data['residence'] ?? data['hostel'] ?? '').toString().trim().toLowerCase();
-    _isHostel = hostelVal == 'hostel' || hostelVal == 'h' || hostelVal == 'true';
-    _isDayScholar = !_isHostel;
-    final messVal = (data['mess'] ?? '').toString().trim().toLowerCase();
-    _isMess = _isHostel ? true : (messVal == 'yes' || messVal == 'y' || messVal == '1' || messVal == 'true');
-    final transVal = (data['transport'] ?? data['bus'] ?? '').toString().trim().toLowerCase();
-    _isBus = transVal == 'yes' || transVal == 'y' || transVal == '1' || transVal == 'true';
+    final hostelRaw = data['hostel'];
+    if (hostelRaw is bool) {
+      _isHostel = hostelRaw;
+    } else {
+      _isHostel = (data['type'] ?? '').toString().trim().toLowerCase() == 'hostel';
+    }
+    final dayScholarRaw = data['dayScholar'];
+    _isDayScholar = dayScholarRaw is bool ? dayScholarRaw : !_isHostel;
+    final messRaw = data['mess'];
+    if (messRaw is bool) {
+      _isMess = messRaw;
+    } else {
+      final messStr = (messRaw ?? '').toString().trim().toLowerCase();
+      _isMess = _isHostel ? true : (messStr == 'yes' || messStr == 'y');
+    }
+    final busRaw = data['bus'];
+    if (busRaw is bool) {
+      _isBus = busRaw;
+    } else {
+      final transStr = (data['transport'] ?? busRaw ?? '').toString().trim().toLowerCase();
+      _isBus = transStr == 'yes' || transStr == 'y';
+    }
   }
 
   List<String> _getSections(String? className) {
@@ -737,30 +819,41 @@ class _OverviewTabState extends State<_OverviewTab> {
 
   // ── FACILITY LOGIC ─────────────────────────────────────────────────────────
 
-  void _onHostelChanged(bool value) {
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
+
+  void _handleDayScholar(bool val) {
     setState(() {
-      _isHostel = value;
-      if (value) {
+      if (val) {
+        _isDayScholar = true;
+        _isHostel = false;
+      } else {
+        if (!_isHostel) {
+          _showError('Select either Day Scholar or Hostel');
+          return;
+        }
         _isDayScholar = false;
-        _isMess = true; // auto-enable mess when hostel
       }
     });
   }
 
-  void _onDayScholarChanged(bool value) {
+  void _handleHostel(bool val) {
     setState(() {
-      _isDayScholar = value;
-      if (value) _isHostel = false;
+      if (val) {
+        _isHostel = true;
+        _isDayScholar = false;
+        _isMess = true;
+      } else {
+        if (!_isDayScholar) {
+          _showError('Select either Hostel or Day Scholar');
+          return;
+        }
+        _isHostel = false;
+      }
     });
-  }
-
-  void _onMessChanged(bool value) {
-    if (_isHostel && !value) return; // block disabling mess while hostel is on
-    setState(() => _isMess = value);
-  }
-
-  void _onBusChanged(bool value) {
-    setState(() => _isBus = value);
   }
 
   Widget _buildFacilities() {
@@ -776,33 +869,58 @@ class _OverviewTabState extends State<_OverviewTab> {
           icon: Icons.apartment_outlined,
           title: 'Facilities',
           children: [
-            _facilityItem(
-              icon: Icons.home_outlined,
-              label: 'Day Scholar',
-              value: _isDayScholar,
-              onChanged: _onDayScholarChanged,
-              color: Colors.blue,
-            ),
-            _facilityItem(
-              icon: Icons.hotel,
-              label: 'Hostel',
-              value: _isHostel,
-              onChanged: _onHostelChanged,
-              color: Colors.purple,
-            ),
-            _facilityItem(
-              icon: Icons.restaurant_outlined,
-              label: 'Mess',
-              value: _isMess,
-              onChanged: _onMessChanged,
-              color: Colors.green,
-            ),
-            _facilityItem(
-              icon: Icons.directions_bus_outlined,
-              label: 'Bus',
-              value: _isBus,
-              onChanged: _onBusChanged,
-              color: Colors.orange,
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _facilityItem(
+                      icon: Icons.home_outlined,
+                      label: 'Day Scholar',
+                      value: _isDayScholar,
+                      isEditing: widget.isEditing,
+                      onChanged: _handleDayScholar,
+                      color: Colors.blue,
+                    ),
+                    _facilityItem(
+                      icon: Icons.bed,
+                      label: 'Hostel',
+                      value: _isHostel,
+                      isEditing: widget.isEditing,
+                      onChanged: _handleHostel,
+                      color: Colors.purple,
+                    ),
+                    _facilityItem(
+                      icon: Icons.restaurant,
+                      label: 'Mess',
+                      value: _isMess,
+                      isEditing: widget.isEditing,
+                      onChanged: (val) {
+                        if (!widget.isEditing) return;
+                        if (_isHostel && !val) {
+                          _showError('Mess is required for Hostel');
+                          return;
+                        }
+                        setState(() => _isMess = val);
+                      },
+                      color: Colors.green,
+                    ),
+                    _facilityItem(
+                      icon: Icons.directions_bus,
+                      label: 'Transport',
+                      value: _isBus,
+                      isEditing: widget.isEditing,
+                      onChanged: (val) {
+                        if (!widget.isEditing) return;
+                        setState(() => _isBus = val);
+                      },
+                      color: Colors.orange,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -971,18 +1089,19 @@ class _OverviewTabState extends State<_OverviewTab> {
     required IconData icon,
     required String label,
     required bool value,
+    required bool isEditing,
     required Function(bool) onChanged,
     required Color color,
   }) {
     return Container(
-      width: double.infinity,
+      width: 320,
       margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: value ? color.withOpacity(0.08) : Colors.grey.withOpacity(0.04),
+        color: value ? color.withOpacity(0.08) : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: value ? color.withOpacity(0.35) : Colors.grey.withOpacity(0.2),
+          color: value ? color.withOpacity(0.3) : Colors.grey.withOpacity(0.2),
         ),
       ),
       child: Row(
@@ -1005,7 +1124,7 @@ class _OverviewTabState extends State<_OverviewTab> {
               value: value,
               activeColor: color,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              onChanged: onChanged,
+              onChanged: isEditing ? onChanged : null,
             ),
           ),
         ],

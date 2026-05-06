@@ -493,16 +493,6 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                             context.push('/student-profile', extra: {'studentId': doc.id, 'schoolId': schoolId});
                                           },
                                         ),
-                                        IconButton(
-                                          icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.blue),
-                                          onPressed: () {
-                                            context.push('/edit-student', extra: {'studentId': doc.id, 'data': d});
-                                          },
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                                          onPressed: () async => await _deleteStudent(context, schoolId, doc.id, name),
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -1169,62 +1159,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     final isBus = isHostel ? false : (transVal == 'yes' || transVal == 'y' || transVal == '1' || transVal == 'true');
     final photoUrl = (d['photoUrl'] ?? '').toString();
 
-    return Dismissible(
-      key: ValueKey(doc.id),
-      direction: DismissDirection.horizontal,
-      dismissThresholds: const {
-        DismissDirection.startToEnd: 0.3,
-        DismissDirection.endToStart: 0.3,
-      },
-      movementDuration: const Duration(milliseconds: 250),
-      resizeDuration: const Duration(milliseconds: 200),
-      background: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 200),
-        builder: (context, value, child) {
-          return Container(
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.only(left: 20),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Opacity(
-              opacity: value,
-              child: const Icon(Icons.edit, color: Colors.white, size: 22),
-            ),
-          );
-        },
-      ),
-      secondaryBackground: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 200),
-        builder: (context, value, child) {
-          return Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Opacity(
-              opacity: value,
-              child: const Icon(Icons.delete, color: Colors.white, size: 22),
-            ),
-          );
-        },
-      ),
-      confirmDismiss: (direction) async {
-        HapticFeedback.lightImpact();
-        if (direction == DismissDirection.startToEnd) {
-          context.push('/edit-student', extra: {'studentId': doc.id, 'data': d});
-          return false;
-        }
-        // Soft-delete: moves to deleted_students, Dismissible animates the tile out
-        await _softDeleteStudent(schoolId, doc.id, d);
-        return true;
-      },
-      child: MouseRegion(
+    return MouseRegion(
         cursor: SystemMouseCursors.click,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -1295,7 +1230,6 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
             ),
           ],
         ),
-      ),
       ),
     );
   }
@@ -2123,6 +2057,18 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
             onTap: () {
               Navigator.pop(context);
               context.push('/restore-students',
+                  extra: {'schoolId': _cSchoolId});
+            },
+          ),
+          const SizedBox(height: 10),
+          _settingsCard(
+            icon: Icons.delete_sweep,
+            title: 'Bulk Delete Students',
+            subtitle: 'Select and remove multiple students',
+            color: Colors.red,
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/school-admin/students/bulk-delete',
                   extra: {'schoolId': _cSchoolId});
             },
           ),

@@ -83,9 +83,10 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
           'classKey': "${selectedClassName!.trim()}_${selectedSection!.trim()}",
           if (parentName.isNotEmpty) 'parentName': parentName,
           if (parentPhone.isNotEmpty) 'parentPhone': parentPhone,
-          'type': isHostel ? 'hostel' : 'day',
-          'mess': (isHostel ? true : isMess) ? 'yes' : 'no',
-          'transport': (isHostel ? false : isBus) ? 'yes' : 'no',
+          'hostel': isHostel,
+          'dayScholar': !isHostel,
+          'mess': isHostel ? true : isMess,
+          'bus': isBus,
         },
       );
 
