@@ -87,7 +87,9 @@ class MonthlyAnalyticsScreen extends StatelessWidget {
                 'value': values[i],
               });
 
-          combined.sort((a, b) => a['day'].compareTo(b['day']));
+          combined.sort(
+  (a, b) => (a['day'] as int).compareTo(b['day'] as int),
+);
 
           values =
               combined.map((e) => e['value'] as double).toList();

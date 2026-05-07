@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:school_app/services/image_upload_service.dart';
+import '../../attendance/services/student_attendance_service.dart';
 
 // ── FORMATTER ─────────────────────────────────────────────────────────────────
 
@@ -332,8 +334,10 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                                   },
                                 ),
                                 _AttendanceTab(
-                                  studentId: widget.studentId,
+                                  studentId: (data['admissionNo'] ?? widget.studentId).toString(),
                                   schoolId: widget.schoolId,
+                                  className: (data['class'] ?? data['className'] ?? '').toString(),
+                                  section: (data['section'] ?? '').toString(),
                                 ),
                                 _MarksTab(
                                   studentId: widget.studentId,
@@ -1240,83 +1244,698 @@ class _OverviewTabState extends State<_OverviewTab> {
 
 // ── ATTENDANCE TAB ────────────────────────────────────────────────────────────
 
-class _AttendanceTab extends StatelessWidget {
+class _AttendanceTab extends StatefulWidget {
   final String studentId;
   final String schoolId;
+  final String className;
+  final String section;
 
   const _AttendanceTab({
     required this.studentId,
     required this.schoolId,
+    required this.className,
+    required this.section,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('schools')
-          .doc(schoolId)
-          .collection('attendance')
-          .where('studentId', isEqualTo: studentId)
-          .orderBy('date', descending: true)
-          .snapshots(),
+  State<_AttendanceTab> createState() => _AttendanceTabState();
+}
+
+class _AttendanceTabState extends State<_AttendanceTab> {
+  final _attendanceService = StudentAttendanceService();
+  DateTime _selectedMonth = DateTime.now();
+
+  Future<Map<String, dynamic>> _fetch() =>
+      _attendanceService.getStudentMonthlyAttendance(
+        schoolId: widget.schoolId,
+        studentId: widget.studentId,
+        className: widget.className,
+        section: widget.section,
+        selectedMonth: _selectedMonth,
+      );
+
+  Widget _chip(String label, int value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  Widget _buildSummary(Map<String, dynamic> attendance) {
+    final present = attendance['present'] as int;
+    final absent = attendance['absent'] as int;
+    final holiday = attendance['holiday'] as int;
+    final percent = attendance['percentage'] as int;
+    final total = present + absent + holiday;
+    final List<DateTime> absentDates =
+        List<DateTime>.from(attendance['absentDates'] ?? []);
+    final bool showWarning =
+        (attendance['showWarning'] ?? false) as bool && percent < 75;
+    final bool criticalWarning = percent < 50;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showWarning)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 18),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: criticalWarning
+                    ? Colors.red.shade50
+                    : Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: criticalWarning
+                      ? Colors.red.shade200
+                      : Colors.orange.shade200,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    criticalWarning
+                        ? Icons.warning_rounded
+                        : Icons.info_outline,
+                    color: criticalWarning ? Colors.red : Colors.orange,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          criticalWarning
+                              ? 'Critical Attendance Warning'
+                              : 'Low Attendance Warning',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            color: criticalWarning
+                                ? Colors.red.shade800
+                                : Colors.orange.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          criticalWarning
+                              ? 'Attendance is below 50%. Immediate attention required.'
+                              : 'Attendance is below 75%. Student may not meet attendance requirements.',
+                          style: TextStyle(
+                            height: 1.4,
+                            color: criticalWarning
+                                ? Colors.red.shade700
+                                : Colors.orange.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _chip('Present', present, Colors.green),
+              _chip('Absent', absent, Colors.red),
+              _chip('Holiday', holiday, Colors.orange),
+              _chip('%', percent, Colors.blue),
+            ],
+          ),
+          const SizedBox(height: 20),
+          if (total == 0)
+            const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 32),
+                  Icon(Icons.event_busy, size: 48, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text('No attendance data for this month',
+                      style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            ),
+          if (absentDates.isNotEmpty) ...
+            [
+              const SizedBox(height: 24),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.event_busy,
+                            color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Absent Details',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    ...absentDates.map((date) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              '${date.day.toString().padLeft(2, '0')} '
+                              '${_monthName(date.month)} '
+                              '${date.year}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          const SizedBox(height: 24),
+          _buildAttendanceCalendar(),
+          const SizedBox(height: 24),
+          _buildAttendanceAnalytics(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceCalendar() {
+    return FutureBuilder<Map<int, String>>(
+      key: ValueKey(
+        '${_selectedMonth.year}-${_selectedMonth.month}-cal',
+      ),
+      future: _attendanceService.getStudentDailyAttendance(
+        schoolId: widget.schoolId,
+        studentId: widget.studentId,
+        className: widget.className,
+        section: widget.section,
+        selectedMonth: _selectedMonth,
+      ),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final docs = snapshot.data!.docs;
-
-        if (docs.isEmpty) {
           return const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.event_busy, size: 48, color: Colors.grey),
-                SizedBox(height: 12),
-                Text('No attendance data',
-                    style: TextStyle(color: Colors.grey)),
-              ],
-            ),
+            child: CircularProgressIndicator(),
           );
         }
 
-        return ListView.separated(
-          physics: const BouncingScrollPhysics(),
+        final attendanceMap = snapshot.data!;
+
+        final daysInMonth = DateUtils.getDaysInMonth(
+          _selectedMonth.year,
+          _selectedMonth.month,
+        );
+
+        return Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(16),
-          itemCount: docs.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final d = docs[index].data() as Map<String, dynamic>;
-            final isPresent = d['present'] == true;
-            return ListTile(
-              leading: Icon(
-                isPresent ? Icons.check_circle : Icons.cancel,
-                color: isPresent ? Colors.green : Colors.red,
-              ),
-              title: Text((d['date'] ?? '').toString()),
-              trailing: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isPresent
-                      ? Colors.green.withOpacity(0.1)
-                      : Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  isPresent ? 'Present' : 'Absent',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isPresent ? Colors.green : Colors.red,
-                  ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.grey.shade200,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Attendance Calendar',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
                 ),
               ),
-            );
-          },
+              const SizedBox(height: 16),
+              Builder(
+                builder: (context) {
+                  final firstDayOfMonth = DateTime(
+                    _selectedMonth.year,
+                    _selectedMonth.month,
+                    1,
+                  );
+
+                  final startWeekday = firstDayOfMonth.weekday % 7;
+
+                  final totalCells = daysInMonth + startWeekday;
+
+                  const weekDays = [
+                    'SUN',
+                    'MON',
+                    'TUE',
+                    'WED',
+                    'THU',
+                    'FRI',
+                    'SAT',
+                  ];
+
+                  return Column(
+                    children: [
+                      // WEEKDAY HEADER
+                      Row(
+                        children: weekDays.map((day) {
+                          return Expanded(
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Text(
+                                  day,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: totalCells,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 7,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                          childAspectRatio: 0.92,
+                        ),
+                        itemBuilder: (context, index) {
+                          // Empty space before month starts
+                          if (index < startWeekday) {
+                            return const SizedBox();
+                          }
+
+                          final day = index - startWeekday + 1;
+                          final status = attendanceMap[day];
+
+                          Color bgColor = Colors.grey.shade100;
+                          Color textColor = Colors.black87;
+                          Color borderColor = Colors.transparent;
+                          String shortStatus = '';
+
+                          if (status == 'present') {
+                            bgColor = Colors.green.shade100;
+                            textColor = Colors.green.shade800;
+                            borderColor = Colors.green.shade300;
+                            shortStatus = 'P';
+                          }
+
+                          if (status == 'absent') {
+                            bgColor = Colors.red.shade100;
+                            textColor = Colors.red.shade800;
+                            borderColor = Colors.red.shade300;
+                            shortStatus = 'A';
+                          }
+
+                          if (status == 'holiday') {
+                            bgColor = Colors.orange.shade100;
+                            textColor = Colors.orange.shade800;
+                            borderColor = Colors.orange.shade300;
+                            shortStatus = 'H';
+                          }
+
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '$day',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (shortStatus.isNotEmpty)
+                                    Align(
+                                      alignment: Alignment.bottomRight,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: borderColor,
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          shortStatus,
+                                          style: TextStyle(
+                                            fontSize: MediaQuery.of(context).size.width < 600 ? 10 : 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: textColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                children: [
+                  _legend(Colors.green, 'Present'),
+                  _legend(Colors.red, 'Absent'),
+                  _legend(Colors.orange, 'Holiday'),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
+  }
+
+  Widget _buildAttendanceAnalytics() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _attendanceService.getAttendanceAnalytics(
+        schoolId: widget.schoolId,
+        studentId: widget.studentId,
+        className: widget.className,
+        section: widget.section,
+      ),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox();
+        }
+
+        final analytics = snapshot.data!;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: Colors.grey.shade200,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Attendance Analytics',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                height: 260,
+                child: BarChart(
+                  BarChartData(
+                    maxY: 100,
+                    alignment: BarChartAlignment.spaceAround,
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: 20,
+                      getDrawingHorizontalLine: (value) {
+                        return FlLine(
+                          color: Colors.grey.withOpacity(0.25),
+                          strokeWidth: 1,
+                          dashArray: [5, 5],
+                        );
+                      },
+                    ),
+                    borderData: FlBorderData(show: false),
+                    titlesData: FlTitlesData(
+                      topTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 34,
+                          getTitlesWidget: (value, meta) {
+                            final index = value.toInt();
+                            if (index < 0 || index >= analytics.length) {
+                              return const SizedBox();
+                            }
+                            final percentage =
+                                analytics[index]['percentage'] ?? 0;
+                            if (percentage == 0) return const SizedBox();
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.deepPurple.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '$percentage%',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.deepPurple,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 32,
+                          interval: 20,
+                          getTitlesWidget: (value, meta) {
+                            return Text(
+                              value.toInt().toString(),
+                              style: const TextStyle(fontSize: 11),
+                            );
+                          },
+                        ),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            final index = value.toInt();
+
+                            if (index < 0 || index >= analytics.length) {
+                              return const SizedBox();
+                            }
+
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                analytics[index]['monthName'] as String,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    barGroups: List.generate(
+                      analytics.length,
+                      (index) {
+                        final item = analytics[index];
+                        final percentage =
+                            (item['percentage'] ?? 0).toDouble();
+
+                        Color barColor;
+                        if (percentage >= 75) {
+                          barColor = Colors.green;
+                        } else if (percentage >= 50) {
+                          barColor = Colors.orange;
+                        } else {
+                          barColor = Colors.red;
+                        }
+
+                        return BarChartGroupData(
+                          x: index,
+                          barsSpace: 4,
+                          barRods: [
+                            BarChartRodData(
+                              toY: percentage,
+                              width: 26,
+                              borderRadius: BorderRadius.circular(6),
+                              color: barColor,
+                              backDrawRodData: BackgroundBarChartRodData(
+                                show: true,
+                                toY: 100,
+                                color: Colors.grey.withOpacity(0.06),
+                              ),
+                            ),
+                          ],
+                          showingTooltipIndicators: [],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _legend(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Month selector
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: () => setState(() {
+                  _selectedMonth = DateTime(
+                      _selectedMonth.year, _selectedMonth.month - 1);
+                }),
+              ),
+              Text(
+                '${_monthName(_selectedMonth.month)} ${_selectedMonth.year}',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: () => setState(() {
+                  _selectedMonth = DateTime(
+                      _selectedMonth.year, _selectedMonth.month + 1);
+                }),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('schools')
+                .doc(widget.schoolId)
+                .collection('attendance')
+                .snapshots(),
+            builder: (context, attendanceSnapshot) {
+              if (attendanceSnapshot.connectionState ==
+                  ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              return FutureBuilder<Map<String, dynamic>>(
+                key: ValueKey('${_selectedMonth.year}-${_selectedMonth.month}'),
+                future: _fetch(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!snapshot.hasData) {
+                    return const Center(child: Text('No attendance data'));
+                  }
+                  return _buildSummary(snapshot.data!);
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _monthName(int month) {
+    const names = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return names[month];
   }
 }
 

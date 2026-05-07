@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import 'package:school_app/features/teacher/attendance/models/attendance_status.dart';
 import 'package:school_app/features/teacher/attendance/providers/students_by_class_section_provider.dart';
@@ -30,6 +31,19 @@ class _TeacherAttendanceScreenState
   final _statuses = <String, AttendanceStatus>{};
 
   bool _isSaving = false;
+  bool _isOffline = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Connectivity().onConnectivityChanged.listen((results) {
+      setState(() {
+        _isOffline = results.isEmpty ||
+            (results.length == 1 &&
+                results.first == ConnectivityResult.none);
+      });
+    });
+  }
 
   Widget _quickBtn(
     String studentId,
@@ -267,6 +281,24 @@ class _TeacherAttendanceScreenState
 
           return Column(
             children: [
+              if (_isOffline)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  color: Colors.orange.shade100,
+                  child: const Row(
+                    children: [
+                      Icon(Icons.wifi_off, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Offline Mode — Attendance will sync automatically',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Padding(
                 padding:
                     const EdgeInsets.all(
