@@ -1,18 +1,18 @@
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../attendance/services/attendance_service.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final String schoolId;
-  final String className;
-  final String section;
-  final String? selectedDate;
+  final String teacherId;
+  final Map<String, dynamic> teacherData;
 
   const AttendanceScreen({
     super.key,
     required this.schoolId,
-    required this.className,
-    required this.section,
-    this.selectedDate,
+    required this.teacherId,
+    required this.teacherData,
   });
 
   @override
@@ -20,333 +20,295 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
-  Map<String, String> studentNames = {};
-  Map<String, String?> attendance = {};
+  final AttendanceService _service = AttendanceService();
 
-  TextEditingController searchController = TextEditingController();
-  String searchQuery = '';
+  Map<String, dynamic>? selectedClass;
+  String? selectedSection;
+  final Map<String, String> attendanceMap = {};
 
-  int present = 0;
-  int absent = 0;
-  bool isSaving = false;
-
-  late String today;
-
-  bool get isSunday => DateTime.now().weekday == DateTime.sunday;
-
-  @override
-  void initState() {
-    super.initState();
-    today = widget.selectedDate ?? DateTime.now().toIso8601String().split('T')[0];
-    loadData();
-  }
-
-  // 🔥 LOAD DATA
-  Future<void> loadData() async {
-    final studentsSnap = await FirebaseFirestore.instance
-        .collection('schools')
-        .doc(widget.schoolId)
-        .collection('students')
-        .where('className', isEqualTo: widget.className)
-        .where('section', isEqualTo: widget.section)
-        .get();
-
-    for (var doc in studentsSnap.docs) {
-      studentNames[doc.id] = doc['name'] ?? doc.id;
-      attendance.putIfAbsent(doc.id, () => 'A');
-    }
-
-    final docId = "${widget.className}_${widget.section}_$today";
-
-    final doc = await FirebaseFirestore.instance
-        .collection('schools')
-        .doc(widget.schoolId)
-        .collection('attendance')
-        .doc(docId)
-        .get();
-
-    if (doc.exists) {
-      final data = doc.data()!;
-      final saved = Map<String, dynamic>.from(data['students']);
-      attendance = saved.map((k, v) => MapEntry(k, v.toString()));
-    }
-
-    calculate();
-    setState(() {});
-  }
-
-  // 🔥 CALCULATE
-  void calculate() {
-    present = attendance.values.where((e) => e == 'P').length;
-    absent = attendance.values.where((e) => e == 'A').length;
-  }
-
-  // 🔥 SAVE
-  Future<void> saveAttendance() async {
-    if (isSunday) return;
-
-    setState(() => isSaving = true);
-
-    final docId = "${widget.className}_${widget.section}_$today";
-
-    await FirebaseFirestore.instance
-        .collection('schools')
-        .doc(widget.schoolId)
-        .collection('attendance')
-        .doc(docId)
-        .set({
-      'date': today,
-      'className': widget.className,
-      'section': widget.section,
-      'students': attendance,
-      'isHoliday': false,
-    });
-
-    setState(() => isSaving = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Attendance Saved")),
-    );
-  }
-
-  // 🔥 TOGGLE
-  Widget buildToggle(String id) {
-    final value = attendance[id];
-
-    Color bgColor;
-    String text;
-
-    if (value == 'P') {
-      bgColor = const Color(0xFF4CAF50); // Green
-      text = 'P';
-    } else if (value == 'A') {
-      bgColor = const Color(0xFFE53935); // Red
-      text = 'A';
-    } else {
-      bgColor = const Color(0xFF1E88E5); // Blue (H)
-      text = 'H';
-    }
-
-    return GestureDetector(
-      onTap: () {
-    
-
-        setState(() {
-          if (value == 'P') {
-            attendance[id] = 'A';
-          } else {
-            attendance[id] = 'P';
-          }
-          calculate();
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        width: 70,
-        height: 34,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(50),
-          boxShadow: [
-            BoxShadow(
-              color: bgColor.withOpacity(0.3),
-              blurRadius: 6,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: value == 'P'
-              ? MainAxisAlignment.end
-              : MainAxisAlignment.start,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              width: 26,
-              height: 26,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: bgColor,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 🔥 TOP CARD
-  Widget topCard() {
-    double percent =
-        (present + absent) == 0 ? 0 : (present / (present + absent)) * 100;
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4F46E5), Color(0xFF06B6D4)],
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        children: [
-          Text(today, style: const TextStyle(color: Colors.white)),
-          const SizedBox(height: 8),
-          Text("${percent.toStringAsFixed(0)}%",
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold)),
-          const Text("Attendance", style: TextStyle(color: Colors.white)),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Text("P = $present",
-                  style: const TextStyle(color: Colors.white)),
-              Text("A = $absent",
-                  style: const TextStyle(color: Colors.white)),
-            ],
-          )
-        ],
-      ),
+  List<Map<String, dynamic>> get assignedClasses {
+    return List<Map<String, dynamic>>.from(
+      widget.teacherData['assignedClasses'] ?? [],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isSunday) {
-      return Scaffold(
-        appBar: AppBar(title: Text("${widget.className}-${widget.section}")),
-        body: Center(
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text("Sunday",
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                Text("Attendance Disabled"),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    final filteredKeys = attendance.keys.where((id) {
-      final name =
-          studentNames[id]?.toLowerCase() ?? id.toLowerCase();
-      return name.contains(searchQuery);
-    }).toList();
-
     return Scaffold(
+      backgroundColor: const Color(0xffF8FAFC),
+
       appBar: AppBar(
-        title: Text("${widget.className}-${widget.section}"),
+        title: const Text("Attendance"),
+        backgroundColor: Colors.white,
+        elevation: 0,
       ),
+
+      floatingActionButton: selectedClass != null && selectedSection != null
+          ? FloatingActionButton.extended(
+              backgroundColor: const Color(0xff5B5FEF),
+              onPressed: _saveAttendance,
+              icon: const Icon(Icons.save),
+              label: const Text("Save"),
+            )
+          : null,
+
       body: Column(
         children: [
-          topCard(),
-
-          // 🔍 SEARCH
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: searchController,
-              onChanged: (value) {
-                setState(() {
-                  searchQuery = value.toLowerCase();
-                });
-              },
-              decoration: InputDecoration(
-                hintText: "Search student...",
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-              ),
-            ),
-          ),
-
-          // BUTTONS
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        attendance.updateAll((k, v) => 'P');
-                        calculate();
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green),
-                    child: const Text("Present All"),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        attendance.updateAll((k, v) => 'H');
-                        calculate();
-                      });
-                    },
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue),
-                    child: const Text("Holiday", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // STUDENTS
-          Expanded(
-            child: ListView(
-              children: filteredKeys.map((id) {
-                return ListTile(
-                  title: Text(studentNames[id] ?? id),
-                  trailing: buildToggle(id),
-                );
-              }).toList(),
-            ),
-          ),
-
-          // SAVE
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: ElevatedButton(
-              onPressed: isSaving ? null : saveAttendance,
-              child: isSaving
-                  ? const CircularProgressIndicator()
-                  : const Text("Save Attendance"),
-            ),
-          )
+          _topSelectors(),
+          Expanded(child: _studentsList()),
         ],
       ),
     );
   }
+
+  Widget _topSelectors() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          DropdownButtonFormField<Map<String, dynamic>>(
+            value: selectedClass,
+            decoration: _inputDecoration("Select Class"),
+            items: assignedClasses.map((assignment) {
+              return DropdownMenuItem(
+                value: assignment,
+                child: Text(assignment['className']),
+              );
+            }).toList(),
+            onChanged: (v) {
+              setState(() {
+                selectedClass = v;
+                selectedSection = null;
+              });
+            },
+          ),
+
+          const SizedBox(height: 14),
+
+          if (selectedClass != null)
+            DropdownButtonFormField<String>(
+              value: selectedSection,
+              decoration: _inputDecoration("Select Section"),
+              items: List<String>.from(
+                selectedClass!['sections'] ?? [],
+              ).map((section) {
+                return DropdownMenuItem(
+                  value: section,
+                  child: Text(section),
+                );
+              }).toList(),
+              onChanged: (v) {
+                setState(() {
+                  selectedSection = v;
+                });
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _studentsList() {
+    if (selectedClass == null || selectedSection == null) {
+      return _emptyState();
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .collection('students')
+          .where('classId', isEqualTo: selectedClass!['classId'])
+          .where('section', isEqualTo: selectedSection)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data!.docs;
+
+        if (docs.isEmpty) {
+          return const Center(child: Text("No students found"));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final doc = docs[index];
+            final data = doc.data() as Map<String, dynamic>;
+            final studentId = doc.id;
+
+            attendanceMap.putIfAbsent(studentId, () => "Present");
+
+            final currentStatus = attendanceMap[studentId];
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.grey.shade100),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xffEEF2FF),
+                    child: Text(
+                      (data['name'] ?? 'S').toString().substring(0, 1),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xff5B5FEF),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          data['name'] ?? '',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xff111827),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          data['admissionNo'] ?? '',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _attendanceButton(
+                    title: "P",
+                    color: const Color(0xffDCFCE7),
+                    textColor: const Color(0xff166534),
+                    isSelected: currentStatus == "Present",
+                    onTap: () => setState(() => attendanceMap[studentId] = "Present"),
+                  ),
+                  const SizedBox(width: 8),
+                  _attendanceButton(
+                    title: "A",
+                    color: const Color(0xffFEE2E2),
+                    textColor: const Color(0xff991B1B),
+                    isSelected: currentStatus == "Absent",
+                    onTap: () => setState(() => attendanceMap[studentId] = "Absent"),
+                  ),
+                  const SizedBox(width: 8),
+                  _attendanceButton(
+                    title: "L",
+                    color: const Color(0xffFEF3C7),
+                    textColor: const Color(0xff92400E),
+                    isSelected: currentStatus == "Leave",
+                    onTap: () => setState(() => attendanceMap[studentId] = "Leave"),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _attendanceButton({
+    required String title,
+    required Color color,
+    required Color textColor,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        height: 42,
+        width: 42,
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade300,
+            width: 1.5,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: isSelected ? textColor : Colors.grey,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            height: 90,
+            width: 90,
+            decoration: const BoxDecoration(
+              color: Color(0xffEEF2FF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_circle_outline,
+              size: 42,
+              color: Color(0xff5B5FEF),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            "Select Class & Section",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Color(0xff374151),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Choose class and section\nto mark attendance.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: const Color(0xffF8FAFC),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+    );
+  }
+
+  void _saveAttendance() {}
 }

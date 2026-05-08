@@ -537,9 +537,595 @@ class _ClassesSetupScreenState
     );
   }
 
-  // TODO: implement full sheet in next step
   void _showClassSheet({
+
     Map<String, dynamic>? editData,
     String? classId,
-  }) {}
+
+  }) {
+
+    final bool isEdit =
+        editData != null;
+
+    final nameController =
+        TextEditingController(
+      text: editData?['name'] ?? '',
+    );
+
+    String selectedGroup =
+        editData?['group'] ??
+            schoolGroups.first;
+
+    List<String> sections =
+        List<String>.from(
+      editData?['sections'] ?? [],
+    );
+
+    final sectionController =
+        TextEditingController();
+
+    showModalBottomSheet(
+
+      context: context,
+
+      isScrollControlled: true,
+
+      backgroundColor: Colors.transparent,
+
+      builder: (_) {
+
+        return StatefulBuilder(
+
+          builder: (context, setSheetState) {
+
+            return Container(
+
+              padding: EdgeInsets.only(
+
+                left: 24,
+                right: 24,
+                top: 24,
+
+                bottom:
+                    MediaQuery.of(context)
+                            .viewInsets
+                            .bottom +
+                        24,
+              ),
+
+              decoration: const BoxDecoration(
+
+                color: Colors.white,
+
+                borderRadius:
+                    BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
+              ),
+
+              child: SingleChildScrollView(
+
+                child: Column(
+
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+
+                  mainAxisSize:
+                      MainAxisSize.min,
+
+                  children: [
+
+                    Center(
+
+                      child: Container(
+
+                        height: 5,
+                        width: 60,
+
+                        decoration: BoxDecoration(
+
+                          color: Colors.grey.shade300,
+
+                          borderRadius:
+                              BorderRadius.circular(
+                            10,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    Text(
+
+                      isEdit
+                          ? "Edit Class"
+                          : "Add Class",
+
+                      style: const TextStyle(
+
+                        fontSize: 22,
+
+                        fontWeight:
+                            FontWeight.w700,
+
+                        color: Color(
+                          0xff111827,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    Text(
+
+                      "Centralized class and section configuration",
+
+                      style: TextStyle(
+
+                        fontSize: 13,
+
+                        color:
+                            Colors.grey.shade600,
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    _inputField(
+
+                      controller:
+                          nameController,
+
+                      label: "Class Name",
+
+                      hint:
+                          "Class 8",
+
+                      capitalization:
+                          TextCapitalization
+                              .characters,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    DropdownButtonFormField<String>(
+
+                      value: selectedGroup,
+
+                      decoration: InputDecoration(
+
+                        labelText:
+                            "Academic Group",
+
+                        filled: true,
+
+                        fillColor:
+                            const Color(
+                          0xffF8FAFC,
+                        ),
+
+                        border:
+                            OutlineInputBorder(
+
+                          borderRadius:
+                              BorderRadius.circular(
+                            16,
+                          ),
+
+                          borderSide:
+                              BorderSide.none,
+                        ),
+                      ),
+
+                      items:
+                          schoolGroups.map(
+                        (group) {
+
+                          return DropdownMenuItem(
+
+                            value: group,
+
+                            child: Text(
+                              group,
+                            ),
+                          );
+                        },
+                      ).toList(),
+
+                      onChanged: (v) {
+
+                        if (v != null) {
+
+                          setSheetState(() {
+                            selectedGroup = v;
+                          });
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    const Text(
+
+                      "Sections",
+
+                      style: TextStyle(
+
+                        fontSize: 15,
+
+                        fontWeight:
+                            FontWeight.w600,
+
+                        color: Color(
+                          0xff374151,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    Row(
+                      children: [
+
+                        Expanded(
+                          child: _inputField(
+
+                            controller:
+                                sectionController,
+
+                            label:
+                                "Add Section",
+
+                            hint:
+                                "A / BLUE / RED",
+
+                            capitalization:
+                                TextCapitalization
+                                    .characters,
+                          ),
+                        ),
+
+                        const SizedBox(
+                          width: 12,
+                        ),
+
+                        SizedBox(
+
+                          height: 56,
+
+                          child: ElevatedButton(
+
+                            style:
+                                ElevatedButton
+                                    .styleFrom(
+
+                              backgroundColor:
+                                  const Color(
+                                0xff5B5FEF,
+                              ),
+
+                              shape:
+                                  RoundedRectangleBorder(
+
+                                borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                  16,
+                                ),
+                              ),
+                            ),
+
+                            onPressed: () {
+
+                              final value =
+                                  sectionController
+                                      .text
+                                      .trim()
+                                      .toUpperCase();
+
+                              if (value.isEmpty) {
+                                return;
+                              }
+
+                              if (sections
+                                  .contains(
+                                value,
+                              )) {
+                                return;
+                              }
+
+                              setSheetState(() {
+
+                                sections
+                                    .add(value);
+
+                                sectionController
+                                    .clear();
+                              });
+                            },
+
+                            child: const Icon(
+                              Icons.add,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    Wrap(
+
+                      spacing: 10,
+                      runSpacing: 10,
+
+                      children:
+                          sections.map((s) {
+
+                        return Container(
+
+                          padding:
+                              const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+
+                          decoration:
+                              BoxDecoration(
+
+                            color:
+                                const Color(
+                              0xffF5F3FF,
+                            ),
+
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                              14,
+                            ),
+                          ),
+
+                          child: Row(
+
+                            mainAxisSize:
+                                MainAxisSize.min,
+
+                            children: [
+
+                              Text(
+
+                                s,
+
+                                style:
+                                    const TextStyle(
+
+                                  fontWeight:
+                                      FontWeight
+                                          .w600,
+
+                                  color: Color(
+                                    0xff5B5FEF,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(
+                                width: 8,
+                              ),
+
+                              GestureDetector(
+
+                                onTap: () {
+
+                                  setSheetState(() {
+                                    sections
+                                        .remove(s);
+                                  });
+                                },
+
+                                child: const Icon(
+
+                                  Icons.close,
+
+                                  size: 18,
+
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+
+                      }).toList(),
+                    ),
+
+                    const SizedBox(height: 34),
+
+                    SizedBox(
+
+                      width: double.infinity,
+                      height: 54,
+
+                      child: ElevatedButton(
+
+                        style:
+                            ElevatedButton
+                                .styleFrom(
+
+                          backgroundColor:
+                              const Color(
+                            0xff5B5FEF,
+                          ),
+
+                          shape:
+                              RoundedRectangleBorder(
+
+                            borderRadius:
+                                BorderRadius
+                                    .circular(
+                              16,
+                            ),
+                          ),
+                        ),
+
+                        onPressed: () async {
+
+                          final name =
+                              nameController.text
+                                  .trim();
+
+                          if (name.isEmpty ||
+                              sections.isEmpty) {
+
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(
+
+                              const SnackBar(
+                                content: Text(
+                                  "Fill all fields",
+                                ),
+                              ),
+                            );
+
+                            return;
+                          }
+
+                          if (isEdit) {
+
+                            await _service
+                                .updateClass(
+
+                              schoolId:
+                                  widget.schoolId,
+
+                              classId:
+                                  classId!,
+
+                              name: name,
+
+                              group:
+                                  selectedGroup,
+
+                              sections:
+                                  sections,
+                            );
+
+                          } else {
+
+                            await _service
+                                .addClass(
+
+                              schoolId:
+                                  widget.schoolId,
+
+                              name: name,
+
+                              group:
+                                  selectedGroup,
+
+                              sections:
+                                  sections,
+                            );
+                          }
+
+                          if (!mounted) return;
+
+                          Navigator.pop(context);
+                        },
+
+                        child: Text(
+
+                          isEdit
+                              ? "Update Class"
+                              : "Save Class",
+
+                          style: const TextStyle(
+
+                            fontSize: 15,
+
+                            fontWeight:
+                                FontWeight.w600,
+
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _inputField({
+
+    required TextEditingController controller,
+
+    required String label,
+    required String hint,
+
+    TextCapitalization capitalization =
+        TextCapitalization.none,
+
+  }) {
+
+    return TextField(
+
+      controller: controller,
+
+      textCapitalization:
+          capitalization,
+
+      decoration: InputDecoration(
+
+        labelText: label,
+
+        hintText: hint,
+
+        filled: true,
+
+        fillColor:
+            const Color(0xffF8FAFC),
+
+        border: OutlineInputBorder(
+
+          borderRadius:
+              BorderRadius.circular(16),
+
+          borderSide: BorderSide.none,
+        ),
+
+        enabledBorder:
+            OutlineInputBorder(
+
+          borderRadius:
+              BorderRadius.circular(16),
+
+          borderSide: BorderSide(
+            color: Colors.grey.shade200,
+          ),
+        ),
+
+        focusedBorder:
+            const OutlineInputBorder(
+
+          borderRadius:
+              BorderRadius.all(
+            Radius.circular(16),
+          ),
+
+          borderSide: BorderSide(
+            color: Color(0xff5B5FEF),
+          ),
+        ),
+      ),
+    );
+  }
 }

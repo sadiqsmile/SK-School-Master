@@ -1,12 +1,16 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-class ParentAnnouncementsScreen extends StatelessWidget {
+class ParentHomeworkScreen extends StatelessWidget {
   final String schoolId;
+  final String studentId;
+  final Map<String, dynamic> studentData;
 
-  const ParentAnnouncementsScreen({
+  const ParentHomeworkScreen({
     super.key,
     required this.schoolId,
+    required this.studentId,
+    required this.studentData,
   });
 
   @override
@@ -16,14 +20,14 @@ class ParentAnnouncementsScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text("Announcements"),
+        title: const Text("Homework"),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('schools')
             .doc(schoolId)
-            .collection('announcements')
-            .orderBy('createdAt', descending: true)
+            .collection('homework')
+            .where('classId', isEqualTo: studentData['classId'])
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
@@ -34,8 +38,8 @@ class ParentAnnouncementsScreen extends StatelessWidget {
 
           final docs = allDocs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            final roles = List<String>.from(data['targetRoles'] ?? []);
-            return roles.contains("parent");
+            final sections = List<String>.from(data['sections'] ?? []);
+            return sections.contains(studentData['section']);
           }).toList();
 
           if (docs.isEmpty) {
@@ -48,23 +52,6 @@ class ParentAnnouncementsScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final doc = docs[index];
               final data = doc.data() as Map<String, dynamic>;
-              final priority = data['priority'];
-
-              Color badgeColor = const Color(0xffDBEAFE);
-              Color textColor = const Color(0xff1D4ED8);
-              IconData icon = Icons.notifications;
-
-              if (priority == "High") {
-                badgeColor = const Color(0xffFEE2E2);
-                textColor = const Color(0xff991B1B);
-                icon = Icons.warning_amber_rounded;
-              }
-
-              if (priority == "Medium") {
-                badgeColor = const Color(0xffFEF3C7);
-                textColor = const Color(0xff92400E);
-                icon = Icons.info_outline;
-              }
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -79,16 +66,6 @@ class ParentAnnouncementsScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Container(
-                          height: 52,
-                          width: 52,
-                          decoration: BoxDecoration(
-                            color: badgeColor,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(icon, color: textColor),
-                        ),
-                        const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,46 +73,22 @@ class ParentAnnouncementsScreen extends StatelessWidget {
                               Text(
                                 data['title'] ?? '',
                                 style: const TextStyle(
-                                  fontSize: 17,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xff111827),
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: badgeColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  priority,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: textColor,
-                                  ),
+                              Text(
+                                "${data['subjectName']} • ${data['className']}",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      data['description'] ?? '',
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.7,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
@@ -146,10 +99,41 @@ class ParentAnnouncementsScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Text(
-                            data['createdBy'] ?? 'Admin',
+                            data['dueDate'] ?? '',
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               color: Color(0xff5B5FEF),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      data['description'] ?? '',
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.6,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xffDCFCE7),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Text(
+                            "Active Homework",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xff166534),
                             ),
                           ),
                         ),
@@ -178,14 +162,14 @@ class ParentAnnouncementsScreen extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.campaign_outlined,
+              Icons.menu_book_outlined,
               size: 42,
               color: Color(0xff5B5FEF),
             ),
           ),
           const SizedBox(height: 20),
           const Text(
-            "No Announcements",
+            "No Homework Found",
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -194,7 +178,7 @@ class ParentAnnouncementsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            "School announcements and\nimportant notices will appear here.",
+            "Homework shared by teachers\nwill appear here.",
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,

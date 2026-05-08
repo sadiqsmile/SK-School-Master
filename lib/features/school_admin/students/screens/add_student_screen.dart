@@ -19,8 +19,10 @@ class AddStudentScreen extends ConsumerStatefulWidget {
 class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
   final nameController = TextEditingController();
   final admissionController = TextEditingController();
-  final parentNameController = TextEditingController();
+  final fatherNameController = TextEditingController();
+  final motherNameController = TextEditingController();
   final parentPhoneController = TextEditingController();
+  final parentEmailController = TextEditingController();
 
   String? selectedClassId;
   String? selectedClassName;
@@ -37,8 +39,10 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
   void dispose() {
     nameController.dispose();
     admissionController.dispose();
-    parentNameController.dispose();
+    fatherNameController.dispose();
+    motherNameController.dispose();
     parentPhoneController.dispose();
+    parentEmailController.dispose();
     super.dispose();
   }
 
@@ -48,12 +52,21 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
 
     final name = nameController.text.trim().toUpperCase();
     final admissionNo = admissionController.text.trim().toUpperCase();
-    final parentName = parentNameController.text.trim().toUpperCase();
+    final fatherName = fatherNameController.text.trim().toUpperCase();
+    final motherName = motherNameController.text.trim().toUpperCase();
     final parentPhone = parentPhoneController.text.trim();
+    final parentEmail = parentEmailController.text.trim().toLowerCase();
 
     if (name.isEmpty || admissionNo.isEmpty) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Enter student name and admission no')),
+      );
+      return;
+    }
+
+    if (parentPhone.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Parent phone is required')),
       );
       return;
     }
@@ -81,8 +94,10 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
           'className': selectedClassName!.trim(),
           'section': selectedSection!.trim(),
           'classKey': "${selectedClassName!.trim()}_${selectedSection!.trim()}",
-          if (parentName.isNotEmpty) 'parentName': parentName,
+          if (fatherName.isNotEmpty) 'fatherName': fatherName,
+          if (motherName.isNotEmpty) 'motherName': motherName,
           if (parentPhone.isNotEmpty) 'parentPhone': parentPhone,
+          if (parentEmail.isNotEmpty) 'parentEmail': parentEmail,
           'hostel': isHostel,
           'dayScholar': !isHostel,
           'mess': isHostel ? true : isMess,
@@ -198,11 +213,20 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
                 const SizedBox(height: 10),
 
                 TextField(
-                  controller: parentNameController,
+                  controller: fatherNameController,
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: const [UpperCaseTextFormatter()],
                   decoration:
-                      const InputDecoration(labelText: 'Parent Name'),
+                      const InputDecoration(labelText: 'Father Name'),
+                ),
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: motherNameController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: const [UpperCaseTextFormatter()],
+                  decoration:
+                      const InputDecoration(labelText: 'Mother Name'),
                 ),
                 const SizedBox(height: 10),
 
@@ -210,7 +234,15 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
                   controller: parentPhoneController,
                   keyboardType: TextInputType.phone,
                   decoration:
-                      const InputDecoration(labelText: 'Parent Phone'),
+                      const InputDecoration(labelText: 'Parent Phone *'),
+                ),
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: parentEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration:
+                      const InputDecoration(labelText: 'Parent Email (optional)'),
                 ),
 
                 const SizedBox(height: 16),

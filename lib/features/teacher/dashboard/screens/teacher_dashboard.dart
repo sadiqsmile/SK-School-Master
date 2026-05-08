@@ -31,6 +31,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   String schoolId = "";
   String className = "";
   String section = "";
+  String teacherId = "";
+  Map<String, dynamic> teacherData = {};
 
   File? image;
   Uint8List? webImage;
@@ -64,7 +66,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
       final userData = userDoc.data()!;
       schoolId = userData["schoolId"] ?? "";
 
-      final teacherId = userData["teacherId"] ?? user.uid;
+      teacherId = userData["teacherId"] ?? user.uid;
 
       if (schoolId.isEmpty) {
         if (mounted) setState(() {});
@@ -81,6 +83,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
       if (teacherDoc.exists) {
         final data = teacherDoc.data()!;
         teacherName = data["name"] ?? "";
+        teacherData = data;
 
         final keys = List<String>.from(
           data["assignmentKeys"] ?? [],
@@ -360,12 +363,12 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                     MaterialPageRoute(
                       builder: (_) =>
                           AttendanceScreen(
-                        className:
-                            className,
-                        section:
-                            section,
                         schoolId:
                             schoolId,
+                        teacherId:
+                            teacherId,
+                        teacherData:
+                            teacherData,
                       ),
                     ),
                   );
@@ -881,12 +884,9 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
             MaterialPageRoute(
               builder: (_) =>
                   AttendanceScreen(
-                className:
-                    className,
-                section:
-                    section,
-                schoolId:
-                    schoolId,
+                schoolId: schoolId,
+                teacherId: teacherId,
+                teacherData: teacherData,
               ),
             ),
           );

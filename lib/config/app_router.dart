@@ -43,6 +43,7 @@ import 'package:school_app/features/school_admin/analytics/screens/school_analyt
 import 'package:school_app/features/school_admin/analytics/screens/student_risk_list_screen.dart';
 import 'package:school_app/features/school_admin/notifications/screens/notifications_screen.dart';
 import 'package:school_app/features/school_admin/settings/screens/modules_control_screen.dart';
+import 'package:school_app/features/school_admin/academic_setup/screens/academic_setup_dashboard.dart';
 import 'package:school_app/features/parent/screens/parent_login_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/teacher_attendance_screen.dart';
 import 'package:school_app/features/teacher/homework/screens/homework_screen.dart';
@@ -427,6 +428,19 @@ final appRouter = GoRouter(
           allowedRoles: const [UserRole.admin],
           requiredModules: const [SchoolModuleKey.students],
           child: StudentReportDetailScreen(studentId: studentId),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/school-admin/academic-setup',
+      builder: (context, state) {
+        final schoolId = state.extra as String;
+        return RoleGuard(
+          title: 'Academic Setup',
+          allowedRoles: const [UserRole.admin],
+          child: AcademicSetupDashboard(
+            schoolId: schoolId,
+          ),
         );
       },
     ),

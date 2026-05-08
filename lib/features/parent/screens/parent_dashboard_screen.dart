@@ -1,302 +1,376 @@
-// features/parent/screens/parent_dashboard_screen.dart
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'parent_announcements_screen.dart';
+import 'parent_attendance_screen.dart';
+import 'parent_homework_screen.dart';
+import 'parent_marks_analytics_screen.dart';
+import '../../student/screens/report_card_screen.dart';
 
-import 'package:school_app/features/parent/screens/parent_announcements_screen.dart';
+class ParentDashboardScreen extends StatefulWidget {
+  final String schoolId;
+  final String parentId;
+  final Map<String, dynamic> parentData;
 
-import 'package:school_app/models/student.dart';
-import 'package:school_app/providers/core_providers.dart';
-import 'package:school_app/features/parent/providers/parent_children_provider.dart';
-import 'package:school_app/models/announcement.dart';
-import 'package:school_app/providers/announcement_provider.dart';
-import 'package:school_app/features/announcements/screens/announcement_detail_screen.dart';
-import 'package:school_app/core/widgets/web_dashboard_footer.dart';
-
-class ParentDashboardScreen extends ConsumerStatefulWidget {
-  const ParentDashboardScreen({super.key});
-
-  @override
-  ConsumerState<ParentDashboardScreen> createState() =>
-      _ParentDashboardScreenState();
-}
-
-class _ParentDashboardScreenState extends ConsumerState<ParentDashboardScreen> {
-  @override
-  void initState() {
-    super.initState();
-
-    // Auto-select the first child when the list loads.
-    ref.listen<AsyncValue<List<Student>>>(parentChildrenProvider, (prev, next) {
-      next.whenOrNull(
-        data: (children) {
-          final selected = ref.read(selectedChildIdProvider);
-          if (children.isEmpty) return;
-          if (selected != null) return;
-          // Post-frame to avoid set-state during build.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            ref.read(selectedChildIdProvider.notifier).state =
-                children.first.id;
-          });
-        },
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final childrenAsync = ref.watch(parentChildrenProvider);
-    final selectedChild = ref.watch(selectedChildProvider);
-    final announcementsAsync = ref.watch(announcementsProvider);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Parent'),
-        actions: [
-          IconButton(
-            tooltip: 'Logout',
-            onPressed: () => ref.read(authServiceProvider).signOut(),
-            icon: const Icon(Icons.logout_rounded),
-          ),
-        ],
-      ),
-      body: childrenAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text('Failed to load your children: $e'),
-          ),
-        ),
-        data: (children) {
-          if (children.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'No students are linked to this parent account yet.\n\nPlease contact the school admin.',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-
-          final selectedId = ref.watch(selectedChildIdProvider);
-          final effectiveSelectedId = selectedId ?? children.first.id;
-
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _AnnouncementsPreviewCard(
-                children: children,
-                announcementsAsync: announcementsAsync,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: ValueKey<String>(effectiveSelectedId),
-                initialValue: effectiveSelectedId,
-                decoration: const InputDecoration(
-                  labelText: 'Select child',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final s in children)
-                    DropdownMenuItem(
-                      value: s.id,
-                      child: Text(s.name.isEmpty ? s.id : s.name),
-                    ),
-                ],
-                onChanged: (value) {
-                  ref.read(selectedChildIdProvider.notifier).state = value;
-                },
-              ),
-              const SizedBox(height: 16),
-              if (selectedChild != null)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          selectedChild.name.isEmpty
-                              ? 'Student: ${selectedChild.id}'
-                              : selectedChild.name,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text('Admission No: ${selectedChild.admissionNo}'),
-                        Text('Class: ${selectedChild.classId}'),
-                        Text('Section: ${selectedChild.section}'),
-                      ],
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              const Text(
-                'More features coming next:',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: const Icon(Icons.campaign_outlined),
-                title: const Text('Announcements'),
-                subtitle: const Text('Read messages from school'),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ParentAnnouncementsScreen(),
-                    ),
-                  );
-                },
-              ),
-              const ListTile(
-                leading: Icon(Icons.fact_check_outlined),
-                title: Text('Attendance'),
-                subtitle: Text('Read-only view (to be implemented)'),
-              ),
-              const ListTile(
-                leading: Icon(Icons.menu_book_outlined),
-                title: Text('Homework'),
-                subtitle: Text('Read-only view (to be implemented)'),
-              ),
-              const ListTile(
-                leading: Icon(Icons.payments_outlined),
-                title: Text('Fees'),
-                subtitle: Text('Read-only view (to be implemented)'),
-              ),
-              const WebDashboardFooter(),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _AnnouncementsPreviewCard extends StatelessWidget {
-  const _AnnouncementsPreviewCard({
-    required this.children,
-    required this.announcementsAsync,
+  const ParentDashboardScreen({
+    super.key,
+    required this.schoolId,
+    required this.parentId,
+    required this.parentData,
   });
 
-  final List<Student> children;
-  final AsyncValue announcementsAsync;
+  @override
+  State<ParentDashboardScreen> createState() => _ParentDashboardScreenState();
+}
 
+class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
+    final List<dynamic> studentIds = widget.parentData['studentIds'] ?? [];
+
+    return Scaffold(
+      backgroundColor: const Color(0xffF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Recent Announcements',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ParentAnnouncementsScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text('See all'),
-                ),
-              ],
+            const Text(
+              "Parent Dashboard",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xff111827),
+              ),
             ),
-            const SizedBox(height: 8),
-            announcementsAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.all(8),
-                child: LinearProgressIndicator(),
+            Text(
+              widget.parentData['name'] ?? '',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
               ),
-              error: (e, _) => Text(
-                'Failed to load announcements: $e',
-                style: const TextStyle(color: Color(0xFF6B7280)),
-              ),
-              data: (snapshot) {
-                final visible = snapshot.docs
-                    .map(Announcement.fromDoc)
-                    .where((a) => _isVisibleForParent(a.target, children))
-                    .take(3)
-                    .toList(growable: false);
-
-                if (visible.isEmpty) {
-                  return const Text(
-                    'No announcements yet.',
-                    style: TextStyle(color: Color(0xFF6B7280)),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    for (final a in visible)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.campaign_rounded),
-                        title: Text(
-                          a.title.trim().isEmpty
-                              ? '(Untitled)'
-                              : a.title.trim(),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        subtitle: Text(
-                          a.message.trim().isEmpty
-                              ? '(No message)'
-                              : a.message.trim(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  AnnouncementDetailScreen(announcement: a),
-                            ),
-                          );
-                        },
-                      ),
-                  ],
-                );
-              },
             ),
           ],
         ),
       ),
+      body: studentIds.isEmpty
+          ? _emptyState()
+          : StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('schools')
+                  .doc(widget.schoolId)
+                  .collection('students')
+                  .where(
+                    FieldPath.documentId,
+                    whereIn: studentIds,
+                  )
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final students = snapshot.data!.docs;
+
+                if (students.isEmpty) {
+                  return _emptyState();
+                }
+
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    ...students.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      return _studentCard(data, doc.id);
+                    }).toList(),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ParentAnnouncementsScreen(
+                              schoolId: widget.schoolId,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.grey.shade100),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              height: 58,
+                              width: 58,
+                              decoration: BoxDecoration(
+                                color: const Color(0xffEEF2FF),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: const Icon(
+                                Icons.campaign,
+                                color: Color(0xff5B5FEF),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Announcements",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xff111827),
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    "School notices & updates",
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
     );
   }
-}
 
-bool _isVisibleForParent(String target, List<Student> children) {
-  final t = target.trim();
-  if (t == 'all') return true;
-  if (t == 'parents') return true;
-
-  if (!t.startsWith('class_')) return false;
-  final parsed = _parseClassTarget(t);
-  if (parsed == null) return false;
-
-  final (classId, sectionId) = parsed;
-  for (final c in children) {
-    if (c.classId.trim() == classId && c.section.trim() == sectionId) {
-      return true;
-    }
+  Widget _studentCard(Map<String, dynamic> student, String studentId) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 32,
+                backgroundColor: const Color(0xffEEF2FF),
+                backgroundImage: student['photoUrl'] != null &&
+                        student['photoUrl'].toString().isNotEmpty
+                    ? NetworkImage(student['photoUrl'])
+                    : null,
+                child: student['photoUrl'] == null ||
+                        student['photoUrl'].toString().isEmpty
+                    ? Text(
+                        (student['name'] ?? 'S').toString().substring(0, 1),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xff5B5FEF),
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      student['name'] ?? '',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xff111827),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "${student['className']} • Section ${student['section']}",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ParentAttendanceScreen(
+                          schoolId: widget.schoolId,
+                          studentId: studentId,
+                          studentData: student,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _quickTile(
+                    icon: Icons.check_circle,
+                    title: "Attendance",
+                    color: const Color(0xffDCFCE7),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ParentMarksAnalyticsScreen(
+                          schoolId: widget.schoolId,
+                          studentId: studentId,
+                          studentData: student,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _quickTile(
+                    icon: Icons.assignment,
+                    title: "Marks",
+                    color: const Color(0xffDBEAFE),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ParentHomeworkScreen(
+                          schoolId: widget.schoolId,
+                          studentId: studentId,
+                          studentData: student,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _quickTile(
+                    icon: Icons.menu_book,
+                    title: "Homework",
+                    color: const Color(0xffFEF3C7),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ReportCardScreen(
+                          schoolId: widget.schoolId,
+                          studentId: studentId,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _quickTile(
+                    icon: Icons.picture_as_pdf,
+                    title: "Report Card",
+                    color: const Color(0xffF3E8FF),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
-  return false;
-}
 
-(String, String)? _parseClassTarget(String target) {
-  final parts = target.split('_');
-  if (parts.length < 3) return null;
-  final classId = parts[1].trim();
-  final sectionId = parts.sublist(2).join('_').trim();
-  if (classId.isEmpty || sectionId.isEmpty) return null;
-  return (classId, sectionId);
+  Widget _quickTile({
+    required IconData icon,
+    required String title,
+    required Color color,
+  }) {
+    return Container(
+      height: 90,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 28),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            height: 90,
+            width: 90,
+            decoration: const BoxDecoration(
+              color: Color(0xffEEF2FF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.family_restroom,
+              size: 42,
+              color: Color(0xff5B5FEF),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            "No Students Linked",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Color(0xff374151),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Student accounts linked to this\nparent will appear here.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

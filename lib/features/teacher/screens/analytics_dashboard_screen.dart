@@ -212,21 +212,7 @@ class _AnalyticsDashboardScreenState
                                         color: Colors.transparent,
                                         child: InkWell(
                                           borderRadius: BorderRadius.circular(10),
-                                          onTap: () {
-                                            final selectedDate =
-                                                "${selectedMonth.year}-${selectedMonth.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => AttendanceScreen(
-                                                  className: widget.className,
-                                                  section: widget.section,
-                                                  schoolId: widget.schoolId,
-                                                  selectedDate: selectedDate,
-                                                ),
-                                              ),
-                                            );
-                                          },
+                                          onTap: () {},
                                           child: Column(
                                             mainAxisAlignment: MainAxisAlignment.end,
                                             children: [

@@ -1,6 +1,7 @@
 // features/school_admin/students/services/student_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:school_app/core/utils/firestore_keys.dart';
+import '../../../parent/services/parent_service.dart';
 
 class DuplicateAdmissionNumberException implements Exception {
   DuplicateAdmissionNumberException(this.admissionNo);
@@ -17,6 +18,7 @@ class StudentService {
       : _db = db ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
+  final ParentService _parentService = ParentService();
 
   Future<String> _resolveActiveAcademicYearId(
     String schoolId,
@@ -113,6 +115,26 @@ class StudentService {
 
       return docRef;
     });
+
+    // Auto-create or link parent after student is persisted
+    final fatherName =
+        (data['fatherName'] ?? data['parentName'] ?? '').toString().trim();
+    final parentPhone =
+        (data['parentPhone'] ?? '').toString().trim();
+    final studentName =
+        (data['name'] ?? '').toString().trim();
+
+    if (fatherName.isNotEmpty && parentPhone.isNotEmpty) {
+      await _parentService.createOrLinkParent(
+        schoolId: schoolId,
+        studentId: docRef.id,
+        studentName: studentName,
+        parentName: fatherName,
+        phone: parentPhone,
+      );
+    }
+
+    return docRef;
   }
 
   // ==========================================================

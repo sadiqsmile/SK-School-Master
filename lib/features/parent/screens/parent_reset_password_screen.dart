@@ -2,102 +2,82 @@
 import 'package:flutter/material.dart';
 
 import 'parent_dashboard_screen.dart';
-import 'parent_reset_password_screen.dart';
 
-class ParentLoginScreen extends StatefulWidget {
-  const ParentLoginScreen({super.key});
+class ParentResetPasswordScreen extends StatefulWidget {
+  final String schoolId;
+  final String parentId;
+  final Map<String, dynamic> parentData;
+
+  const ParentResetPasswordScreen({
+    super.key,
+    required this.schoolId,
+    required this.parentId,
+    required this.parentData,
+  });
 
   @override
-  State<ParentLoginScreen> createState() => _ParentLoginScreenState();
+  State<ParentResetPasswordScreen> createState() =>
+      _ParentResetPasswordScreenState();
 }
 
-class _ParentLoginScreenState extends State<ParentLoginScreen> {
-  final phoneController = TextEditingController();
+class _ParentResetPasswordScreenState
+    extends State<ParentResetPasswordScreen> {
   final passwordController = TextEditingController();
+  final confirmController = TextEditingController();
 
+  bool obscure1 = true;
+  bool obscure2 = true;
   bool isLoading = false;
-  bool obscurePassword = true;
 
   @override
   void dispose() {
-    phoneController.dispose();
     passwordController.dispose();
+    confirmController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
-    final phone = phoneController.text.trim();
+  Future<void> _resetPassword() async {
     final password = passwordController.text.trim();
+    final confirm = confirmController.text.trim();
 
-    if (phone.isEmpty || password.isEmpty) {
-      _showMessage("Enter phone & password");
+    if (password.length < 4) {
+      _showMessage("Password too short");
+      return;
+    }
+
+    if (password != confirm) {
+      _showMessage("Passwords do not match");
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
-      final schoolsSnapshot =
-          await FirebaseFirestore.instance.collection('schools').get();
-
-      QueryDocumentSnapshot? matchedParent;
-      String? matchedSchoolId;
-
-      for (final school in schoolsSnapshot.docs) {
-        final parentQuery = await school.reference
-            .collection('parents')
-            .where('phone', isEqualTo: phone)
-            .limit(1)
-            .get();
-
-        if (parentQuery.docs.isNotEmpty) {
-          matchedParent = parentQuery.docs.first;
-          matchedSchoolId = school.id;
-          break;
-        }
-      }
-
-      if (matchedParent == null) {
-        _showMessage("Parent account not found");
-        setState(() => isLoading = false);
-        return;
-      }
-
-      final parentData = matchedParent.data() as Map<String, dynamic>;
-
-      if (parentData['password'] != password) {
-        _showMessage("Invalid password");
-        setState(() => isLoading = false);
-        return;
-      }
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .collection('parents')
+          .doc(widget.parentId)
+          .update({
+        "password": password,
+        "mustChangePassword": false,
+      });
 
       if (!mounted) return;
 
-      if (parentData['mustChangePassword'] == true) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ParentResetPasswordScreen(
-              schoolId: matchedSchoolId!,
-              parentId: matchedParent!.id,
-              parentData: parentData,
-            ),
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ParentDashboardScreen(
+            schoolId: widget.schoolId,
+            parentId: widget.parentId,
+            parentData: widget.parentData,
           ),
-        );
-      } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ParentDashboardScreen(
-              schoolId: matchedSchoolId!,
-              parentId: matchedParent!.id,
-              parentData: parentData,
-            ),
-          ),
-        );
-      }
+        ),
+        (route) => false,
+      );
     } catch (e) {
-      _showMessage("Login failed");
+      _showMessage("Failed to update password");
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -131,7 +111,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.family_restroom,
+                        Icons.lock_reset,
                         size: 42,
                         color: Color(0xff5B5FEF),
                       ),
@@ -140,7 +120,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                   const SizedBox(height: 28),
                   const Center(
                     child: Text(
-                      "Parent Login",
+                      "Reset Password",
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
@@ -148,10 +128,10 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Center(
                     child: Text(
-                      "Login using registered phone number",
+                      "Create a new password for your account",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -161,22 +141,28 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                   ),
                   const SizedBox(height: 32),
                   TextField(
-                    controller: phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: _inputDecoration("Phone Number", Icons.phone),
+                    controller: passwordController,
+                    obscureText: obscure1,
+                    decoration:
+                        _inputDecoration("New Password", Icons.lock).copyWith(
+                      suffixIcon: IconButton(
+                        onPressed: () => setState(() => obscure1 = !obscure1),
+                        icon: Icon(
+                            obscure1 ? Icons.visibility_off : Icons.visibility),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 18),
                   TextField(
-                    controller: passwordController,
-                    obscureText: obscurePassword,
+                    controller: confirmController,
+                    obscureText: obscure2,
                     decoration:
-                        _inputDecoration("Password", Icons.lock).copyWith(
+                        _inputDecoration("Confirm Password", Icons.lock_outline)
+                            .copyWith(
                       suffixIcon: IconButton(
-                        onPressed: () =>
-                            setState(() => obscurePassword = !obscurePassword),
-                        icon: Icon(obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility),
+                        onPressed: () => setState(() => obscure2 = !obscure2),
+                        icon: Icon(
+                            obscure2 ? Icons.visibility_off : Icons.visibility),
                       ),
                     ),
                   ),
@@ -191,7 +177,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      onPressed: isLoading ? null : _login,
+                      onPressed: isLoading ? null : _resetPassword,
                       child: isLoading
                           ? const SizedBox(
                               height: 20,
@@ -200,7 +186,7 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
                                   strokeWidth: 2, color: Colors.white),
                             )
                           : const Text(
-                              "Login",
+                              "Save Password",
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,

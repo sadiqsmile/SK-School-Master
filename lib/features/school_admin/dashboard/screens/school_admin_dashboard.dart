@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/features/school_admin/dashboard/providers/dashboard_providers.dart';
 import 'package:school_app/providers/current_school_provider.dart';
@@ -90,12 +91,12 @@ class SchoolAdminDashboard extends ConsumerWidget {
                     const SizedBox(height: 18),
 
                     mobile
-                        ? _quickActions(context)
+                        ? _quickActions(context, schoolId)
                         : Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
-                                child: _quickActions(context),
+                                child: _quickActions(context, schoolId),
                               ),
                             ],
                           ),
@@ -233,7 +234,7 @@ class SchoolAdminDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _quickActions(BuildContext context) {
+  Widget _quickActions(BuildContext context, String schoolId) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -272,6 +273,17 @@ class SchoolAdminDashboard extends ConsumerWidget {
               Navigator.pushNamed(
                 context,
                 '/school-admin/analytics',
+              );
+            },
+          ),
+          _tile(
+            context,
+            Icons.account_tree_rounded,
+            'Academic Setup',
+            () {
+              context.push(
+                '/school-admin/academic-setup',
+                extra: schoolId,  // passed from currentSchoolProvider data callback
               );
             },
           ),
