@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:school_app/features/teacher/screens/teacher_profile_screen.dart';
 import 'package:school_app/features/school_admin/teachers/screens/assign_teacher_screen.dart';
 import 'package:school_app/features/school_admin/fees/screens/fee_list_screen.dart';
@@ -56,6 +57,9 @@ import 'package:school_app/models/user_role.dart';
 import 'package:school_app/main.dart' show navigatorKey;
 import 'package:school_app/features/school_admin/students/screens/restore_students_screen.dart';
 import 'package:school_app/features/school_admin/students/screens/bulk_delete_students_screen.dart';
+import 'package:school_app/features/school_admin/teachers/screens/archived_teachers_screen.dart';
+import 'package:school_app/providers/school_admin_provider.dart' show schoolIdProvider;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final appRouter = GoRouter(
   navigatorKey: navigatorKey,
@@ -316,6 +320,27 @@ final appRouter = GoRouter(
         title: 'Module Control',
         allowedRoles: [UserRole.admin],
         child: ModulesControlScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/school-admin/settings/archived-teachers',
+      builder: (context, state) => Consumer(
+        builder: (context, ref, _) {
+          final schoolIdAsync = ref.watch(schoolIdProvider);
+          return schoolIdAsync.when(
+            data: (schoolId) => RoleGuard(
+              title: 'Archived Teachers',
+              allowedRoles: const [UserRole.admin],
+              child: ArchivedTeachersScreen(schoolId: schoolId),
+            ),
+            loading: () => const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => Scaffold(
+              body: Center(child: Text('Error: $e')),
+            ),
+          );
+        },
       ),
     ),
     GoRoute(

@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
+import 'teacher_profile_screen.dart';
 
 class TeachersScreen extends ConsumerWidget {
   const TeachersScreen({super.key});
@@ -15,8 +16,15 @@ class TeachersScreen extends ConsumerWidget {
     final teachersAsync =
         ref.watch(teachersProvider);
 
+    final schoolIdAsync = ref.watch(schoolIdProvider);
+
     return AdminLayout(
       title: 'Teachers',
+      onSettingsPressed: () => showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _TeacherSettingsSheet(context: context),
+      ),
       floatingActionButton:
           FloatingActionButton.extended(
         onPressed: () =>
@@ -43,13 +51,75 @@ class TeachersScreen extends ConsumerWidget {
           ),
         ),
         data: (snapshot) {
-          final teachers =
-              snapshot.docs;
+          final teachers = snapshot.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return data['archived'] != true;
+          }).toList();
 
           if (teachers.isEmpty) {
-            return const Center(
-              child: Text(
-                'No teachers added',
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+
+                  Container(
+                    height: 90,
+                    width: 90,
+                    decoration: BoxDecoration(
+                      color: Colors.deepPurple.withOpacity(0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.groups_rounded,
+                      size: 42,
+                      color: Colors.deepPurple,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    "No Active Teachers",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xff374151),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    "Add teachers to manage classes,\nsubjects and timetable.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      context.push('/add-teacher');
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text("Add Teacher"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
           }
@@ -238,6 +308,8 @@ class TeachersScreen extends ConsumerWidget {
                           context:
                               context,
                           ref: ref,
+                          schoolId:
+                              schoolIdAsync.value ?? '',
                           teacherId:
                               teacherId,
                           name:
@@ -426,13 +498,26 @@ class TeachersScreen extends ConsumerWidget {
   Widget _teacherCard({
     required BuildContext context,
     required WidgetRef ref,
+    required String schoolId,
     required String teacherId,
     required String name,
     required String email,
     required String phone,
     required List assignmentKeys,
   }) {
-    return Container(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TeacherProfileScreen(
+              schoolId: schoolId,
+              teacherId: teacherId,
+            ),
+          ),
+        );
+      },
+      child: Container(
       margin:
           const EdgeInsets.only(
         bottom: 14,
@@ -676,6 +761,7 @@ class TeachersScreen extends ConsumerWidget {
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -750,5 +836,190 @@ class TeachersScreen extends ConsumerWidget {
         ),
       );
     }
+  }
+}
+
+// ─── Teacher Settings Bottom Sheet ─────────────────────────────────────────
+
+class _TeacherSettingsSheet extends StatelessWidget {
+  final BuildContext context;
+  const _TeacherSettingsSheet({required this.context});
+
+  @override
+  Widget build(BuildContext ctx) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // handle bar
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xffE5E7EB),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Teacher Settings',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xff1F2937),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _SheetTile(
+            icon: Icons.archive_outlined,
+            iconColor: const Color(0xff5B5FEF),
+            iconBg: const Color(0xffEEEFFF),
+            title: 'Archived Teachers',
+            subtitle: 'View and restore deleted teachers',
+            onTap: () {
+              Navigator.pop(ctx);
+              context.push('/school-admin/settings/archived-teachers');
+            },
+          ),
+          const SizedBox(height: 8),
+          _SheetTile(
+            icon: Icons.file_download_outlined,
+            iconColor: const Color(0xff0891B2),
+            iconBg: const Color(0xffE0F7FA),
+            title: 'Export Teachers',
+            subtitle: 'Download teacher list as spreadsheet',
+            comingSoon: true,
+          ),
+          const SizedBox(height: 8),
+          _SheetTile(
+            icon: Icons.file_upload_outlined,
+            iconColor: const Color(0xff059669),
+            iconBg: const Color(0xffD1FAE5),
+            title: 'Import Teachers',
+            subtitle: 'Bulk import teachers from a file',
+            comingSoon: true,
+          ),
+          const SizedBox(height: 8),
+          _SheetTile(
+            icon: Icons.lock_outline_rounded,
+            iconColor: const Color(0xffD97706),
+            iconBg: const Color(0xffFEF3C7),
+            title: 'Teacher Permissions',
+            subtitle: 'Control what teachers can access',
+            comingSoon: true,
+          ),
+          const SizedBox(height: 8),
+          _SheetTile(
+            icon: Icons.badge_outlined,
+            iconColor: const Color(0xffDC2626),
+            iconBg: const Color(0xffFEE2E2),
+            title: 'Teacher Roles',
+            subtitle: 'Assign roles like HOD, Class Teacher',
+            comingSoon: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final bool comingSoon;
+
+  const _SheetTile({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+    this.comingSoon = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xffF9FAFB),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: comingSoon ? null : onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                height: 42,
+                width: 42,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xff1F2937),
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xff6B7280),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (comingSoon)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffF3F4F6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Soon',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xff9CA3AF),
+                    ),
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xff9CA3AF),
+                  size: 20,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

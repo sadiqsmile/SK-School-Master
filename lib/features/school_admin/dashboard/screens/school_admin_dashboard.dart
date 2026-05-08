@@ -2,34 +2,23 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fl_chart/fl_chart.dart';
 
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
-import 'package:school_app/features/school_admin/analytics/providers/analytics_provider.dart';
+import 'package:school_app/features/school_admin/dashboard/providers/dashboard_providers.dart';
+import 'package:school_app/providers/current_school_provider.dart';
 
 class SchoolAdminDashboard extends ConsumerWidget {
   const SchoolAdminDashboard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final analyticsAsync = ref.watch(analyticsProvider);
+    final schoolAsync = ref.watch(currentSchoolProvider);
 
     return AdminLayout(
       title: 'Dashboard',
-      body: analyticsAsync.when(
-        data: (data) {
-          final students = (data['students'] ?? 0).toString();
-          final totalFees = (data['totalFees'] ?? 0).toString();
-          final paidFees = (data['paidFees'] ?? 0).toString();
-          final pendingFees = (data['pendingFees'] ?? 0).toString();
-
-          final paidY = (data['paidFees'] is num)
-              ? (data['paidFees'] as num).toDouble()
-              : 0.0;
-
-          final pendingY = (data['pendingFees'] is num)
-              ? (data['pendingFees'] as num).toDouble()
-              : 0.0;
+      body: schoolAsync.when(
+        data: (school) {
+          final schoolId = school.id;
 
           return LayoutBuilder(
             builder: (context, box) {
@@ -48,38 +37,52 @@ class SchoolAdminDashboard extends ConsumerWidget {
                       crossAxisSpacing: 14,
                       mainAxisSpacing: 14,
                       shrinkWrap: true,
-                      physics:
-                          const NeverScrollableScrollPhysics(),
-                      childAspectRatio:
-                          mobile ? 1.20 : 1.45,
+                      physics: const NeverScrollableScrollPhysics(),
+                      childAspectRatio: mobile ? 1.20 : 1.45,
                       children: [
-                        _metricCard(
-                          title: 'Students',
-                          value: students,
-                          icon: Icons.groups_rounded,
-                          start: const Color(0xFF3B82F6),
-                          end: const Color(0xFF2563EB),
+                        ref.watch(studentsCountProvider(schoolId)).when(
+                          data: (count) => _metricCard(
+                            title: 'Students',
+                            value: count.toString(),
+                            icon: Icons.groups_rounded,
+                            start: const Color(0xFF3B82F6),
+                            end: const Color(0xFF2563EB),
+                          ),
+                          loading: () => _loadingCard(),
+                          error: (_, __) => _loadingCard(),
                         ),
-                        _metricCard(
-                          title: 'Total Fees',
-                          value: '₹$totalFees',
-                          icon: Icons.account_balance_wallet_rounded,
-                          start: const Color(0xFF111827),
-                          end: const Color(0xFF374151),
+                        ref.watch(teachersCountProvider(schoolId)).when(
+                          data: (count) => _metricCard(
+                            title: 'Teachers',
+                            value: count.toString(),
+                            icon: Icons.school_rounded,
+                            start: const Color(0xFF8B5CF6),
+                            end: const Color(0xFF7C3AED),
+                          ),
+                          loading: () => _loadingCard(),
+                          error: (_, __) => _loadingCard(),
                         ),
-                        _metricCard(
-                          title: 'Collected',
-                          value: '₹$paidFees',
-                          icon: Icons.check_circle_rounded,
-                          start: const Color(0xFF10B981),
-                          end: const Color(0xFF059669),
+                        ref.watch(todayAttendanceProvider(schoolId)).when(
+                          data: (att) => _metricCard(
+                            title: 'Today Present',
+                            value: (att['present'] ?? 0).toString(),
+                            icon: Icons.check_circle_rounded,
+                            start: const Color(0xFF10B981),
+                            end: const Color(0xFF059669),
+                          ),
+                          loading: () => _loadingCard(),
+                          error: (_, __) => _loadingCard(),
                         ),
-                        _metricCard(
-                          title: 'Pending',
-                          value: '₹$pendingFees',
-                          icon: Icons.pending_actions_rounded,
-                          start: const Color(0xFFEF4444),
-                          end: const Color(0xFFDC2626),
+                        ref.watch(todayAttendanceProvider(schoolId)).when(
+                          data: (att) => _metricCard(
+                            title: 'Today Absent',
+                            value: (att['absent'] ?? 0).toString(),
+                            icon: Icons.cancel_rounded,
+                            start: const Color(0xFFEF4444),
+                            end: const Color(0xFFDC2626),
+                          ),
+                          loading: () => _loadingCard(),
+                          error: (_, __) => _loadingCard(),
                         ),
                       ],
                     ),
@@ -87,30 +90,12 @@ class SchoolAdminDashboard extends ConsumerWidget {
                     const SizedBox(height: 18),
 
                     mobile
-                        ? Column(
-                            children: [
-                              _feesChartCard(
-                                paidY: paidY,
-                                pendingY: pendingY,
-                              ),
-                              const SizedBox(height: 14),
-                              _quickActions(),
-                            ],
-                          )
+                        ? _quickActions(context)
                         : Row(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
-                                flex: 2,
-                                child: _feesChartCard(
-                                  paidY: paidY,
-                                  pendingY: pendingY,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: _quickActions(),
+                                child: _quickActions(context),
                               ),
                             ],
                           ),
@@ -120,8 +105,26 @@ class SchoolAdminDashboard extends ConsumerWidget {
             },
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
+        loading: () => SingleChildScrollView(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            children: [
+              _heroHeader(),
+              const SizedBox(height: 18),
+              GridView.count(
+                crossAxisCount: 4,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+                childAspectRatio: 1.45,
+                children: List.generate(
+                  4,
+                  (_) => _loadingCard(),
+                ),
+              ),
+            ],
+          ),
         ),
         error: (e, _) => Center(
           child: Text('Error: $e'),
@@ -175,6 +178,15 @@ class SchoolAdminDashboard extends ConsumerWidget {
     );
   }
 
+  Widget _loadingCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+    );
+  }
+
   Widget _metricCard({
     required String title,
     required String value,
@@ -221,51 +233,7 @@ class SchoolAdminDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _feesChartCard({
-    required double paidY,
-    required double pendingY,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: SizedBox(
-        height: 300,
-        child: BarChart(
-          BarChartData(
-            maxY: (paidY > pendingY ? paidY : pendingY) + 10,
-            borderData: FlBorderData(show: false),
-            barGroups: [
-              BarChartGroupData(
-                x: 0,
-                barRods: [
-                  BarChartRodData(
-                    toY: paidY,
-                    width: 28,
-                    color: const Color(0xFF10B981),
-                  ),
-                ],
-              ),
-              BarChartGroupData(
-                x: 1,
-                barRods: [
-                  BarChartRodData(
-                    toY: pendingY,
-                    width: 28,
-                    color: const Color(0xFFEF4444),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _quickActions() {
+  Widget _quickActions(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -274,26 +242,195 @@ class SchoolAdminDashboard extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          _tile(Icons.person_add, 'Add Student'),
-          _tile(Icons.groups, 'Manage Students'),
-          _tile(Icons.analytics, 'Analytics'),
+          _tile(
+            context,
+            Icons.person_add,
+            'Add Student',
+            () {
+              Navigator.pushNamed(
+                context,
+                '/school-admin/students/add',
+              );
+            },
+          ),
+          _tile(
+            context,
+            Icons.groups,
+            'Manage Students',
+            () {
+              Navigator.pushNamed(
+                context,
+                '/school-admin/students',
+              );
+            },
+          ),
+          _tile(
+            context,
+            Icons.analytics,
+            'Analytics',
+            () {
+              Navigator.pushNamed(
+                context,
+                '/school-admin/analytics',
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
   Widget _tile(
+    BuildContext context,
     IconData icon,
     String title,
+    VoidCallback onTap,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          vertical: 12,
+          horizontal: 4,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: Colors.grey,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _strengthOverviewSection({
+    required int nurseryCount,
+    required int primaryCount,
+    required int middleCount,
+    required int highSchoolCount,
+    required int collegeCount,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon),
-          const SizedBox(width: 12),
-          Expanded(child: Text(title)),
-          const Icon(Icons.chevron_right),
+          const Text(
+            'Student Strength Overview',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              _strengthCard(
+                title: 'Nursery',
+                count: nurseryCount,
+                color: const Color(0xFFF59E0B),
+                icon: Icons.child_care_rounded,
+              ),
+              _strengthCard(
+                title: 'Primary',
+                count: primaryCount,
+                color: const Color(0xFF3B82F6),
+                icon: Icons.menu_book_rounded,
+              ),
+              _strengthCard(
+                title: 'Middle School',
+                count: middleCount,
+                color: const Color(0xFF10B981),
+                icon: Icons.groups_rounded,
+              ),
+              _strengthCard(
+                title: 'High School',
+                count: highSchoolCount,
+                color: const Color(0xFF8B5CF6),
+                icon: Icons.school_rounded,
+              ),
+              _strengthCard(
+                title: 'College',
+                count: collegeCount,
+                color: const Color(0xFFEF4444),
+                icon: Icons.account_balance_rounded,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _strengthCard({
+    required String title,
+    required int count,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      width: 170,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: color.withOpacity(0.18),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

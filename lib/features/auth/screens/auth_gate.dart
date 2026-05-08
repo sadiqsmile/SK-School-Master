@@ -16,6 +16,7 @@ import '../../parent/screens/force_change_password_screen.dart';
 import '../../parent/screens/parent_shell.dart';
 import '../../teacher/dashboard/screens/teacher_dashboard.dart';
 import '../../teacher/screens/teacher_force_change_password_screen.dart';
+import '../../teacher/screens/teacher_first_password_change_screen.dart';
 import '../../mentor/screens/mentor_dashboard_screen.dart';
 
 class AuthGate extends ConsumerWidget {
@@ -116,7 +117,7 @@ class AuthGate extends ConsumerWidget {
                         Scaffold(body: Center(child: Text(e.toString()))),
                     data: (mustChange) {
                       if (mustChange) {
-                        return const TeacherForceChangePasswordScreen();
+                        return const TeacherFirstPasswordChangeScreen();
                       }
                       return const TeacherDashboard();
                     },

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AddTeacherScreen extends StatefulWidget {
@@ -32,11 +33,11 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
     setState(() => isSaving = true);
 
     try {
-      // 🔐 Default password (first 6 chars of email)
+      // 🔐 Temporary password
       final password =
           email.length >= 6 ? email.substring(0, 6) : "123456";
 
-      // 🔥 Get current admin BEFORE creating teacher
+      // 🔥 Current Admin
       final currentAdmin = FirebaseAuth.instance.currentUser!;
       final adminUid = currentAdmin.uid;
 
@@ -47,28 +48,51 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
 
       final schoolId = adminDoc['schoolId'];
 
-      // 🔥 CREATE TEACHER AUTH USER
+      // ✅ SECONDARY FIREBASE APP
+      final secondaryApp = await Firebase.initializeApp(
+        name: 'Secondary',
+        options: Firebase.app().options,
+      );
+
+      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+
+      // ✅ CREATE TEACHER AUTH ACCOUNT
       final userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          await secondaryAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       final teacherUid = userCredential.user!.uid;
 
-      // 🔥 SAVE IN USERS COLLECTION WITH teacherId
+      // ✅ USERS COLLECTION
       await FirebaseFirestore.instance
           .collection('users')
           .doc(teacherUid)
           .set({
         "role": selectedRole,
         "schoolId": schoolId,
-        "teacherId": teacherUid, // 🔥 THIS IS THE KEY
+        "teacherId": teacherUid,
         "name": name,
         "email": email,
+        "phone": phone,
+        "gender": "",
+        "dob": null,
+        "qualification": "",
+        "experience": "",
+        "address": "",
+        "joiningDate": null,
+        "emergencyContact": "",
+        "subjects": [],
+        "isActive": true,
+        "isDeleted": false,
+        "mustChangePassword": true,
+        "createdBy": adminUid,
+        "createdAt": FieldValue.serverTimestamp(),
+        "updatedAt": FieldValue.serverTimestamp(),
       });
 
-      // 🔥 SAVE IN TEACHERS COLLECTION WITH teacherId
+      // ✅ TEACHERS COLLECTION
       await FirebaseFirestore.instance
           .collection('schools')
           .doc(schoolId)
@@ -78,31 +102,72 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
         "name": name,
         "email": email,
         "phone": phone,
+        "photoUrl": "",
         "role": selectedRole,
         "teacherId": teacherUid,
+        "schoolId": schoolId,
+        "gender": "",
+        "dob": null,
+        "qualification": "",
+        "experience": "",
+        "address": "",
+        "joiningDate": null,
+        "emergencyContact": "",
+        "subjects": [],
         "assignmentKeys": [],
+        "isActive": true,
+        "isDeleted": false,
+        "archived": false,
+        "mustChangePassword": true,
+        "createdBy": adminUid,
         "createdAt": FieldValue.serverTimestamp(),
+        "updatedAt": FieldValue.serverTimestamp(),
       });
+
+      // ✅ SIGN OUT SECONDARY APP
+      await secondaryAuth.signOut();
+      await secondaryApp.delete();
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "${selectedRole == "mentor" ? "Mentor" : "Teacher"} Added Successfully ✅",
+            "${selectedRole == "mentor" ? "Mentor" : "Teacher"} Added Successfully ✅\nTemporary Password: $password",
           ),
           backgroundColor: Colors.green,
         ),
       );
 
       Navigator.pop(context);
+
+    } on FirebaseAuthException catch (e) {
+
+      String message = "Something went wrong";
+
+      if (e.code == 'email-already-in-use') {
+        message = "Email already exists";
+      } else if (e.code == 'invalid-email') {
+        message = "Invalid email address";
+      } else if (e.code == 'weak-password') {
+        message = "Weak password";
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+
     } catch (e) {
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );
+
     }
 
-    if (mounted) setState(() => isSaving = false);
+    if (mounted) {
+      setState(() => isSaving = false);
+    }
   }
 
   @override

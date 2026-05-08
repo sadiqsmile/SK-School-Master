@@ -1450,7 +1450,14 @@ class _AttendanceTabState extends State<_AttendanceTab> {
               ),
             ],
           const SizedBox(height: 24),
-          _buildAttendanceCalendar(),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 820,
+              ),
+              child: _buildAttendanceCalendar(),
+            ),
+          ),
           const SizedBox(height: 24),
           _buildAttendanceAnalytics(),
         ],
@@ -1496,6 +1503,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
                 'Attendance Calendar',
@@ -1504,9 +1512,10 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                   fontSize: 15,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               Builder(
                 builder: (context) {
+                  final isMobile = MediaQuery.of(context).size.width < 600;
                   final firstDayOfMonth = DateTime(
                     _selectedMonth.year,
                     _selectedMonth.month,
@@ -1535,7 +1544,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                           return Expanded(
                             child: Center(
                               child: Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.only(bottom: 10),
                                 child: Text(
                                   day,
                                   style: TextStyle(
@@ -1555,11 +1564,11 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: totalCells,
                         gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
+                            SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 7,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 0.92,
+                          crossAxisSpacing: isMobile ? 4 : 6,
+                          mainAxisSpacing: isMobile ? 4 : 6,
+                          childAspectRatio: isMobile ? 1.0 : 1.18,
                         ),
                         itemBuilder: (context, index) {
                           // Empty space before month starts
@@ -1572,75 +1581,40 @@ class _AttendanceTabState extends State<_AttendanceTab> {
 
                           Color bgColor = Colors.grey.shade100;
                           Color textColor = Colors.black87;
-                          Color borderColor = Colors.transparent;
-                          String shortStatus = '';
 
                           if (status == 'present') {
                             bgColor = Colors.green.shade100;
                             textColor = Colors.green.shade800;
-                            borderColor = Colors.green.shade300;
-                            shortStatus = 'P';
                           }
 
                           if (status == 'absent') {
                             bgColor = Colors.red.shade100;
                             textColor = Colors.red.shade800;
-                            borderColor = Colors.red.shade300;
-                            shortStatus = 'A';
                           }
 
                           if (status == 'holiday') {
                             bgColor = Colors.orange.shade100;
                             textColor = Colors.orange.shade800;
-                            borderColor = Colors.orange.shade300;
-                            shortStatus = 'H';
                           }
 
                           return Container(
                             decoration: BoxDecoration(
                               color: bgColor,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: borderColor),
+                              borderRadius: BorderRadius.circular(
+                                isMobile ? 10 : 14,
+                              ),
+                              border: Border.all(
+                                color: bgColor.withOpacity(0.25),
+                              ),
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '$day',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                      color: textColor,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  if (shortStatus.isNotEmpty)
-                                    Align(
-                                      alignment: Alignment.bottomRight,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: borderColor,
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          shortStatus,
-                                          style: TextStyle(
-                                            fontSize: MediaQuery.of(context).size.width < 600 ? 10 : 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: textColor,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                            child: Center(
+                              child: Text(
+                                '$day',
+                                style: TextStyle(
+                                  fontSize: isMobile ? 14 : 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColor,
+                                ),
                               ),
                             ),
                           );
@@ -1684,7 +1658,12 @@ class _AttendanceTabState extends State<_AttendanceTab> {
 
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            18,
+            16,
+            10,
+          ),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
@@ -1704,7 +1683,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
               ),
               const SizedBox(height: 24),
               SizedBox(
-                height: 260,
+                height: 280,
                 child: BarChart(
                   BarChartData(
                     maxY: 100,
@@ -1712,7 +1691,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: false,
-                      horizontalInterval: 20,
+                      horizontalInterval: 25,
                       getDrawingHorizontalLine: (value) {
                         return FlLine(
                           color: Colors.grey.withOpacity(0.25),
@@ -1726,30 +1705,30 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                       topTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
-                          reservedSize: 34,
+                          reservedSize: 20,
                           getTitlesWidget: (value, meta) {
                             final index = value.toInt();
-                            if (index < 0 || index >= analytics.length) {
+                            if (index < 0 ||
+                                index >= analytics.length) {
                               return const SizedBox();
                             }
                             final percentage =
                                 analytics[index]['percentage'] ?? 0;
-                            if (percentage == 0) return const SizedBox();
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.deepPurple.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
+                            if (percentage == 0) {
+                              return const SizedBox();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
                               child: Text(
                                 '$percentage%',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
-                                  color: Colors.deepPurple,
+                                  color: percentage >= 75
+                                      ? Colors.green
+                                      : percentage >= 50
+                                          ? Colors.orange
+                                          : Colors.red,
                                 ),
                               ),
                             );
@@ -1767,7 +1746,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                           getTitlesWidget: (value, meta) {
                             return Text(
                               value.toInt().toString(),
-                              style: const TextStyle(fontSize: 11),
+                              style: const TextStyle(fontSize: 10),
                             );
                           },
                         ),
@@ -1775,6 +1754,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
                           showTitles: true,
+                          reservedSize: 32,
                           getTitlesWidget: (value, meta) {
                             final index = value.toInt();
 
@@ -1818,14 +1798,9 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                           barRods: [
                             BarChartRodData(
                               toY: percentage,
-                              width: 26,
-                              borderRadius: BorderRadius.circular(6),
+                              width: 32,
+                              borderRadius: BorderRadius.circular(8),
                               color: barColor,
-                              backDrawRodData: BackgroundBarChartRodData(
-                                show: true,
-                                toY: 100,
-                                color: Colors.grey.withOpacity(0.06),
-                              ),
                             ),
                           ],
                           showingTooltipIndicators: [],
