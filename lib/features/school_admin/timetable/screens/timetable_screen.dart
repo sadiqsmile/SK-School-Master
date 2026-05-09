@@ -1015,19 +1015,7 @@ class _TimetableScreenState
                       items:
                           weekDays.map((day) {
 
-                        return DropdownMenuItem(
-
-                          value: day,
-
-                          child: Text(day),
-                        );
-
-                      }).toList(),
-
-                      onChanged: (v) {
-
-                        if (v != null) {
-
+                  return DropdownMenuItem<String>(
                           setSheetState(() {
                             selectedDay = v;
                           });
@@ -1059,29 +1047,7 @@ class _TimetableScreenState
 
                       ].map((period) {
 
-                        return DropdownMenuItem(
-
-                          value: period,
-
-                          child: Text(period),
-                        );
-
-                      }).toList(),
-
-                      onChanged: (v) {
-
-                        setSheetState(() {
-                          selectedPeriod = v;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    StreamBuilder<QuerySnapshot>(
-
-                      stream:
-                          FirebaseFirestore
+                  return DropdownMenuItem<String>(
                               .instance
                               .collection(
                                 'schools',
@@ -1182,9 +1148,10 @@ class _TimetableScreenState
                                     subject,
                               };
 
-                              return DropdownMenuItem(
+                        return DropdownMenuItem<
+                            Map<String, dynamic>>(
 
-                                value: value,
+                          value: value,
 
                                 child: Text(
 

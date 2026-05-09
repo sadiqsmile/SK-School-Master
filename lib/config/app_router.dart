@@ -43,6 +43,8 @@ import 'package:school_app/features/school_admin/analytics/screens/school_analyt
 import 'package:school_app/features/school_admin/analytics/screens/student_risk_list_screen.dart';
 import 'package:school_app/features/school_admin/notifications/screens/notifications_screen.dart';
 import 'package:school_app/features/school_admin/settings/screens/modules_control_screen.dart';
+import 'package:school_app/features/school_admin/settings/screens/import_export_screen.dart';
+import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
 import 'package:school_app/features/school_admin/academic_setup/screens/academic_setup_dashboard.dart';
 import 'package:school_app/features/parent/screens/parent_login_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/teacher_attendance_screen.dart';
@@ -443,6 +445,48 @@ final appRouter = GoRouter(
           ),
         );
       },
+    ),
+    GoRoute(
+      path: '/import-export',
+      builder: (context, state) => Consumer(
+        builder: (context, ref, _) {
+          final schoolIdAsync = ref.watch(schoolIdProvider);
+          return schoolIdAsync.when(
+            data: (schoolId) => RoleGuard(
+              title: 'Imports & Exports',
+              allowedRoles: const [UserRole.admin],
+              child: ImportExportScreen(schoolId: schoolId),
+            ),
+            loading: () => const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => const Scaffold(
+              body: Center(child: Text('Error loading schoolId')),
+            ),
+          );
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/import-subjects',
+      builder: (context, state) => Consumer(
+        builder: (context, ref, _) {
+          final schoolIdAsync = ref.watch(schoolIdProvider);
+          return schoolIdAsync.when(
+            data: (schoolId) => RoleGuard(
+              title: 'Import Subjects',
+              allowedRoles: const [UserRole.admin],
+              child: ImportSubjectScreen(schoolId: schoolId),
+            ),
+            loading: () => const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => const Scaffold(
+              body: Center(child: Text('Error loading schoolId')),
+            ),
+          );
+        },
+      ),
     ),
     GoRoute(
       path: '/school-admin/academic/promote',
