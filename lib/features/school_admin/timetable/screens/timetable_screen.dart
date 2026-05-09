@@ -1015,11 +1015,21 @@ class _TimetableScreenState
                       items:
                           weekDays.map((day) {
 
-                  return DropdownMenuItem<String>(
-                          setSheetState(() {
-                            selectedDay = v;
-                          });
-                        }
+                        return DropdownMenuItem<String>(
+
+                          value: day,
+
+                          child: Text(day),
+                        );
+
+                      }).toList(),
+
+                      onChanged: (v) {
+
+                        setSheetState(() {
+
+                          selectedDay = v;
+                        });
                       },
                     ),
 
@@ -1047,7 +1057,30 @@ class _TimetableScreenState
 
                       ].map((period) {
 
-                  return DropdownMenuItem<String>(
+                        return DropdownMenuItem<String>(
+
+                          value: period,
+
+                          child: Text(period),
+                        );
+
+                      }).toList(),
+
+                      onChanged: (v) {
+
+                        setSheetState(() {
+
+                          selectedPeriod = v;
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    StreamBuilder<QuerySnapshot>(
+
+                      stream:
+                          FirebaseFirestore
                               .instance
                               .collection(
                                 'schools',
@@ -1148,10 +1181,10 @@ class _TimetableScreenState
                                     subject,
                               };
 
-                        return DropdownMenuItem<
-                            Map<String, dynamic>>(
+                              return DropdownMenuItem<
+                                  Map<String, dynamic>>(
 
-                          value: value,
+                                value: value,
 
                                 child: Text(
 
@@ -1299,4 +1332,5 @@ class _TimetableScreenState
       },
     );
   }
-}
+    }
+    

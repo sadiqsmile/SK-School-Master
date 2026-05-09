@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../features/import_export/screens/import_subject_screen.dart';
+import '../../../../features/import_export/services/subject_export_service.dart';
+import '../../../../features/import_export/services/subject_template_service.dart';
 
 class ImportExportScreen extends StatelessWidget {
   final String schoolId;
@@ -36,7 +38,19 @@ class ImportExportScreen extends StatelessWidget {
               title: 'Export Subjects',
               subtitle: 'Download subjects',
               icon: Icons.download,
-              onTap: () {},
+              onTap: () async {
+                await SubjectExportService().exportSubjects(
+                  schoolId: schoolId,
+                );
+              },
+            ),
+            _buildCard(
+              title: 'Subject Template',
+              subtitle: 'Download Excel format',
+              icon: Icons.file_download,
+              onTap: () async {
+                await SubjectTemplateService().downloadTemplate();
+              },
             ),
             _buildCard(
               title: 'Import Students',
