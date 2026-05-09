@@ -290,7 +290,18 @@ class TeacherProfileScreen extends StatelessWidget {
                       ],
                     ),
 
-                    buildSectionTitle("Profile", "Class Teacher"),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 22, bottom: 12),
+                      child: Text(
+                        'Class Teacher',
+                        style: TextStyle(
+                          fontSize: 13,
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
 
                     Builder(
                       builder: (context) {
@@ -321,7 +332,18 @@ class TeacherProfileScreen extends StatelessWidget {
                       },
                     ),
 
-                    buildSectionTitle("Academics", "Assigned Classes"),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 22, bottom: 12),
+                      child: Text(
+                        'Assigned Classes',
+                        style: TextStyle(
+                          fontSize: 13,
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
 
                     Wrap(
                       spacing: 10,
@@ -353,7 +375,18 @@ class TeacherProfileScreen extends StatelessWidget {
                       }).toList(),
                     ),
 
-                    buildSectionTitle("Academics", "Subjects"),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 22, bottom: 12),
+                      child: Text(
+                        'Subjects',
+                        style: TextStyle(
+                          fontSize: 13,
+                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
 
                     Wrap(
                       spacing: 10,
