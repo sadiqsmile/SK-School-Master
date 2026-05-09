@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
+import 'package:school_app/core/widgets/profile_avatar.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 import 'teacher_profile_screen.dart';
@@ -299,6 +300,11 @@ class TeachersScreen extends ConsumerWidget {
                                     '')
                                 .toString();
 
+                        final photoUrl =
+                          (data['photoUrl'] ??
+                              '')
+                            .toString();
+
                         final assignmentKeys =
                             (data['assignmentKeys'] ??
                                     [])
@@ -318,6 +324,8 @@ class TeachersScreen extends ConsumerWidget {
                               email,
                           phone:
                               phone,
+                            photoUrl:
+                              photoUrl,
                           assignmentKeys:
                               assignmentKeys,
                         );
@@ -503,8 +511,14 @@ class TeachersScreen extends ConsumerWidget {
     required String name,
     required String email,
     required String phone,
+    required String photoUrl,
     required List assignmentKeys,
   }) {
+    final assignmentTags = assignmentKeys
+        .map((e) => e.toString())
+        .toSet()
+        .toList();
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -549,27 +563,11 @@ class TeachersScreen extends ConsumerWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor:
-                    const Color(
-                  0xFFE0E7FF,
-                ),
-                child: Text(
-                  name.isEmpty
-                      ? '?'
-                      : name[0]
-                          .toUpperCase(),
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight
-                            .bold,
-                    color: Color(
-                      0xFF4F46E5,
-                    ),
-                  ),
-                ),
+              ProfileAvatar(
+                name: name,
+                imageUrl:
+                    photoUrl,
+                radius: 28,
               ),
               const SizedBox(
                 width: 12,
@@ -693,21 +691,55 @@ class TeachersScreen extends ConsumerWidget {
                 width: 6,
               ),
               Expanded(
-                child: Text(
-                  assignmentKeys
-                          .isEmpty
-                      ? 'Not Assigned'
-                      : assignmentKeys
-                          .join(
-                          ', ',
+                child: assignmentTags
+                        .isEmpty
+                    ? const Text(
+                        'Not Assigned',
+                        style:
+                            TextStyle(
+                          color: Color(
+                            0xFF475569,
+                          ),
                         ),
-                  style:
-                      const TextStyle(
-                    color: Color(
-                      0xFF475569,
-                    ),
-                  ),
-                ),
+                      )
+                    : Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: assignmentTags
+                            .map((item) {
+                          return Container(
+                            padding:
+                                const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  const Color(
+                                0xffEEF2FF,
+                              ),
+                              borderRadius:
+                                  BorderRadius.circular(
+                                12,
+                              ),
+                            ),
+                            child: Text(
+                              item.replaceAll(
+                                '_',
+                                '-',
+                              ),
+                              style:
+                                  const TextStyle(
+                                fontWeight:
+                                    FontWeight.w600,
+                                color: Color(
+                                  0xff5B5FEF,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
               ),
             ],
           ),
