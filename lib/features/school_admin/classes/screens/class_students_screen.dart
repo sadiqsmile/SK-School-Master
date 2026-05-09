@@ -155,9 +155,29 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
                             ),
                             child: Row(
                               children: [
+                                Container(
+                                  width: 30,
+                                  height: 30,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xffF3F4F6),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
                                 ProfileAvatar(
                                   name: name,
                                   imageUrl: data['photoUrl']?.toString(),
+                                  radius: 22,
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(
@@ -168,7 +188,7 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
                                         name,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
-                                          fontSize: 15,
+                                          fontSize: 18,
                                           color: Color(0xff111827),
                                         ),
                                       ),
