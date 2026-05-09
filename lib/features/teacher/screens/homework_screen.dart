@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../homework/services/homework_service.dart';
+import 'homework_submissions_screen.dart';
 
 class HomeworkScreen extends StatefulWidget {
   final String schoolId;
@@ -137,6 +138,38 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xff5B5FEF),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => HomeworkSubmissionsScreen(
+                                schoolId: widget.schoolId,
+                                homeworkId: doc.id,
+                                homeworkTitle: data['title'] ?? 'Homework',
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          "View Submissions",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

@@ -1,5 +1,6 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:school_app/core/widgets/profile_avatar.dart';
 
 import '../../attendance/services/attendance_service.dart';
 
@@ -155,16 +156,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
+                  ProfileAvatar(
+                    name: (data['name'] ?? '').toString(),
+                    imageUrl: data['photoUrl']?.toString(),
                     radius: 24,
-                    backgroundColor: const Color(0xffEEF2FF),
-                    child: Text(
-                      (data['name'] ?? 'S').toString().substring(0, 1),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xff5B5FEF),
-                      ),
-                    ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(

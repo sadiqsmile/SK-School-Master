@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'parent_announcements_screen.dart';
 import 'parent_attendance_screen.dart';
+import 'parent_fee_screen.dart';
 import 'parent_homework_screen.dart';
 import 'parent_marks_analytics_screen.dart';
 import '../../student/screens/report_card_screen.dart';
@@ -132,6 +133,69 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                                   SizedBox(height: 4),
                                   Text(
                                     "School notices & updates",
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () {
+                        final firstStudent = students.first;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ParentFeeScreen(
+                              schoolId: widget.schoolId,
+                              studentId: firstStudent.id,
+                              studentData:
+                                  firstStudent.data() as Map<String, dynamic>,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.grey.shade100),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              height: 58,
+                              width: 58,
+                              decoration: BoxDecoration(
+                                color: const Color(0xffEEF2FF),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: const Icon(
+                                Icons.account_balance_wallet,
+                                color: Color(0xff5B5FEF),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Fees",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xff111827),
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    "Track fee payments & dues",
                                     style: TextStyle(fontSize: 13),
                                   ),
                                 ],

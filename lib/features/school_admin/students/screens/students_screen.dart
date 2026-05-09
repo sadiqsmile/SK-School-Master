@@ -2188,8 +2188,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     );
 
     int added = 0;
-    int updated = 0;
     int skipped = 0;
+    final List<String> duplicateStudents = [];
 
     showDialog(
       context: context,
@@ -2220,35 +2220,43 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       }
 
       try {
-        final id =
-            (row['admissionNo'] ??
-                    '')
+        final admissionNo =
+            (row['admissionNo'] ?? '')
                 .toString()
                 .trim()
                 .toUpperCase();
 
-        final existing =
+        final studentName =
+            (row['name'] ?? 'Unknown')
+                .toString()
+                .trim();
+
+        final existingStudent =
             await FirebaseFirestore
                 .instance
-                .collection(
-                    'schools')
+                .collection('schools')
                 .doc(schoolId)
-                .collection(
-                    'students')
-                .doc(id)
+                .collection('students')
+                .where(
+                  'admissionNo',
+                  isEqualTo: admissionNo,
+                )
+                .limit(1)
                 .get();
 
-        await service
-            .upsertStudent(
+        if (existingStudent.docs.isNotEmpty) {
+          duplicateStudents.add(studentName);
+          skipped++;
+          progress.value = (i + 1) / rows.length;
+          continue;
+        }
+
+        await service.upsertStudent(
           schoolId: schoolId,
           data: row,
         );
 
-        if (existing.exists) {
-          updated++;
-        } else {
-          added++;
-        }
+        added++;
       } catch (_) {
         skipped++;
       }
@@ -2278,24 +2286,61 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
             ),
           ),
           title: const Text(
-            '✅ Import Successful',
+            '✅ Import Complete',
           ),
           content: Column(
             mainAxisSize:
                 MainAxisSize.min,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
               _sum(
-                'Added',
+                'Imported',
                 added,
               ),
               _sum(
-                'Updated',
-                updated,
-              ),
-              _sum(
-                'Skipped',
+                'Skipped (Duplicates)',
                 skipped,
               ),
+              if (duplicateStudents.isNotEmpty) ...
+                [
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Duplicate Students:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...duplicateStudents.map(
+                    (name) => Padding(
+                      padding: const EdgeInsets.only(
+                        left: 4,
+                        bottom: 4,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.person_outline,
+                            size: 16,
+                            color: Color(0xffDC2626),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xff374151),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
             ],
           ),
           actions: [

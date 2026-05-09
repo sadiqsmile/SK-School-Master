@@ -6,11 +6,82 @@ import 'package:go_router/go_router.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 
-class ClassesScreen extends ConsumerWidget {
+class ClassesScreen extends ConsumerStatefulWidget {
   const ClassesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ClassesScreen> createState() => _ClassesScreenState();
+}
+
+class _ClassesScreenState extends ConsumerState<ClassesScreen> {
+  Future<void> _deleteClass(String classId) async {
+    final schoolId = ref.read(currentSchoolProvider).value!.id;
+    await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(schoolId)
+        .collection('classes')
+        .doc(classId)
+        .delete();
+  }
+
+  Future<void> _showDeleteDialog(String classId) async {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Color(0xffFEF2F2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xffDC2626),
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Text("Delete Class"),
+            ],
+          ),
+          content: const Text(
+            "This action cannot be undone.\n\nDeleting this class may affect:\n\u2022 Students\n\u2022 Attendance\n\u2022 Timetables\n\u2022 Homework",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xffDC2626),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              onPressed: () async {
+                Navigator.pop(context);
+                await _deleteClass(classId);
+              },
+              icon: const Icon(Icons.delete, color: Colors.white),
+              label: const Text(
+                "Delete",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final schoolAsync = ref.watch(currentSchoolProvider);
 
     return AdminLayout(
@@ -40,7 +111,8 @@ class ClassesScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(16),
                 itemCount: docs.length,
                 itemBuilder: (context, index) {
-                  final data = docs[index].data() as Map<String, dynamic>;
+                  final doc = docs[index];
+                  final data = doc.data() as Map<String, dynamic>;
 
                   final name = data['name'] ?? '';
                   final group = data['group'] ?? '';
@@ -54,42 +126,43 @@ class ClassesScreen extends ConsumerWidget {
                       });
                     },
                     child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(14),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 6,
-                          )
-                        ],
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: Colors.grey.shade200),
                       ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          /// 🎓 ICON
+                          // Icon
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            height: 52,
+                            width: 52,
                             decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
+                              color: const Color(0xffEEF2FF),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            child: const Icon(Icons.class_, color: Colors.blue),
+                            child: const Icon(
+                              Icons.menu_book_rounded,
+                              color: Color(0xff5B5FEF),
+                            ),
                           ),
 
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 16),
 
-                          /// 📚 DETAILS
+                          // Details
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  name,
+                                  data['name'] ?? 'Unknown Class',
                                   style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xff111827),
                                   ),
                                 ),
 
@@ -97,27 +170,59 @@ class ClassesScreen extends ConsumerWidget {
 
                                 Text(
                                   group,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
 
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 14),
 
                                 Wrap(
-                                  spacing: 6,
-                                  children: sections
-                                      .map(
-                                        (s) => Chip(
-                                          label: Text(s),
-                                          backgroundColor:
-                                              Colors.deepPurple.shade50,
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: sections.map((section) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xffF3F4F6),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        section,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
                                         ),
-                                      )
-                                      .toList(),
+                                      ),
+                                    );
+                                  }).toList(),
                                 ),
                               ],
+                            ),
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          // Delete button
+                          GestureDetector(
+                            onTap: () => _showDeleteDialog(doc.id),
+                            child: Tooltip(
+                              message: "Delete Class",
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xffFEF2F2),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Icon(
+                                  Icons.delete_outline,
+                                  color: Color(0xffDC2626),
+                                  size: 20,
+                                ),
+                              ),
                             ),
                           ),
                         ],

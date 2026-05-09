@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,8 @@ import 'package:school_app/features/teacher/screens/attendance_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_calendar_screen.dart';
 import 'package:school_app/features/teacher/screens/analytics_dashboard_screen.dart';
 import 'package:school_app/features/teacher/screens/student_history_screen.dart';
+import 'package:school_app/features/teacher/screens/teacher_announcements_screen.dart';
+import 'package:school_app/features/teacher/screens/teacher_timetable_screen.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -98,6 +101,18 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
             section = parts[1].trim();
           }
         }
+      }
+
+      // Save FCM token to teacher document
+      final fcmToken =
+          await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null && schoolId.isNotEmpty && teacherId.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('schools')
+            .doc(schoolId)
+            .collection('teachers')
+            .doc(teacherId)
+            .update({'fcmToken': fcmToken});
       }
 
       if (mounted) setState(() {});
@@ -831,7 +846,17 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                       menu(
                         Icons.schedule,
                         "Time Table",
-                        () {},
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TeacherTimetableScreen(
+                                schoolId: schoolId,
+                                teacherName: teacherData['name'] ?? teacherName,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       menu(
                         Icons.edit_note,
@@ -854,6 +879,21 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                                     section,
                                 schoolId:
                                     schoolId,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      menu(
+                        Icons.campaign_outlined,
+                        "Announcements",
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  TeacherAnnouncementsScreen(
+                                schoolId: schoolId,
                               ),
                             ),
                           );

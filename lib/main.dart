@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:school_app/config/app_router.dart';
+import 'package:school_app/core/services/notification_service.dart';
 import 'firebase_options.dart';
 
 final GlobalKey<ScaffoldMessengerState> messengerKey =
@@ -16,6 +17,8 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  await NotificationService().initialize();
 
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,

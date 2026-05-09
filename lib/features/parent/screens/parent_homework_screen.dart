@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../../student/screens/homework_submission_screen.dart';
+
 class ParentHomeworkScreen extends StatelessWidget {
   final String schoolId;
   final String studentId;
@@ -138,6 +140,39 @@ class ParentHomeworkScreen extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xff5B5FEF),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => HomeworkSubmissionScreen(
+                                schoolId: schoolId,
+                                homeworkId: doc.id,
+                                studentId: studentId,
+                                studentName: studentData['name'] ?? '',
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          "Submit Homework",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

@@ -1,4 +1,5 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import 'parent_dashboard_screen.dart';
@@ -72,6 +73,17 @@ class _ParentLoginScreenState extends State<ParentLoginScreen> {
       }
 
       if (!mounted) return;
+
+      // Save FCM token to the parent's Firestore document
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await FirebaseFirestore.instance
+            .collection('schools')
+            .doc(matchedSchoolId)
+            .collection('parents')
+            .doc(matchedParent.id)
+            .update({"fcmToken": fcmToken});
+      }
 
       if (parentData['mustChangePassword'] == true) {
         Navigator.push(

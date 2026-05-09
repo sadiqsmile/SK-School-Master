@@ -1,12 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:school_app/core/widgets/profile_avatar.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class TeacherAnnouncementsScreen extends StatelessWidget {
+class HomeworkSubmissionsScreen extends StatelessWidget {
   final String schoolId;
+  final String homeworkId;
+  final String homeworkTitle;
 
-  const TeacherAnnouncementsScreen({
+  const HomeworkSubmissionsScreen({
     super.key,
     required this.schoolId,
+    required this.homeworkId,
+    required this.homeworkTitle,
   });
 
   @override
@@ -16,27 +22,21 @@ class TeacherAnnouncementsScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text("Announcements"),
+        title: Text(homeworkTitle),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('schools')
             .doc(schoolId)
-            .collection('announcements')
-            .orderBy('createdAt', descending: true)
+            .collection('homework_submissions')
+            .where('homeworkId', isEqualTo: homeworkId)
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final allDocs = snapshot.data!.docs;
-
-          final docs = allDocs.where((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            final roles = List<String>.from(data['targetRoles'] ?? []);
-            return roles.contains("teacher");
-          }).toList();
+          final docs = snapshot.data!.docs;
 
           if (docs.isEmpty) {
             return _emptyState();
@@ -48,23 +48,6 @@ class TeacherAnnouncementsScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final doc = docs[index];
               final data = doc.data() as Map<String, dynamic>;
-              final priority = data['priority'];
-
-              Color badgeColor = const Color(0xffDBEAFE);
-              Color textColor = const Color(0xff1D4ED8);
-              IconData icon = Icons.notifications;
-
-              if (priority == "High") {
-                badgeColor = const Color(0xffFEE2E2);
-                textColor = const Color(0xff991B1B);
-                icon = Icons.warning_amber_rounded;
-              }
-
-              if (priority == "Medium") {
-                badgeColor = const Color(0xffFEF3C7);
-                textColor = const Color(0xff92400E);
-                icon = Icons.info_outline;
-              }
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -79,14 +62,10 @@ class TeacherAnnouncementsScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Container(
-                          height: 52,
-                          width: 52,
-                          decoration: BoxDecoration(
-                            color: badgeColor,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Icon(icon, color: textColor),
+                        ProfileAvatar(
+                          name: (data['studentName'] ?? '').toString(),
+                          imageUrl: data['photoUrl']?.toString(),
+                          radius: 24,
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -94,11 +73,10 @@ class TeacherAnnouncementsScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                data['title'] ?? '',
+                                data['studentName'] ?? '',
                                 style: const TextStyle(
-                                  fontSize: 17,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xff111827),
                                 ),
                               ),
                               const SizedBox(height: 6),
@@ -108,14 +86,14 @@ class TeacherAnnouncementsScreen extends StatelessWidget {
                                   vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: badgeColor,
+                                  color: const Color(0xffDCFCE7),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  priority,
-                                  style: TextStyle(
+                                  data['status'] ?? '',
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    color: textColor,
+                                    color: Color(0xff166534),
                                   ),
                                 ),
                               ),
@@ -124,36 +102,49 @@ class TeacherAnnouncementsScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      data['description'] ?? '',
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.7,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xffEEF2FF),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Text(
-                            data['createdBy'] ?? 'Admin',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xff5B5FEF),
+                    if ((data['note'] ?? '').toString().isNotEmpty)
+                      Column(
+                        children: [
+                          const SizedBox(height: 18),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xffF8FAFC),
+                              borderRadius: BorderRadius.circular(18),
                             ),
+                            child: Text(data['note']),
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xff5B5FEF),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                      ],
+                        onPressed: () async {
+                          final url = data['fileUrl'];
+                          if (url == null) return;
+                          await launchUrl(Uri.parse(url));
+                        },
+                        icon: const Icon(
+                          Icons.open_in_new,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          "Open Submission",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -178,14 +169,14 @@ class TeacherAnnouncementsScreen extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.campaign_outlined,
+              Icons.assignment_outlined,
               size: 42,
               color: Color(0xff5B5FEF),
             ),
           ),
           const SizedBox(height: 20),
           const Text(
-            "No Announcements",
+            "No Submissions",
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -194,7 +185,7 @@ class TeacherAnnouncementsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            "School announcements and\nstaff notices will appear here.",
+            "Student homework submissions\nwill appear here.",
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,

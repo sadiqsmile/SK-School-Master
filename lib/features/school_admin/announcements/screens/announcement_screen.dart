@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../announcements/services/announcement_service.dart';
+import '../../../announcements/services/announcement_service.dart';
 
 class AnnouncementScreen extends StatefulWidget {
   final String schoolId;

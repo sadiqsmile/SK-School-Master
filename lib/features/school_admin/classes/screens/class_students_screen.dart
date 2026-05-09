@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:school_app/providers/current_school_provider.dart';
-import 'package:school_app/features/school_admin/layout/admin_layout.dart';
+import 'package:school_app/core/widgets/profile_avatar.dart';
 
 class ClassStudentsScreen extends ConsumerStatefulWidget {
   final String className;
@@ -15,85 +15,191 @@ class ClassStudentsScreen extends ConsumerStatefulWidget {
 }
 
 class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
-  String selectedSection = "All";
+  String selectedSection = 'All';
+
+  List<String> get _classNameVariants {
+    final name = widget.className;
+    final stripped = name.replaceAll(RegExp(r'^Class\s+', caseSensitive: false), '').trim();
+    return stripped == name ? [name] : [name, stripped];
+  }
 
   @override
   Widget build(BuildContext context) {
     final schoolAsync = ref.watch(currentSchoolProvider);
 
-    return AdminLayout(
-      title: widget.className,
-      body: schoolAsync.when(
-        data: (school) {
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('schools')
-                .doc(school.id)
-                .collection('students')
-                .where('className', isEqualTo: widget.className)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final allDocs = snapshot.data!.docs;
-              final docs = selectedSection == "All"
-                  ? allDocs
-                  : allDocs.where((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      return data['section'] == selectedSection;
-                    }).toList();
-
-              if (docs.isEmpty) {
-                return const Center(child: Text("No students found"));
-              }
-
-              return Column(
-                children: [
-                  SizedBox(
-                    height: 40,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: ["All", "A", "B", "C"].map((section) {
-                        final isSelected = selectedSection == section;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(section),
-                            selected: isSelected,
-                            onSelected: (_) {
-                              setState(() => selectedSection = section);
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: docs.length,
-                      itemBuilder: (context, index) {
-                        final data = docs[index].data() as Map<String, dynamic>;
-                        return ListTile(
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.person),
-                          ),
-                          title: Text(data['name'] ?? ''),
-                          subtitle: Text("Section {data['section'] ?? ''}"),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+    return schoolAsync.when(
+      data: (school) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('schools')
+              .doc(school.id)
+              .collection('students')
+              .where('className', whereIn: _classNameVariants)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Scaffold(
+                appBar: AppBar(title: Text(widget.className)),
+                body: const Center(child: CircularProgressIndicator()),
               );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text("Error: $e")),
+            }
+
+            final allDocs = snapshot.data!.docs;
+
+            final sectionSet = <String>{};
+            for (final doc in allDocs) {
+              final s = (doc.data() as Map<String, dynamic>)['section']?.toString() ?? '';
+              if (s.isNotEmpty) sectionSet.add(s);
+            }
+            final sections = ['All', ...sectionSet.toList()..sort()];
+
+            final docs = selectedSection == 'All'
+                ? allDocs
+                : allDocs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['section'] == selectedSection;
+                  }).toList();
+
+            return Scaffold(
+              backgroundColor: const Color(0xffF8FAFC),
+              appBar: AppBar(
+                backgroundColor: Colors.white,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                title: Text(
+                  selectedSection == 'All'
+                      ? widget.className
+                      : '${widget.className} — $selectedSection',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    color: Color(0xff111827),
+                  ),
+                ),
+              ),
+              body: Column(
+                children: [
+                  if (sections.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: SizedBox(
+                        height: 40,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: sections.map((section) {
+                            final isSelected = selectedSection == section;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text(section),
+                                selected: isSelected,
+                                selectedColor: const Color(0xff5B5FEF),
+                                labelStyle: TextStyle(
+                                  color: isSelected ? Colors.white : const Color(0xff374151),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                onSelected: (_) {
+                                  setState(() => selectedSection = section);
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 8),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${docs.length} student${docs.length == 1 ? "" : "s"}',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  if (docs.isEmpty)
+                    const Expanded(
+                      child: Center(child: Text('No students found')),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final data = docs[index].data() as Map<String, dynamic>;
+                          final name = (data['name'] ?? '').toString();
+                          final section = (data['section'] ?? '').toString();
+                          final admissionNo = (data['admissionNo'] ?? '').toString();
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                ProfileAvatar(
+                                  name: name,
+                                  imageUrl: data['photoUrl']?.toString(),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15,
+                                          color: Color(0xff111827),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Section $section  •  Adm: $admissionNo',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        body: Center(child: Text('Error: $e')),
       ),
     );
   }
