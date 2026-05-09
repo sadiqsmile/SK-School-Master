@@ -1,8 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class AssignSubjectScreen extends StatefulWidget {
-
   final String schoolId;
   final String teacherId;
 
@@ -13,51 +12,51 @@ class AssignSubjectScreen extends StatefulWidget {
   });
 
   @override
-  State<AssignSubjectScreen> createState() =>
-      _AssignSubjectScreenState();
+  State<AssignSubjectScreen> createState() => _AssignSubjectScreenState();
 }
 
-class _AssignSubjectScreenState
-    extends State<AssignSubjectScreen> {
-
-  String? selectedClass;
-  String? selectedSection;
-  String? selectedSubject;
-
+class _AssignSubjectScreenState extends State<AssignSubjectScreen> {
+  List<String> subjects = [];
+  List<String> selectedSubjects = [];
+  bool isLoading = true;
   bool isSaving = false;
 
-  final List<String> subjects = [
-    "Mathematics",
-    "Science",
-    "Physics",
-    "Chemistry",
-    "Biology",
-    "English",
-    "Social",
-    "Computer",
-    "Kannada",
-    "Hindi",
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadSubjects();
+  }
+
+  Future<void> _loadSubjects() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(widget.schoolId)
+        .collection('subjects')
+        .get();
+
+    final loaded = snapshot.docs
+        .map((e) => (e.data()['name'] ?? '').toString())
+        .where((s) => s.isNotEmpty)
+        .toList()
+      ..sort();
+
+    setState(() {
+      subjects = loaded;
+      isLoading = false;
+    });
+  }
 
   Future<void> _save() async {
-
-    if (selectedClass == null ||
-        selectedSection == null ||
-        selectedSubject == null) {
-
+    if (selectedSubjects.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Select all fields"),
-        ),
+        const SnackBar(content: Text('Select at least one subject')),
       );
-
       return;
     }
 
     setState(() => isSaving = true);
 
     try {
-
       final docRef = FirebaseFirestore.instance
           .collection('schools')
           .doc(widget.schoolId)
@@ -65,224 +64,188 @@ class _AssignSubjectScreenState
           .doc(widget.teacherId);
 
       final doc = await docRef.get();
+      final data = doc.data() as Map<String, dynamic>;
+      final existing = List<String>.from(data['subjects'] ?? []);
 
-      final data =
-          doc.data() as Map<String, dynamic>;
-
-      final current =
-          List<Map<String, dynamic>>.from(
-        data['subjectAssignments'] ?? [],
-      );
-
-      final alreadyExists = current.any((e) {
-
-        return e['classId'] == selectedClass &&
-            e['sectionId'] == selectedSection &&
-            e['subject'] == selectedSubject;
-
-      });
-
-      if (alreadyExists) {
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Assignment already exists",
-            ),
-          ),
-        );
-
-        setState(() => isSaving = false);
-
-        return;
-      }
-
-      current.add({
-
-        "classId": selectedClass,
-        "sectionId": selectedSection,
-        "subject": selectedSubject,
-      });
+      final merged = {...existing, ...selectedSubjects}.toList()..sort();
 
       await docRef.update({
-
-        "subjectAssignments": current,
-
-        "updatedAt":
-            FieldValue.serverTimestamp(),
+        'subjects': merged,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            "Subject Assigned Successfully ✅",
-          ),
+          content: Text('Subjects assigned successfully ✅'),
           backgroundColor: Colors.green,
         ),
       );
-
       Navigator.pop(context);
-
     } catch (e) {
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
     }
 
-    if (mounted) {
-      setState(() => isSaving = false);
-    }
+    if (mounted) setState(() => isSaving = false);
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
+      backgroundColor: const Color(0xffF8FAFC),
       appBar: AppBar(
-        title: const Text("Assign Subject"),
-      ),
-
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-
-        child: Center(
-          child: Container(
-            constraints:
-                const BoxConstraints(maxWidth: 500),
-
-            child: Column(
-              children: [
-
-                DropdownButtonFormField<String>(
-                  value: selectedClass,
-
-                  decoration: InputDecoration(
-                    labelText: "Class",
-
-                    border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(14),
-                    ),
-                  ),
-
-                  items: List.generate(12, (i) {
-
-                    final c = (i + 1).toString();
-
-                    return DropdownMenuItem(
-                      value: c,
-                      child: Text("Class $c"),
-                    );
-
-                  }),
-
-                  onChanged: (v) {
-                    setState(() => selectedClass = v);
-                  },
-                ),
-
-                const SizedBox(height: 18),
-
-                DropdownButtonFormField<String>(
-                  value: selectedSection,
-
-                  decoration: InputDecoration(
-                    labelText: "Section",
-
-                    border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(14),
-                    ),
-                  ),
-
-                  items: ["A", "B", "C", "D"]
-                      .map((e) {
-
-                    return DropdownMenuItem(
-                      value: e,
-                      child: Text(e),
-                    );
-
-                  }).toList(),
-
-                  onChanged: (v) {
-                    setState(() => selectedSection = v);
-                  },
-                ),
-
-                const SizedBox(height: 18),
-
-                DropdownButtonFormField<String>(
-                  value: selectedSubject,
-
-                  decoration: InputDecoration(
-                    labelText: "Subject",
-
-                    border: OutlineInputBorder(
-                      borderRadius:
-                          BorderRadius.circular(14),
-                    ),
-                  ),
-
-                  items: subjects.map((e) {
-
-                    return DropdownMenuItem(
-                      value: e,
-                      child: Text(e),
-                    );
-
-                  }).toList(),
-
-                  onChanged: (v) {
-                    setState(() => selectedSubject = v);
-                  },
-                ),
-
-                const SizedBox(height: 30),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 54,
-
-                  child: ElevatedButton(
-                    onPressed:
-                        isSaving ? null : _save,
-
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          const Color(0xff5B5FEF),
-
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(16),
-                      ),
-                    ),
-
-                    child:
-                        isSaving
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                            : const Text(
-                                "Assign Subject",
-
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight:
-                                      FontWeight.w600,
-                                ),
-                              ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Assign Subjects',
+          style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xff111827)),
         ),
       ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Select Subjects',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xff374151),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap to select one or more subjects this teacher teaches.',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                  ),
+                  const SizedBox(height: 20),
+                  if (subjects.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.menu_book_outlined,
+                                size: 48, color: Colors.grey.shade300),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'No subjects found.\nAdd subjects in Academic Setup first.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Color(0xff6B7280)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: subjects.map((subject) {
+                          final isSelected = selectedSubjects.contains(subject);
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                if (isSelected) {
+                                  selectedSubjects.remove(subject);
+                                } else {
+                                  selectedSubjects.add(subject);
+                                }
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xff5B5FEF)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? const Color(0xff5B5FEF)
+                                      : Colors.grey.shade200,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        const BoxShadow(
+                                          color: Color(0x335B5FEF),
+                                          blurRadius: 8,
+                                          offset: Offset(0, 4),
+                                        ),
+                                      ]
+                                    : [],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isSelected) ...[
+                                    const Icon(Icons.check_circle_rounded,
+                                        size: 16, color: Colors.white),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  Text(
+                                    subject,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : const Color(0xff374151),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  if (selectedSubjects.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      '${selectedSubjects.length} subject${selectedSubjects.length == 1 ? '' : 's'} selected',
+                      style: const TextStyle(
+                        color: Color(0xff5B5FEF),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: isSaving ? null : _save,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xff5B5FEF),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: isSaving
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              'Save Subjects',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

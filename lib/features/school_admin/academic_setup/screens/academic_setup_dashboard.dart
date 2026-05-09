@@ -90,10 +90,10 @@ class AcademicSetupDashboard
 
             crossAxisCount: 2,
 
-            crossAxisSpacing: 18,
-            mainAxisSpacing: 18,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
 
-            childAspectRatio: 1.2,
+            childAspectRatio: 1.8,
           ),
 
           itemBuilder: (context, index) {
@@ -144,7 +144,7 @@ class AcademicSetupDashboard
               child: Container(
 
                 padding:
-                    const EdgeInsets.all(22),
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
 
                 decoration: BoxDecoration(
 
@@ -173,17 +173,17 @@ class AcademicSetupDashboard
                   ],
                 ),
 
-                child: Column(
+                child: Row(
 
                   crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      CrossAxisAlignment.center,
 
                   children: [
 
                     Container(
 
-                      height: 54,
-                      width: 54,
+                      height: 44,
+                      width: 44,
 
                       decoration:
                           BoxDecoration(
@@ -195,7 +195,7 @@ class AcademicSetupDashboard
 
                         borderRadius:
                             BorderRadius.circular(
-                          18,
+                          14,
                         ),
                       ),
 
@@ -209,45 +209,57 @@ class AcademicSetupDashboard
                           0xff5B5FEF,
                         ),
 
-                        size: 28,
+                        size: 22,
                       ),
                     ),
 
-                    const Spacer(),
+                    const SizedBox(width: 14),
 
-                    Text(
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        mainAxisAlignment:
+                            MainAxisAlignment.center,
 
-                      item['title']
-                          .toString(),
+                        children: [
 
-                      style:
-                          const TextStyle(
+                          Text(
 
-                        fontSize: 17,
+                            item['title']
+                                .toString(),
 
-                        fontWeight:
-                            FontWeight.w600,
+                            style:
+                                const TextStyle(
 
-                        color:
-                            Color(0xff111827),
-                      ),
-                    ),
+                              fontSize: 14,
 
-                    const SizedBox(height: 6),
+                              fontWeight:
+                                  FontWeight.w600,
 
-                    Text(
+                              color:
+                                  Color(0xff111827),
+                            ),
+                          ),
 
-                      item['subtitle']
-                          .toString(),
+                          const SizedBox(height: 3),
 
-                      style: TextStyle(
+                          Text(
 
-                        fontSize: 13,
+                            item['subtitle']
+                                .toString(),
 
-                        height: 1.5,
+                            style: TextStyle(
 
-                        color:
-                            Colors.grey.shade600,
+                              fontSize: 12,
+
+                              height: 1.4,
+
+                              color:
+                                  Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

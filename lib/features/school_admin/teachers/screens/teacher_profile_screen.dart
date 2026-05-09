@@ -279,6 +279,7 @@ class TeacherProfileScreen extends StatelessWidget {
                           Icons.location_on_outlined,
                           "Address",
                           data['address'] ?? '-',
+                          multiLine: true,
                         ),
 
                         _infoCard(
@@ -381,37 +382,7 @@ class TeacherProfileScreen extends StatelessWidget {
                       }).toList(),
                     ),
 
-                    buildSectionTitle("Timetable", "Subject Assignments"),
 
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children:
-                          List<Map<String, dynamic>>.from(
-                        data['subjectAssignments'] ?? [],
-                      ).map((e) {
-
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xffF5F3FF),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            "${e['subject']} \u2022 ${e['classId']}-${e['sectionId']}",
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xff5B5FEF),
-                            ),
-                          ),
-                        );
-
-                      }).toList(),
-                    ),
                   ],
                 ),
               ),
@@ -539,11 +510,13 @@ class TeacherProfileScreen extends StatelessWidget {
   Widget _infoCard(
     IconData icon,
     String title,
-    String value,
-  ) {
+    String value, {
+    bool multiLine = false,
+  }) {
 
     return Container(
       width: 220,
+      constraints: multiLine ? const BoxConstraints(minHeight: 120) : null,
       padding: const EdgeInsets.all(18),
 
       decoration: BoxDecoration(
@@ -600,8 +573,9 @@ class TeacherProfileScreen extends StatelessWidget {
           Text(
             value.isEmpty ? "-" : value,
 
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+            maxLines: multiLine ? null : 2,
+            softWrap: multiLine,
+            overflow: multiLine ? TextOverflow.visible : TextOverflow.ellipsis,
 
             style: const TextStyle(
               fontSize: 15,
