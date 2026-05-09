@@ -246,52 +246,52 @@ class _TimetableScreenState
                   "Class",
                 ),
 
-                items:
-                    filteredClasses.map(
-                  (doc) {
+              items: filteredClasses
+    .map<DropdownMenuItem<String>>((doc) {
 
-                    final data =
-                        doc.data()
-                            as Map<String,
-                                dynamic>;
+  final data =
+      doc.data() as Map<String, dynamic>;
 
-                    return DropdownMenuItem(
+  return DropdownMenuItem<String>(
 
-                      value: doc.id,
+    value: doc.id,
 
-                      child: Text(
-                        data['name'],
-                      ),
-                    );
+    child: Text(
+      data['name'] ?? '',
+    ),
+  );
 
-                  },
-                ).toList(),
+}).toList(),
 
                 onChanged: (v) {
 
-                  final classDoc =
-                      filteredClasses
-                          .firstWhere(
-                    (e) => e.id == v,
-                  );
+  final classDoc =
+      filteredClasses.firstWhere(
+    (e) => e.id == v,
+  );
 
-                  final data =
-                      classDoc.data()
-                          as Map<String,
-                              dynamic>;
+  final data =
+      classDoc.data()
+          as Map<String, dynamic>;
 
-                  setState(() {
+  setState(() {
 
-                    selectedClassId = v;
+    selectedClassId = v;
 
-                    selectedClassName =
-                        data['name'];
+    selectedClassName =
+        data['name'];
 
-                    selectedSection =
-                        null;
-                  });
-                },
+    sections =
+        List<String>.from(
+      data['sections'] ?? [],
+    );
+
+    selectedSection = null;
+  });
+},
               ),
+
+
 
               const SizedBox(height: 14),
 
@@ -1028,7 +1028,9 @@ class _TimetableScreenState
 
                         setSheetState(() {
 
-                          selectedDay = v;
+                          if (v != null) {
+  selectedDay = v;
+}
                         });
                       },
                     ),
@@ -1333,4 +1335,3 @@ class _TimetableScreenState
     );
   }
     }
-    

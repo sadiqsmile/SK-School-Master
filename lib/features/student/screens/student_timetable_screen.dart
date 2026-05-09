@@ -646,4 +646,4 @@ class StudentTimetableScreen extends StatelessWidget {
       ),
     );
   }
-}
+

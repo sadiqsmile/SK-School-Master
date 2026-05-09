@@ -1,8 +1,9 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/widgets/premium_dashboard_card.dart';
 import 'classes_setup_screen.dart';
 import 'subjects_screen.dart';
-import '../../../school_admin/settings/screens/import_export_screen.dart';
 
 class AcademicSetupDashboard extends StatelessWidget {
   final String schoolId;
@@ -21,139 +22,86 @@ class AcademicSetupDashboard extends StatelessWidget {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: GridView.count(
+      body: Padding(
         padding: const EdgeInsets.all(20),
-        crossAxisCount: 2,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-        childAspectRatio: 1.8,
-        children: [
-          _buildSetupCard(
-            title: 'Subjects',
-            subtitle: 'Manage centralized subjects',
-            icon: Icons.menu_book_rounded,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SubjectsScreen(schoolId: schoolId),
+        child: GridView.count(
+          shrinkWrap: true,
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.zero,
+          crossAxisCount: MediaQuery.of(context).size.width > 1200 ? 3 : 2,
+          crossAxisSpacing: 20,
+          mainAxisSpacing: 20,
+          childAspectRatio: 3.8,
+          children: [
+            PremiumDashboardCard(
+              title: 'Subjects',
+              subtitle: 'Manage centralized subjects',
+              icon: Icons.menu_book_rounded,
+              colors: const [Color(0xff6366F1), Color(0xff8B5CF6)],
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SubjectsScreen(schoolId: schoolId),
+                ),
               ),
             ),
-          ),
-          _buildSetupCard(
-            title: 'Classes & Sections',
-            subtitle: 'Configure classes and sections',
-            icon: Icons.school_rounded,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ClassesSetupScreen(schoolId: schoolId),
+            PremiumDashboardCard(
+              title: 'Classes',
+              subtitle: 'Manage classes & sections',
+              icon: Icons.school_rounded,
+              colors: const [Color(0xff10B981), Color(0xff059669)],
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ClassesSetupScreen(schoolId: schoolId),
+                ),
               ),
             ),
-          ),
-          _buildSetupCard(
-            title: 'Academic Periods',
-            subtitle: 'Manage academic periods',
-            icon: Icons.access_time_rounded,
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Coming soon')),
+            PremiumDashboardCard(
+              title: 'Academic Periods',
+              subtitle: 'Configure terms & exams',
+              icon: Icons.calendar_month,
+              colors: const [Color(0xffF59E0B), Color(0xffD97706)],
+              onTap: () {},
             ),
-          ),
-          _buildSetupCard(
-            title: 'Group Timings',
-            subtitle: 'Configure group timings',
-            icon: Icons.schedule_rounded,
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Coming soon')),
+            PremiumDashboardCard(
+              title: 'Group Timings',
+              subtitle: 'Manage school timings',
+              icon: Icons.access_time,
+              colors: const [Color(0xffEC4899), Color(0xffBE185D)],
+              onTap: () {},
             ),
-          ),
-          _buildSetupCard(
-            title: 'Examinations',
-            subtitle: 'Configure exam structure',
-            icon: Icons.fact_check_rounded,
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Coming soon')),
+            PremiumDashboardCard(
+              title: 'Imports & Exports',
+              subtitle: 'Excel import & export',
+              icon: Icons.import_export_rounded,
+              colors: const [Color(0xff06B6D4), Color(0xff0891B2)],
+              onTap: () {
+                context.push('/import-export');
+              },
             ),
-          ),
-          _buildSetupCard(
-            title: 'Imports & Exports',
-            subtitle: 'Bulk upload and templates',
-            icon: Icons.upload_file_rounded,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ImportExportScreen(schoolId: schoolId),
-              ),
+            PremiumDashboardCard(
+              title: 'Examinations',
+              subtitle: 'Manage exams & marks',
+              icon: Icons.fact_check_rounded,
+              colors: const [Color(0xffEF4444), Color(0xffDC2626)],
+              onTap: () {
+                context.push('/exam-dashboard');
+              },
             ),
-          ),
-        ],
+            PremiumDashboardCard(
+              title: 'Timetable',
+              subtitle: 'Class & teacher timetable',
+              icon: Icons.calendar_view_week,
+              colors: const [Color(0xff8B5CF6), Color(0xff7C3AED)],
+              onTap: () {
+                context.push('/timetable');
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSetupCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(24),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xffF3F4F6)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              height: 44,
-              width: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xffEEF2FF),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: const Color(0xff5B5FEF), size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xff111827),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      height: 1.4,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

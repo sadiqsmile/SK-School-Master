@@ -5,7 +5,29 @@ import 'package:school_app/features/school_admin/fees/screens/fee_list_screen.da
 import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
 import 'package:school_app/features/school_admin/fees/screens/add_fee_screen.dart';
 import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
+import 'package:school_app/features/import_export/screens/import_export_dashboard_screen.dart';
 
+import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
+
+import 'package:school_app/features/import_export/screens/export_subject_screen.dart';
+
+import 'package:school_app/features/import_export/screens/subject_template_screen.dart';
+
+import 'package:school_app/features/import_export/screens/import_classes_screen.dart';
+
+import 'package:school_app/features/import_export/screens/export_classes_screen.dart';
+
+import 'package:school_app/features/import_export/screens/student_import_screen.dart';
+
+import 'package:school_app/features/import_export/screens/teacher_import_screen.dart';
+
+import 'package:school_app/features/import_export/screens/attendance_import_export_screen.dart';
+
+import 'package:school_app/features/import_export/screens/exam_import_export_screen.dart';
+
+import 'package:school_app/features/import_export/screens/marks_import_export_screen.dart';
+
+import 'package:school_app/features/import_export/screens/timetable_import_export_screen.dart';
 // config/app_router.dart
 
 import 'package:school_app/features/school_admin/classes/screens/class_students_screen.dart';
@@ -43,8 +65,9 @@ import 'package:school_app/features/school_admin/analytics/screens/school_analyt
 import 'package:school_app/features/school_admin/analytics/screens/student_risk_list_screen.dart';
 import 'package:school_app/features/school_admin/notifications/screens/notifications_screen.dart';
 import 'package:school_app/features/school_admin/settings/screens/modules_control_screen.dart';
-import 'package:school_app/features/school_admin/settings/screens/import_export_screen.dart';
+import 'package:school_app/features/import_export/screens/import_export_screen.dart';
 import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
+
 import 'package:school_app/features/school_admin/academic_setup/screens/academic_setup_dashboard.dart';
 import 'package:school_app/features/parent/screens/parent_login_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/teacher_attendance_screen.dart';
@@ -446,6 +469,7 @@ final appRouter = GoRouter(
         );
       },
     ),
+   
     GoRoute(
       path: '/import-export',
       builder: (context, state) => Consumer(
@@ -467,26 +491,86 @@ final appRouter = GoRouter(
         },
       ),
     ),
+   
+   
+   
     GoRoute(
       path: '/import-subjects',
-      builder: (context, state) => Consumer(
-        builder: (context, ref, _) {
-          final schoolIdAsync = ref.watch(schoolIdProvider);
-          return schoolIdAsync.when(
-            data: (schoolId) => RoleGuard(
-              title: 'Import Subjects',
-              allowedRoles: const [UserRole.admin],
-              child: ImportSubjectScreen(schoolId: schoolId),
-            ),
-            loading: () => const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, __) => const Scaffold(
-              body: Center(child: Text('Error loading schoolId')),
-            ),
-          );
-        },
-      ),
+      builder: (context, state) {
+        return ImportSubjectScreen(
+          schoolId: 'demo-school',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/export-subjects',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Export Subjects'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/subject-template',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Subject Template'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/import-classes',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Import Classes'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/export-classes',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Export Classes'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/attendance-import-export',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Attendance Import Export'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/exam-import-export',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Exam Import Export'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/timetable-import-export',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Timetable Import Export'),
+          ),
+        );
+      },
     ),
     GoRoute(
       path: '/school-admin/academic/promote',
@@ -626,5 +710,105 @@ final appRouter = GoRouter(
       path: '/teacher/profile',
       builder: (context, state) => const TeacherProfileScreen(),
     ),
+  
+  GoRoute(
+  path: '/imports-exports',
+  builder: (context, state) {
+    return ImportExportDashboardScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/import-subjects',
+  builder: (context, state) {
+    return ImportSubjectScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/export-subjects',
+  builder: (context, state) {
+    return ExportSubjectScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/subject-template',
+  builder: (context, state) {
+    return const SubjectTemplateScreen();
+  },
+),
+
+GoRoute(
+  path: '/import-classes',
+  builder: (context, state) {
+    return ImportClassesScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/export-classes',
+  builder: (context, state) {
+    return ExportClassesScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/import-students',
+  builder: (context, state) {
+    return StudentImportScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/import-teachers',
+  builder: (context, state) {
+    return TeacherImportScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/attendance-import-export',
+  builder: (context, state) {
+    return const AttendanceImportExportScreen();
+  },
+),
+
+GoRoute(
+  path: '/exam-import-export',
+  builder: (context, state) {
+    return const ExamImportExportScreen();
+  },
+),
+
+GoRoute(
+  path: '/marks-import-export',
+  builder: (context, state) {
+    return const MarksImportExportScreen();
+  },
+),
+
+GoRoute(
+  path: '/timetable-import-export',
+  builder: (context, state) {
+    return const TimetableImportExportScreen();
+  },
+),
+  
+  
   ],
 );
