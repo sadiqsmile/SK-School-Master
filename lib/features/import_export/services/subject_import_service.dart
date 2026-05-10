@@ -3,7 +3,98 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:excel/excel.dart';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+
+
+
 class SubjectImportService {
+static Future<void> pickAndImportSubjects({
+
+  required BuildContext context,
+  required String schoolId,
+
+}) async {
+
+  final result =
+      await FilePicker.platform.pickFiles(
+
+    type: FileType.custom,
+    allowedExtensions: ['xlsx'],
+  );
+
+  if (result == null) return;
+
+  final file = result.files.first;
+
+  if (file.bytes == null) return;
+
+  final Uint8List bytes =
+      file.bytes!;
+
+  final response =
+      await importSubjects(
+
+    bytes: bytes,
+    schoolId: schoolId,
+  );
+
+  if (!context.mounted) return;
+
+  showDialog(
+
+    context: context,
+
+    builder: (_) {
+
+      return AlertDialog(
+
+        title: const Text(
+          'Import Completed',
+        ),
+
+        content: Column(
+
+          mainAxisSize:
+              MainAxisSize.min,
+
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+
+          children: [
+
+            Text(
+              'Imported: ${response['imported']}',
+            ),
+
+            Text(
+              'Duplicates: ${response['duplicates']}',
+            ),
+
+            Text(
+              'Invalid Rows: ${response['invalid']}',
+            ),
+          ],
+        ),
+
+        actions: [
+
+          TextButton(
+
+            onPressed: () {
+
+              Navigator.pop(context);
+            },
+
+            child: const Text(
+              'OK',
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
 
   static Future<Map<String, dynamic>>
       importSubjects({
@@ -28,51 +119,38 @@ class SubjectImportService {
     final firestore =
         FirebaseFirestore.instance;
 
-    for (int i = 1;
-        i < sheet.rows.length;
-        i++) {
+    for (
+      int i = 1;
+      i < sheet.rows.length;
+      i++
+    ) {
 
       final row = sheet.rows[i];
 
-      if (row.length < 3) {
+      // ONLY ONE COLUMN NEEDED NOW
+
+      if (row.isEmpty) {
 
         invalid++;
         continue;
       }
 
-     final subjectName =
-    row[0]
-            ?.value
-            ?.toString()
-            .trim() ??
-        '';
+      final subjectName =
+          row[0]
+                  ?.value
+                  ?.toString()
+                  .trim()
+                  .replaceAll(RegExp(r'\s+'), ' ')
+                  .toUpperCase() ??
+              '';
 
-final subjectCode =
-    row[1]
-            ?.value
-            ?.toString()
-            .trim() ??
-        '';
-
-final groups =
-    row[2]
-            ?.value
-            ?.toString()
-            .split(',')
-            .map(
-              (e) => e.trim(),
-            )
-            .toList() ??
-        [];
-
-      if (subjectName.isEmpty ||
-          subjectCode.isEmpty) {
+      if (subjectName.isEmpty) {
 
         invalid++;
         continue;
       }
 
-      /// DUPLICATE CHECK
+      /// DUPLICATE CHECK BY NAME
 
       final existing =
           await firestore
@@ -80,9 +158,9 @@ final groups =
               .doc(schoolId)
               .collection('subjects')
               .where(
-                'code',
+                'name',
                 isEqualTo:
-                    subjectCode,
+                    subjectName,
               )
               .limit(1)
               .get();
@@ -94,7 +172,7 @@ final groups =
         continue;
       }
 
-      /// SAVE
+      /// SAVE SUBJECT
 
       await firestore
           .collection('schools')
@@ -103,10 +181,6 @@ final groups =
           .add({
 
         'name': subjectName,
-
-        'code': subjectCode,
-
-        'groups': groups,
 
         'createdAt':
             Timestamp.now(),

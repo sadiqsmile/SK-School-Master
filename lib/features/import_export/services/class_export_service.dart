@@ -7,10 +7,10 @@ import '../../school_admin/students/services/template_export_stub.dart'
     if (dart.library.io) '../../school_admin/students/services/template_export_io.dart'
     if (dart.library.html) '../../school_admin/students/services/template_export_web.dart';
 
-class SubjectExportService {
+class ClassExportService {
 
   static Future<void>
-      exportSubjects(
+      exportClasses(
     String schoolId,
   ) async {
 
@@ -19,7 +19,7 @@ class SubjectExportService {
             .instance
             .collection('schools')
             .doc(schoolId)
-            .collection('subjects')
+            .collection('classes')
             .orderBy('name')
             .get();
 
@@ -38,7 +38,7 @@ class SubjectExportService {
     sheet
         .getRangeByIndex(1, 2)
         .setText(
-          'SUBJECT NAME',
+          'CLASS NAME',
         );
 
     sheet
@@ -91,7 +91,7 @@ class SubjectExportService {
 
     await saveExcelFile(
       bytes,
-      'subjects.xlsx',
+      'classes.xlsx',
     );
   }
 }

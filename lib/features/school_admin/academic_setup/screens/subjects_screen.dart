@@ -1,10 +1,9 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-
+import 'deleted_subjects_screen.dart';
 import '../services/subject_service.dart';
 
 class SubjectsScreen extends StatefulWidget {
-
   final String schoolId;
 
   const SubjectsScreen({
@@ -19,6 +18,97 @@ class SubjectsScreen extends StatefulWidget {
 
 class _SubjectsScreenState
     extends State<SubjectsScreen> {
+
+
+void _showDeleteDialog(
+  String subjectId,
+) {
+
+  showDialog(
+
+    context: context,
+
+    builder: (_) {
+
+      return AlertDialog(
+
+        title: const Text(
+          "Delete Subject",
+        ),
+
+        content: const Text(
+          "Are you sure you want to delete this subject?",
+        ),
+
+        actions: [
+
+          TextButton(
+
+            onPressed: () {
+
+              Navigator.pop(context);
+            },
+
+            child: const Text(
+              "Cancel",
+            ),
+          ),
+
+          ElevatedButton.icon(
+
+            style:
+                ElevatedButton.styleFrom(
+              backgroundColor:
+                  Colors.red,
+            ),
+
+            onPressed: () async {
+
+              Navigator.pop(context);
+
+              await FirebaseFirestore
+                  .instance
+                  .collection('schools')
+                  .doc(widget.schoolId)
+                  .collection('subjects')
+                  .doc(subjectId)
+                  .update({
+
+                'archived': true,
+              });
+            },
+
+            icon: const Icon(
+              Icons.delete,
+              color: Colors.white,
+            ),
+
+            label: const Text(
+              "Delete",
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+  
+  
+  
+
+
+  
+  
+
+
+
+
+
+
+
+
+
+
 
   final SubjectService _service =
       SubjectService();
@@ -49,10 +139,37 @@ class _SubjectsScreenState
     return Scaffold(
 
       backgroundColor:
-          const Color(0xffF8FAFC),
+          const Color(0xffF5F5F7),
+
 
       appBar: AppBar(
+actions: [
 
+  IconButton(
+
+    icon: const Icon(
+      Icons.settings,
+    ),
+
+    onPressed: () {
+
+      Navigator.push(
+
+        context,
+
+        MaterialPageRoute(
+
+          builder: (_) =>
+              DeletedSubjectsScreen(
+
+            schoolId:
+                widget.schoolId,
+          ),
+        ),
+      );
+    },
+  ),
+],
         title: const Text(
           "Subjects",
         ),
@@ -83,6 +200,7 @@ class _SubjectsScreenState
         children: [
 
           Container(
+
             color: Colors.white,
 
             padding:
@@ -93,7 +211,9 @@ class _SubjectsScreenState
               controller: searchController,
 
               onChanged: (v) {
-                setState(() => search = v);
+                setState(() {
+                  search = v;
+                });
               },
 
               decoration: InputDecoration(
@@ -107,11 +227,12 @@ class _SubjectsScreenState
                 filled: true,
 
                 fillColor:
-                    const Color(0xffF8FAFC),
+                    const Color(0xffF3F4F6),
 
                 border: OutlineInputBorder(
+
                   borderRadius:
-                      BorderRadius.circular(16),
+                      BorderRadius.circular(14),
 
                   borderSide: BorderSide.none,
                 ),
@@ -120,6 +241,7 @@ class _SubjectsScreenState
           ),
 
           Expanded(
+
             child:
                 StreamBuilder<QuerySnapshot>(
 
@@ -165,18 +287,47 @@ class _SubjectsScreenState
 
                 }).toList();
 
+                filtered.sort((a, b) {
+
+                  final aData =
+                      a.data()
+                          as Map<String, dynamic>;
+
+                  final bData =
+                      b.data()
+                          as Map<String, dynamic>;
+
+                  return (aData['name'] ?? '')
+                      .toString()
+                      .compareTo(
+                    (bData['name'] ?? '')
+                        .toString(),
+                  );
+                });
+
                 if (filtered.isEmpty) {
 
-                  return _emptyState();
+                  return const Center(
+
+                    child: Text(
+                      "No subjects found",
+                    ),
+                  );
                 }
 
-                return ListView.builder(
+                return ListView.separated(
 
                   padding:
                       const EdgeInsets.all(16),
 
                   itemCount:
                       filtered.length,
+
+                  separatorBuilder:
+                      (_, __) =>
+                          const SizedBox(
+                    height: 10,
+                  ),
 
                   itemBuilder:
                       (context, index) {
@@ -195,14 +346,9 @@ class _SubjectsScreenState
 
                     return Container(
 
-                      margin:
-                          const EdgeInsets.only(
-                        bottom: 14,
-                      ),
-
                       padding:
                           const EdgeInsets.all(
-                        18,
+                        14,
                       ),
 
                       decoration: BoxDecoration(
@@ -211,31 +357,8 @@ class _SubjectsScreenState
 
                         borderRadius:
                             BorderRadius.circular(
-                          20,
+                          16,
                         ),
-
-                        border: Border.all(
-                          color:
-                              Colors.grey.shade100,
-                        ),
-
-                        boxShadow: [
-
-                          BoxShadow(
-                            color: Colors.black
-                                .withOpacity(
-                              0.02,
-                            ),
-
-                            blurRadius: 10,
-
-                            offset:
-                                const Offset(
-                              0,
-                              4,
-                            ),
-                          ),
-                        ],
                       ),
 
                       child: Row(
@@ -247,63 +370,35 @@ class _SubjectsScreenState
 
                           Container(
 
-                            height: 54,
-                            width: 54,
+                            width: 40,
+                            alignment:
+                                Alignment.center,
 
-                            decoration:
-                                BoxDecoration(
+                            child: Text(
 
-                              color:
-                                  const Color(
-                                0xffEEF2FF,
-                              ),
+                              "${index + 1}",
 
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(
-                                16,
-                              ),
-                            ),
+                              style:
+                                  const TextStyle(
 
-                            child: Center(
+                                fontSize: 16,
 
-                              child: Text(
+                                fontWeight:
+                                    FontWeight.bold,
 
-                                data['shortName']
-                                        ?.toString()
-                                        .isEmpty ??
-                                    true
-                                    ? "SB"
-                                    : data[
-                                            'shortName']
-                                        .toString()
-                                        .substring(
-                                          0,
-                                          1,
-                                        ),
-
-                                style:
-                                    const TextStyle(
-
-                                  fontSize: 18,
-
-                                  fontWeight:
-                                      FontWeight
-                                          .w700,
-
-                                  color: Color(
-                                    0xff5B5FEF,
-                                  ),
+                                color: Color(
+                                  0xff5B5FEF,
                                 ),
                               ),
                             ),
                           ),
 
                           const SizedBox(
-                            width: 16,
+                            width: 10,
                           ),
 
                           Expanded(
+
                             child: Column(
 
                               crossAxisAlignment:
@@ -313,8 +408,10 @@ class _SubjectsScreenState
                               children: [
 
                                 Text(
-                                  data['name'] ??
-                                      '',
+
+                                  (data['name'] ?? '')
+                                      .toString()
+                                      .toUpperCase(),
 
                                   style:
                                       const TextStyle(
@@ -322,96 +419,71 @@ class _SubjectsScreenState
                                     fontSize: 16,
 
                                     fontWeight:
-                                        FontWeight
-                                            .w600,
+                                        FontWeight.w600,
+                                  ),
+                                ),
 
-                                    color: Color(
-                                      0xff111827,
+                                if (subjectGroups
+                                    .isNotEmpty)
+
+                                  Padding(
+
+                                    padding:
+                                        const EdgeInsets.only(
+                                      top: 8,
+                                    ),
+
+                                    child: Wrap(
+
+                                      spacing: 6,
+
+                                      runSpacing: 6,
+
+                                      children:
+                                          subjectGroups
+                                              .map((g) {
+
+                                        return Container(
+
+                                          padding:
+                                              const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 5,
+                                          ),
+
+                                          decoration:
+                                              BoxDecoration(
+
+                                            color:
+                                                const Color(
+                                              0xffEEF2FF,
+                                            ),
+
+                                            borderRadius:
+                                                BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+
+                                          child: Text(
+
+                                            g,
+
+                                            style:
+                                                const TextStyle(
+
+                                              fontSize: 11,
+
+                                              color: Color(
+                                                0xff5B5FEF,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+
+                                      }).toList(),
                                     ),
                                   ),
-                                ),
-
-                                const SizedBox(
-                                  height: 4,
-                                ),
-
-                                Text(
-
-                                  "${data['shortName']} • ${data['code']}",
-
-                                  style:
-                                      TextStyle(
-
-                                    fontSize: 13,
-
-                                    color:
-                                        Colors.grey
-                                            .shade600,
-                                  ),
-                                ),
-
-                                const SizedBox(
-                                  height: 14,
-                                ),
-
-                                Wrap(
-
-                                  spacing: 8,
-                                  runSpacing: 8,
-
-                                  children:
-                                      subjectGroups
-                                          .map((g) {
-
-                                    return Container(
-
-                                      padding:
-                                          const EdgeInsets
-                                              .symmetric(
-                                        horizontal:
-                                            10,
-                                        vertical: 6,
-                                      ),
-
-                                      decoration:
-                                          BoxDecoration(
-
-                                        color:
-                                            const Color(
-                                          0xffF5F3FF,
-                                        ),
-
-                                        borderRadius:
-                                            BorderRadius
-                                                .circular(
-                                          10,
-                                        ),
-                                      ),
-
-                                      child: Text(
-
-                                        g,
-
-                                        style:
-                                            const TextStyle(
-
-                                          fontSize:
-                                              12,
-
-                                          fontWeight:
-                                              FontWeight
-                                                  .w500,
-
-                                          color:
-                                              Color(
-                                            0xff5B5FEF,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-
-                                  }).toList(),
-                                ),
                               ],
                             ),
                           ),
@@ -446,26 +518,35 @@ class _SubjectsScreenState
                                 ),
                               ),
 
-                              PopupMenuItem(
 
-                                onTap: () {
 
-                                  _service
-                                      .archiveSubject(
+                             PopupMenuItem(
 
-                                    schoolId:
-                                        widget
-                                            .schoolId,
+  onTap: () {
 
-                                    subjectId:
-                                        doc.id,
-                                  );
-                                },
+    Future.delayed(
+      Duration.zero,
 
-                                child: const Text(
-                                  "Archive",
-                                ),
-                              ),
+      () {
+
+        _showDeleteDialog(
+          doc.id,
+        );
+      },
+    );
+  },
+
+  child: const Text(
+    "Delete",
+  ),
+),
+                            
+                            
+
+
+
+
+                            
                             ],
                           ),
                         ],
@@ -481,70 +562,18 @@ class _SubjectsScreenState
     );
   }
 
-  Widget _emptyState() {
 
-    return Center(
-      child: Column(
 
-        mainAxisAlignment:
-            MainAxisAlignment.center,
 
-        children: [
 
-          Container(
 
-            height: 90,
-            width: 90,
 
-            decoration: const BoxDecoration(
-              color: Color(
-                0xffEEF2FF,
-              ),
 
-              shape: BoxShape.circle,
-            ),
 
-            child: const Icon(
 
-              Icons.menu_book_rounded,
 
-              size: 42,
 
-              color: Color(0xff5B5FEF),
-            ),
-          ),
 
-          const SizedBox(height: 20),
-
-          const Text(
-
-            "No Subjects Added",
-
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Color(0xff374151),
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-
-            "Add subjects to manage timetable,\nexams and teacher assignments.",
-
-            textAlign: TextAlign.center,
-
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showAddSubjectSheet({
 
@@ -558,17 +587,9 @@ class _SubjectsScreenState
 
     final nameController =
         TextEditingController(
-      text: editData?['name'] ?? '',
-    );
 
-    final shortNameController =
-        TextEditingController(
-      text: editData?['shortName'] ?? '',
-    );
-
-    final codeController =
-        TextEditingController(
-      text: editData?['code'] ?? '',
+      text:
+          editData?['name'] ?? '',
     );
 
     List<String> selectedGroups =
@@ -582,71 +603,39 @@ class _SubjectsScreenState
 
       isScrollControlled: true,
 
-      backgroundColor: Colors.transparent,
-
       builder: (_) {
 
         return StatefulBuilder(
 
-          builder: (context, setSheetState) {
+          builder:
+              (context, setSheetState) {
 
-            return Container(
+            return Padding(
 
               padding: EdgeInsets.only(
 
-                left: 24,
-                right: 24,
-                top: 24,
+                left: 20,
+                right: 20,
+                top: 20,
 
                 bottom:
                     MediaQuery.of(context)
                             .viewInsets
                             .bottom +
-                        24,
-              ),
-
-              decoration: const BoxDecoration(
-
-                color: Colors.white,
-
-                borderRadius:
-                    BorderRadius.vertical(
-                  top: Radius.circular(30),
-                ),
+                        20,
               ),
 
               child: SingleChildScrollView(
 
                 child: Column(
 
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-
                   mainAxisSize:
                       MainAxisSize.min,
 
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+
                   children: [
-
-                    Center(
-
-                      child: Container(
-
-                        height: 5,
-                        width: 60,
-
-                        decoration: BoxDecoration(
-
-                          color: Colors.grey.shade300,
-
-                          borderRadius:
-                              BorderRadius.circular(
-                            10,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
 
                     Text(
 
@@ -654,112 +643,63 @@ class _SubjectsScreenState
                           ? "Edit Subject"
                           : "Add Subject",
 
-                      style: const TextStyle(
+                      style:
+                          const TextStyle(
 
-                        fontSize: 22,
+                        fontSize: 20,
 
                         fontWeight:
-                            FontWeight.w700,
-
-                        color: Color(
-                          0xff111827,
-                        ),
+                            FontWeight.bold,
                       ),
                     ),
 
-                    const SizedBox(height: 6),
-
-                    Text(
-
-                      "Centralized academic subject configuration",
-
-                      style: TextStyle(
-
-                        fontSize: 13,
-
-                        color:
-                            Colors.grey.shade600,
-                      ),
+                    const SizedBox(
+                      height: 20,
                     ),
 
-                    const SizedBox(height: 28),
-
-                    _inputField(
+                    TextField(
 
                       controller:
                           nameController,
 
-                      label: "Subject Name",
-
-                      hint:
-                          "Mathematics",
-
-                      capitalization:
+                      textCapitalization:
                           TextCapitalization
                               .characters,
-                    ),
 
-                    const SizedBox(height: 18),
+                      decoration:
+                          InputDecoration(
 
-                    Row(
-                      children: [
+                        labelText:
+                            "Subject Name",
 
-                        Expanded(
-                          child: _inputField(
+                        border:
+                            OutlineInputBorder(
 
-                            controller:
-                                shortNameController,
-
-                            label: "Short Name",
-
-                            hint: "MATH",
-
-                            capitalization:
-                                TextCapitalization
-                                    .characters,
+                          borderRadius:
+                              BorderRadius.circular(
+                            14,
                           ),
                         ),
-
-                        const SizedBox(width: 14),
-
-                        Expanded(
-                          child: _inputField(
-
-                            controller:
-                                codeController,
-
-                            label: "Code",
-
-                            hint: "MAT101",
-
-                            capitalization:
-                                TextCapitalization
-                                    .characters,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
 
-                    const SizedBox(height: 28),
+                    const SizedBox(
+                      height: 20,
+                    ),
 
                     const Text(
 
                       "Applicable Groups",
 
                       style: TextStyle(
-
-                        fontSize: 15,
-
                         fontWeight:
                             FontWeight.w600,
-
-                        color: Color(
-                          0xff374151,
-                        ),
                       ),
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(
+                      height: 10,
+                    ),
 
                     Wrap(
 
@@ -795,8 +735,7 @@ class _SubjectsScreenState
                           child: Container(
 
                             padding:
-                                const EdgeInsets
-                                    .symmetric(
+                                const EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 10,
                             ),
@@ -811,8 +750,9 @@ class _SubjectsScreenState
                                   : Colors.white,
 
                               borderRadius:
-                                  BorderRadius
-                                      .circular(14),
+                                  BorderRadius.circular(
+                                12,
+                              ),
 
                               border: Border.all(
 
@@ -820,8 +760,7 @@ class _SubjectsScreenState
                                     ? const Color(
                                         0xff5B5FEF,
                                       )
-                                    : Colors.grey
-                                        .shade300,
+                                    : Colors.grey.shade300,
                               ),
                             ),
 
@@ -831,12 +770,9 @@ class _SubjectsScreenState
 
                               style: TextStyle(
 
-                                fontWeight:
-                                    FontWeight.w600,
-
                                 color: selected
                                     ? Colors.white
-                                    : Colors.black87,
+                                    : Colors.black,
                               ),
                             ),
                           ),
@@ -845,55 +781,24 @@ class _SubjectsScreenState
                       }).toList(),
                     ),
 
-                    const SizedBox(height: 34),
+                    const SizedBox(
+                      height: 24,
+                    ),
 
                     SizedBox(
 
                       width: double.infinity,
-                      height: 54,
 
                       child: ElevatedButton(
-
-                        style:
-                            ElevatedButton
-                                .styleFrom(
-
-                          backgroundColor:
-                              const Color(
-                            0xff5B5FEF,
-                          ),
-
-                          shape:
-                              RoundedRectangleBorder(
-
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                              16,
-                            ),
-                          ),
-                        ),
 
                         onPressed: () async {
 
                           final name =
                               nameController.text
-                                  .trim();
+                                  .trim()
+                                  .toUpperCase();
 
-                          final shortName =
-                              shortNameController
-                                  .text
-                                  .trim();
-
-                          final code =
-                              codeController.text
-                                  .trim();
-
-                          if (name.isEmpty ||
-                              shortName.isEmpty ||
-                              code.isEmpty ||
-                              selectedGroups
-                                  .isEmpty) {
+                          if (name.isEmpty) {
 
                             ScaffoldMessenger.of(
                               context,
@@ -901,7 +806,7 @@ class _SubjectsScreenState
 
                               const SnackBar(
                                 content: Text(
-                                  "Fill all fields",
+                                  "Enter subject name",
                                 ),
                               ),
                             );
@@ -922,10 +827,7 @@ class _SubjectsScreenState
 
                               name: name,
 
-                              shortName:
-                                  shortName,
-
-                              code: code,
+                              shortName: '',
 
                               groups:
                                   selectedGroups,
@@ -941,10 +843,7 @@ class _SubjectsScreenState
 
                               name: name,
 
-                              shortName:
-                                  shortName,
-
-                              code: code,
+                              shortName: '',
 
                               groups:
                                   selectedGroups,
@@ -956,21 +855,25 @@ class _SubjectsScreenState
                           Navigator.pop(context);
                         },
 
+                        style:
+                            ElevatedButton.styleFrom(
+
+                          backgroundColor:
+                              const Color(
+                            0xff5B5FEF,
+                          ),
+
+                          padding:
+                              const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
+                        ),
+
                         child: Text(
 
                           isEdit
                               ? "Update Subject"
                               : "Save Subject",
-
-                          style: const TextStyle(
-
-                            fontSize: 15,
-
-                            fontWeight:
-                                FontWeight.w600,
-
-                            color: Colors.white,
-                          ),
                         ),
                       ),
                     ),
@@ -981,71 +884,6 @@ class _SubjectsScreenState
           },
         );
       },
-    );
-  }
-
-  Widget _inputField({
-
-    required TextEditingController controller,
-
-    required String label,
-    required String hint,
-
-    TextCapitalization capitalization =
-        TextCapitalization.none,
-
-  }) {
-
-    return TextField(
-
-      controller: controller,
-
-      textCapitalization:
-          capitalization,
-
-      decoration: InputDecoration(
-
-        labelText: label,
-
-        hintText: hint,
-
-        filled: true,
-
-        fillColor:
-            const Color(0xffF8FAFC),
-
-        border: OutlineInputBorder(
-
-          borderRadius:
-              BorderRadius.circular(16),
-
-          borderSide: BorderSide.none,
-        ),
-
-        enabledBorder:
-            OutlineInputBorder(
-
-          borderRadius:
-              BorderRadius.circular(16),
-
-          borderSide: BorderSide(
-            color: Colors.grey.shade200,
-          ),
-        ),
-
-        focusedBorder:
-            const OutlineInputBorder(
-
-          borderRadius:
-              BorderRadius.all(
-            Radius.circular(16),
-          ),
-
-          borderSide: BorderSide(
-            color: Color(0xff5B5FEF),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -32,7 +32,7 @@ class SubjectService {
 
     required String shortName,
 
-    required String code,
+   
 
     required List<String> groups,
 
@@ -45,7 +45,7 @@ class SubjectService {
       'shortName':
           shortName.trim(),
 
-      'code': code.trim(),
+     
 
       'groups': groups,
 
@@ -63,7 +63,7 @@ class SubjectService {
 
     required String name,
     required String shortName,
-    required String code,
+   
 
     required List<String> groups,
 
@@ -78,7 +78,7 @@ class SubjectService {
       'shortName':
           shortName.trim(),
 
-      'code': code.trim(),
+     
 
       'groups': groups,
     });

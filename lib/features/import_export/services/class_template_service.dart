@@ -5,7 +5,7 @@ import '../../school_admin/students/services/template_export_stub.dart'
     if (dart.library.io) '../../school_admin/students/services/template_export_io.dart'
     if (dart.library.html) '../../school_admin/students/services/template_export_web.dart';
 
-class SubjectTemplateService {
+class ClassTemplateService {
 
   static Future<void>
       downloadTemplate() async {
@@ -20,7 +20,7 @@ class SubjectTemplateService {
       1,
       1,
     ).setText(
-      'SUBJECT NAME',
+      'CLASS NAME',
     );
 
     sheet.getRangeByIndex(
@@ -35,7 +35,7 @@ class SubjectTemplateService {
 
     await saveExcelFile(
       bytes,
-      'subject_template.xlsx',
+      'class_template.xlsx',
     );
   }
 }

@@ -162,49 +162,107 @@ class _AssignSubjectScreenState extends State<AssignSubjectScreen> {
                               });
                             },
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 18, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? const Color(0xff5B5FEF)
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? const Color(0xff5B5FEF)
-                                      : Colors.grey.shade200,
-                                ),
-                                boxShadow: isSelected
-                                    ? [
-                                        const BoxShadow(
-                                          color: Color(0x335B5FEF),
-                                          blurRadius: 8,
-                                          offset: Offset(0, 4),
-                                        ),
-                                      ]
-                                    : [],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (isSelected) ...[
-                                    const Icon(Icons.check_circle_rounded,
-                                        size: 16, color: Colors.white),
-                                    const SizedBox(width: 6),
-                                  ],
-                                  Text(
-                                    subject,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : const Color(0xff374151),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+
+  duration: const Duration(
+    milliseconds: 180,
+  ),
+
+  padding:
+      const EdgeInsets.symmetric(
+    horizontal: 18,
+    vertical: 12,
+  ),
+
+  decoration: BoxDecoration(
+
+    color: isSelected
+        ? const Color(0xff5B5FEF)
+
+        : [
+            const Color(0xffEEF2FF),
+            const Color(0xffECFDF5),
+            const Color(0xffFEF3C7),
+            const Color(0xffFCE7F3),
+            const Color(0xffE0F2FE),
+          ][
+            subjects.indexOf(subject) % 5
+          ],
+
+    borderRadius:
+        BorderRadius.circular(14),
+
+    border: Border.all(
+
+      color: isSelected
+          ? const Color(0xff5B5FEF)
+          : Colors.transparent,
+    ),
+
+    boxShadow: isSelected
+        ? [
+
+            const BoxShadow(
+
+              color: Color(0x335B5FEF),
+
+              blurRadius: 8,
+
+              offset: Offset(0, 4),
+            ),
+          ]
+        : [],
+  ),
+
+  child: Row(
+
+    mainAxisSize:
+        MainAxisSize.min,
+
+    children: [
+
+      if (isSelected) ...[
+
+        const Icon(
+
+          Icons.check_circle_rounded,
+
+          size: 16,
+
+          color: Colors.white,
+        ),
+
+        const SizedBox(width: 6),
+      ],
+
+      Text(
+
+        subject.toUpperCase(),
+
+        style: TextStyle(
+
+          fontWeight:
+              FontWeight.w700,
+
+          color: isSelected
+              ? Colors.white
+              : const Color(
+                  0xff374151,
+                ),
+        ),
+      ),
+    ],
+  ),
+),
+                          
+                          
+                          
+                          
+                          
+                          
+                          
+                          
+                          
+                          
                           );
                         }).toList(),
                       ),

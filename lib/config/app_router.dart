@@ -9,7 +9,7 @@ import 'package:school_app/features/import_export/screens/import_export_dashboar
 
 import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
 
-import 'package:school_app/features/import_export/screens/export_subject_screen.dart';
+
 
 import 'package:school_app/features/import_export/screens/subject_template_screen.dart';
 
@@ -729,14 +729,7 @@ GoRoute(
   },
 ),
 
-GoRoute(
-  path: '/export-subjects',
-  builder: (context, state) {
-    return ExportSubjectScreen(
-      schoolId: 'demo-school',
-    );
-  },
-),
+
 
 GoRoute(
   path: '/subject-template',
