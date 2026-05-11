@@ -8,6 +8,11 @@ import 'package:school_app/core/widgets/profile_avatar.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 import 'teacher_profile_screen.dart';
+import '../services/teacher_export_service.dart';
+import '../services/teacher_import_service.dart';
+
+
+
 
 class TeachersScreen extends ConsumerWidget {
   const TeachersScreen({super.key});
@@ -873,12 +878,17 @@ class TeachersScreen extends ConsumerWidget {
 
 // ─── Teacher Settings Bottom Sheet ─────────────────────────────────────────
 
-class _TeacherSettingsSheet extends StatelessWidget {
+class _TeacherSettingsSheet extends ConsumerWidget {
   final BuildContext context;
   const _TeacherSettingsSheet({required this.context});
 
   @override
-  Widget build(BuildContext ctx) {
+  Widget build(
+  BuildContext ctx,
+  WidgetRef ref,
+)
+      
+   {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -922,23 +932,88 @@ class _TeacherSettingsSheet extends StatelessWidget {
             },
           ),
           const SizedBox(height: 8),
-          _SheetTile(
-            icon: Icons.file_download_outlined,
-            iconColor: const Color(0xff0891B2),
-            iconBg: const Color(0xffE0F7FA),
-            title: 'Export Teachers',
-            subtitle: 'Download teacher list as spreadsheet',
-            comingSoon: true,
-          ),
+         
+         
+         
+         _SheetTile(
+  icon: Icons.file_download_outlined,
+  iconColor: const Color(0xff0891B2),
+  iconBg: const Color(0xffE0F7FA),
+  title: 'Export Teachers',
+  subtitle: 'Download teacher list as spreadsheet',
+
+ onTap: () async {
+
+  Navigator.pop(ctx);
+
+  final school =
+      await ref.read(
+    currentSchoolProvider.future,
+  );
+
+  await TeacherExportService
+      .exportTeachers(
+    school.id,
+  );
+},
+
+
+
+
+
+),
+
+
+
+
+
           const SizedBox(height: 8),
-          _SheetTile(
-            icon: Icons.file_upload_outlined,
-            iconColor: const Color(0xff059669),
-            iconBg: const Color(0xffD1FAE5),
-            title: 'Import Teachers',
-            subtitle: 'Bulk import teachers from a file',
-            comingSoon: true,
-          ),
+
+
+
+
+
+
+_SheetTile(
+
+  icon: Icons.file_upload_outlined,
+
+  iconColor:
+      const Color(0xff059669),
+
+  iconBg:
+      const Color(0xffD1FAE5),
+
+  title: 'Import Teachers',
+
+  subtitle:
+      'Bulk import teachers from Excel',
+
+  onTap: () async {
+
+    Navigator.pop(ctx);
+
+    final school =
+        await ref.read(
+      currentSchoolProvider.future,
+    );
+
+    await TeacherImportService
+        .pickAndImportTeachers(
+
+      context: ctx,
+      schoolId: school.id,
+    );
+  },
+),
+        
+
+
+
+
+
+
+
           const SizedBox(height: 8),
           _SheetTile(
             icon: Icons.lock_outline_rounded,

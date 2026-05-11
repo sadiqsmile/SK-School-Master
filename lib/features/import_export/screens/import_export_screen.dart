@@ -50,7 +50,7 @@ class ImportExportScreen extends StatelessWidget {
       body: ListView(
 
         padding:
-            const EdgeInsets.all(20),
+            const EdgeInsets.all(16),
 
         children: [
 
@@ -66,8 +66,8 @@ class ImportExportScreen extends StatelessWidget {
 
           Wrap(
 
-            spacing: 16,
-            runSpacing: 16,
+            spacing: 12,
+            runSpacing: 12,
 
             children: [
 
@@ -83,9 +83,7 @@ class ImportExportScreen extends StatelessWidget {
                     Icons.upload_rounded,
 
                 color:
-                    const Color(
-                  0xff6366F1,
-                ),
+                   const Color.fromARGB(255, 250, 91, 91),
 
                 onTap: () async {
 
@@ -110,9 +108,8 @@ class ImportExportScreen extends StatelessWidget {
                     Icons.download_rounded,
 
                 color:
-                    const Color(
-                  0xff10B981,
-                ),
+                   const Color.fromARGB(255, 250, 91, 91),
+                
 
                 onTap: () async {
 
@@ -150,9 +147,7 @@ class ImportExportScreen extends StatelessWidget {
                     Icons.description_rounded,
 
                 color:
-                    const Color(
-                  0xffF59E0B,
-                ),
+               const Color.fromARGB(255, 250, 91, 91),
 
                 onTap: () async {
 
@@ -216,7 +211,7 @@ class ImportExportScreen extends StatelessWidget {
 
                 color:
                     const Color(
-                  0xff0EA5E9,
+                  0xff8B5CF6,
                 ),
 
                 onTap: () async {
@@ -256,7 +251,7 @@ class ImportExportScreen extends StatelessWidget {
 
                 color:
                     const Color(
-                  0xffEC4899,
+                  0xff8B5CF6,
                 ),
 
                 onTap: () async {
@@ -338,58 +333,6 @@ class ImportExportScreen extends StatelessWidget {
 
           const SizedBox(height: 34),
 
-          // =========================
-          // STAFF
-          // =========================
-
-          const _SectionTitle(
-            'Staff',
-          ),
-
-          const SizedBox(height: 14),
-
-          Wrap(
-
-            spacing: 16,
-            runSpacing: 16,
-
-            children: [
-
-              _ModernActionCard(
-
-                title:
-                    'Import Teachers',
-
-                subtitle:
-                    'Bulk teacher upload',
-
-                icon:
-                    Icons.people_alt_rounded,
-
-                color:
-                    const Color(
-                  0xffEF4444,
-                ),
-
-                onTap: () {
-
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(
-
-                    const SnackBar(
-
-                      content: Text(
-                        'Teacher import coming soon',
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 34),
 
           // =========================
           // EXAMINATIONS
@@ -481,6 +424,7 @@ class ImportExportScreen extends StatelessWidget {
   }
 }
 
+
 class _SectionTitle extends StatelessWidget {
 
   final String title;
@@ -492,23 +436,34 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 
-    return Text(
+    return Padding(
 
-      title,
+      padding:
+          const EdgeInsets.only(
+        bottom: 10,
+      ),
 
-      style: const TextStyle(
+      child: Text(
 
-        fontSize: 25,
+        title,
 
-        fontWeight:
-            FontWeight.w800,
+        style: const TextStyle(
 
-        color:
-            Color(0xff111827),
+          fontSize: 18,
+
+          fontWeight:
+              FontWeight.w700,
+
+          color:
+              Color(0xff111827),
+
+          letterSpacing: -0.2,
+        ),
       ),
     );
   }
 }
+
 
 class _ModernActionCard extends StatelessWidget {
 
@@ -539,7 +494,7 @@ class _ModernActionCard extends StatelessWidget {
 
       borderRadius:
           BorderRadius.circular(
-        24,
+        18,
       ),
 
       onTap: onTap,
@@ -547,33 +502,32 @@ class _ModernActionCard extends StatelessWidget {
       child: Container(
 
         width:
-            width > 900
-                ? (width / 3) - 40
+            width > 1100
+                ? (width / 3) - 34
                 : double.infinity,
 
         padding:
-            const EdgeInsets.all(
-          22,
+            const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
         ),
 
         decoration:
             BoxDecoration(
 
-          color: Colors.white,
+          color: color.withOpacity(0.11),
 
           borderRadius:
               BorderRadius.circular(
-            24,
+            18,
           ),
 
           border: Border.all(
 
-            color:
-                const Color(
-              0xffEEF2F7,
+            color: Colors.transparent,
             ),
-          ),
-
+          
+      
           boxShadow: [
 
             BoxShadow(
@@ -581,15 +535,15 @@ class _ModernActionCard extends StatelessWidget {
               color:
                   Colors.black
                       .withOpacity(
-                0.04,
+                0.025,
               ),
 
-              blurRadius: 18,
+              blurRadius: 10,
 
               offset:
                   const Offset(
                 0,
-                8,
+                4,
               ),
             ),
           ],
@@ -601,20 +555,20 @@ class _ModernActionCard extends StatelessWidget {
 
             Container(
 
-              height: 58,
-              width: 58,
+              height: 42,
+              width: 42,
 
               decoration:
                   BoxDecoration(
 
                 color:
                     color.withOpacity(
-                  0.12,
+                  0.10,
                 ),
 
                 borderRadius:
                     BorderRadius.circular(
-                  18,
+                  12,
                 ),
               ),
 
@@ -624,12 +578,12 @@ class _ModernActionCard extends StatelessWidget {
 
                 color: color,
 
-                size: 30,
+                size: 20,
               ),
             ),
 
             const SizedBox(
-              width: 18,
+              width: 12,
             ),
 
             Expanded(
@@ -649,10 +603,10 @@ class _ModernActionCard extends StatelessWidget {
                     style:
                         const TextStyle(
 
-                      fontSize: 18,
+                      fontSize: 15,
 
                       fontWeight:
-                          FontWeight.w700,
+                          FontWeight.w600,
 
                       color:
                           Color(
@@ -662,7 +616,7 @@ class _ModernActionCard extends StatelessWidget {
                   ),
 
                   const SizedBox(
-                    height: 6,
+                    height: 3,
                   ),
 
                   Text(
@@ -672,7 +626,7 @@ class _ModernActionCard extends StatelessWidget {
                     style:
                         const TextStyle(
 
-                      fontSize: 14,
+                      fontSize: 12,
 
                       color:
                           Color(
@@ -686,7 +640,7 @@ class _ModernActionCard extends StatelessWidget {
 
             const Icon(
 
-              Icons.arrow_forward_ios_rounded,
+              Icons.chevron_right_rounded,
 
               size: 18,
 
@@ -701,3 +655,9 @@ class _ModernActionCard extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
+
