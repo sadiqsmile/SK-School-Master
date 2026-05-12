@@ -140,22 +140,35 @@ class _EditTeacherProfileScreenState
         "emergencyContact":
             emergencyController.text.trim(),
         "gender": gender ?? '',
-        "classTeacherOf": {
-          "classId": classTeacherClass,
-          "sectionId": classTeacherSection,
-        },
+        
+      "classTeacherOf":
+    classTeacherClass != null &&
+            classTeacherSection != null
+        ? {
+            "classId": classTeacherClass,
+            "sectionId": classTeacherSection,
+          }
+        : null,
+
+
+
         "assignmentKeys": assignedClasses,
         "updatedAt": FieldValue.serverTimestamp(),
       });
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.teacherId)
-          .update({
+      final userRef = FirebaseFirestore.instance
+    .collection('users')
+    .doc(widget.teacherId);
 
-        "name": nameController.text.trim(),
-        "phone": phoneController.text.trim(),
-      });
+final userSnap = await userRef.get();
+
+if (userSnap.exists) {
+  await userRef.update({
+    "name": nameController.text.trim(),
+    "phone": phoneController.text.trim(),
+  });
+}
+ 
 
       if (!mounted) return;
 
@@ -319,10 +332,47 @@ class _EditTeacherProfileScreenState
 
                 const SizedBox(height: 16),
 
-                _field(
-                  label: "Date of Birth",
-                  controller: dobController,
-                ),
+               TextFormField(
+  controller: dobController,
+  readOnly: true,
+
+  decoration: InputDecoration(
+    labelText: "Date of Birth",
+    suffixIcon: const Icon(Icons.calendar_month),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+  ),
+
+  onTap: () async {
+
+    DateTime initialDate = DateTime(1990);
+
+    try {
+
+      if (dobController.text.isNotEmpty) {
+        initialDate =
+            DateTime.parse(dobController.text);
+      }
+
+    } catch (_) {}
+
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+    );
+
+    if (pickedDate != null) {
+
+      dobController.text =
+          "${pickedDate.year}-"
+          "${pickedDate.month.toString().padLeft(2, '0')}-"
+          "${pickedDate.day.toString().padLeft(2, '0')}";
+    }
+  },
+),
 
                 const SizedBox(height: 16),
 

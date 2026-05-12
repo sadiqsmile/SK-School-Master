@@ -1,4 +1,4 @@
-// 🔴 SAME IMPORTS (unchanged)
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +9,7 @@ import 'dart:ui';
 import 'package:school_app/providers/current_school_provider.dart';
 import 'package:school_app/features/school_admin/students/providers/students_provider.dart';
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AttendanceScreen extends ConsumerStatefulWidget {
   const AttendanceScreen({super.key});
@@ -23,6 +24,50 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
 
   List<Map<String, dynamic>> studentList = [];
 
+@override
+void initState() {
+  super.initState();
+  _loadTeacherData();
+}
+
+Future<void> _loadTeacherData() async {
+  final user = FirebaseAuth.instance.currentUser;
+
+  if (user == null) return;
+
+  final school = await ref.read(currentSchoolProvider.future);
+
+  final doc = await FirebaseFirestore.instance
+      .collection('schools')
+      .doc(school.id)
+      .collection('teachers')
+      .doc(user.uid)
+      .get();
+
+  if (!doc.exists) return;
+
+  final data = doc.data()!;
+
+  final classTeacherOf = data['classTeacherOf'];
+
+  setState(() {
+    teacherData = data;
+
+    if (classTeacherOf != null) {
+      classId = classTeacherOf['class'];
+      sectionId = classTeacherOf['section'];
+
+      isClassTeacher = true;
+      canEditAttendance = true;
+    }
+  });
+}
+
+
+
+
+
+
   @override
   Widget build(BuildContext context) {
     return AdminLayout(
@@ -32,46 +77,27 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         child: Column(
           children: [
 
-            /// CLASS
-            DropdownButtonFormField<String>(
-              hint: const Text("Select Class"),
-              value: classId,
-              items: ['1','2','3','4','5','6','7','8','9','10']
-                  .map((e) => DropdownMenuItem(
-                        value: e,
-                        child: Text("Class $e"),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                setState(() {
-                  classId = v;
-                  sectionId = null;
-                  studentList = [];
-                });
-              },
-            ),
-
-            const SizedBox(height: 10),
-
-            /// SECTION
-            DropdownButtonFormField<String>(
-              hint: const Text("Select Section"),
-              value: sectionId,
-              items: ['A','B','C','D']
-                  .map((e) => DropdownMenuItem(
-                        value: e,
-                        child: Text("Section $e"),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                setState(() {
-                  sectionId = v;
-                  studentList = [];
-                });
-              },
-            ),
-
-            const SizedBox(height: 15),
+           if (isClassTeacher)
+  Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.indigo.shade50,
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.class_),
+        const SizedBox(width: 10),
+        Text(
+          "Class $classId - $sectionId",
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  ),
 
             /// DATE
             Align(
@@ -83,6 +109,23 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
             ),
 
             const SizedBox(height: 15),
+
+
+if (!isClassTeacher)
+  Expanded(
+    child: Center(
+      child: Text(
+        "Only class teachers can mark attendance",
+        style: TextStyle(
+          fontSize: 16,
+          color: Colors.grey.shade700,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ),
+  ),
+
+
 
             if (classId != null && sectionId != null)
               Expanded(
@@ -99,10 +142,12 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         ),
       ),
 
-      floatingActionButton: FloatingActionButton(
-        onPressed: _handleSave, // ✅ FIXED
+     floatingActionButton: canEditAttendance
+    ? FloatingActionButton(
+        onPressed: _handleSave,
         child: const Icon(Icons.save),
-      ),
+      )
+    : null,
     );
   }
 
@@ -199,6 +244,15 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     );
   }
 }
+
+
+
+Map<String, dynamic>? teacherData;
+
+bool isClassTeacher = false;
+bool canEditAttendance = false;
+
+
 
 /// ================= STUDENT LIST =================
 

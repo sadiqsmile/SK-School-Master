@@ -140,7 +140,7 @@ class TeachersScreen extends ConsumerWidget {
               return SingleChildScrollView(
                 padding:
                     const EdgeInsets.all(
-                  16,
+                  13,
                 ),
                 child: Column(
                   crossAxisAlignment:
@@ -156,6 +156,9 @@ class TeachersScreen extends ConsumerWidget {
                       height: 18,
                     ),
 
+
+
+
                     GridView.count(
                       crossAxisCount:
                           mobile
@@ -170,8 +173,8 @@ class TeachersScreen extends ConsumerWidget {
                           14,
                       childAspectRatio:
                           mobile
-                              ? 1.25
-                              : 1.45,
+                              ? 2.1
+                              : 2.8,
                       children: [
                         _statCard(
                           'Total',
@@ -349,6 +352,7 @@ class TeachersScreen extends ConsumerWidget {
   Widget _heroHeader(
     int total,
   ) {
+   
     return Container(
       width: double.infinity,
       padding:
@@ -421,92 +425,123 @@ class TeachersScreen extends ConsumerWidget {
     );
   }
 
-  Widget _statCard(
-    String title,
-    String value,
-    IconData icon,
-    Color start,
-    Color end,
-  ) {
-    return Container(
-      padding:
-          const EdgeInsets.all(
-        16,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(
-          20,
+
+
+Widget _statCard(
+  String title,
+  String value,
+  IconData icon,
+  Color start,
+  Color end,
+) {
+  return Container(
+
+    padding: const EdgeInsets.symmetric(
+      horizontal: 14,
+      vertical: 12,
+    ),
+
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius:
+          BorderRadius.circular(18),
+
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x10000000),
+          blurRadius: 12,
+          offset: Offset(0, 4),
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(
-              0x12000000,
-            ),
-            blurRadius: 18,
-            offset: Offset(
-              0,
-              8,
+      ],
+    ),
+
+    child: Row(
+      children: [
+
+        Container(
+          width: 42,
+          height: 42,
+
+          decoration: BoxDecoration(
+            borderRadius:
+                BorderRadius.circular(12),
+
+            gradient: LinearGradient(
+              colors: [start, end],
             ),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment
-                .start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration:
-                BoxDecoration(
-              borderRadius:
-                  BorderRadius.circular(
-                14,
+
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        Expanded(
+          child: Column(
+            mainAxisAlignment:
+                MainAxisAlignment.center,
+
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+
+            children: [
+
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
               ),
-              gradient:
-                  LinearGradient(
-                colors: [
-                  start,
-                  end,
-                ],
+
+              const SizedBox(height: 3),
+
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            child: Icon(
-              icon,
-              color:
-                  Colors.white,
-            ),
+            ],
           ),
-          const Spacer(),
-          Text(
-            value,
-            style:
-                const TextStyle(
-              fontSize: 24,
-              fontWeight:
-                  FontWeight.w800,
-            ),
-          ),
-          const SizedBox(
-            height: 4,
-          ),
-          Text(
-            title,
-            style:
-                const TextStyle(
-              color:
-                  Color(
-                0xFF6B7280,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   Widget _teacherCard({
     required BuildContext context,
@@ -572,7 +607,7 @@ class TeachersScreen extends ConsumerWidget {
                 name: name,
                 imageUrl:
                     photoUrl,
-                radius: 28,
+                radius: 22,
               ),
               const SizedBox(
                 width: 12,
@@ -715,8 +750,8 @@ class TeachersScreen extends ConsumerWidget {
                           return Container(
                             padding:
                                 const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
+                              horizontal: 10,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color:
@@ -753,49 +788,102 @@ class TeachersScreen extends ConsumerWidget {
             height: 16,
           ),
 
-          Row(
-            children: [
-              Expanded(
-                child:
-                    OutlinedButton.icon(
-                  onPressed: () {
-                    context.push(
-                      '/assign-class',
-                      extra:
-                          teacherId,
-                    );
-                  },
-                  icon: const Icon(
-                    Icons
-                        .edit_note_rounded,
-                  ),
-                  label: const Text(
-                    'Assign',
-                  ),
-                ),
-              ),
-              const SizedBox(
-                width: 10,
-              ),
-              Expanded(
-                child:
-                    ElevatedButton.icon(
-                  onPressed: () =>
-                      _resetAssignments(
-                    context,
-                    ref,
-                    teacherId,
-                  ),
-                  icon: const Icon(
-                    Icons.restart_alt,
-                  ),
-                  label: const Text(
-                    'Reset',
-                  ),
-                ),
-              ),
-            ],
+         Align(
+  alignment: Alignment.centerLeft,
+  child: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+
+      SizedBox(
+        width: 120,
+        height: 38,
+
+        child: OutlinedButton.icon(
+
+          onPressed: () {
+            context.push(
+              '/assign-class',
+              extra: teacherId,
+            );
+          },
+
+          icon: const Icon(
+            Icons.edit_note_rounded,
+            size: 16,
           ),
+
+          label: const Text(
+            'Assign',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ),
+
+      const SizedBox(width: 10),
+
+      SizedBox(
+        width: 110,
+        height: 38,
+
+        child: ElevatedButton.icon(
+
+          onPressed: () =>
+              _resetAssignments(
+            context,
+            ref,
+            teacherId,
+          ),
+
+          icon: const Icon(
+            Icons.restart_alt,
+            size: 16,
+          ),
+
+          label: const Text(
+            'Reset',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          style: ElevatedButton.styleFrom(
+
+            backgroundColor:
+                const Color(0xffF5F3FF),
+
+            foregroundColor:
+                const Color(0xff5B5FEF),
+
+            elevation: 0,
+
+            shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+        
+        
+        
+        
         ],
       ),
     ),

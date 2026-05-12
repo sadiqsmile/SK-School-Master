@@ -1,276 +1,570 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:school_app/features/school_admin/layout/admin_layout.dart';
+import '../../../../providers/current_school_provider.dart';
 
-class ArchivedTeachersScreen extends StatelessWidget {
-
-  final String schoolId;
+class ArchivedTeachersScreen extends ConsumerWidget {
 
   const ArchivedTeachersScreen({
     super.key,
-    required this.schoolId,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+    WidgetRef ref,
+  ) {
 
-    return AdminLayout(
-      title: 'Archived Teachers',
+    return Scaffold(
 
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('schools')
-            .doc(schoolId)
-            .collection('teachers')
-            .where('archived', isEqualTo: true)
-            .orderBy('archivedAt', descending: true)
-            .snapshots(),
+      backgroundColor:
+          const Color(0xffF5F7FB),
 
-        builder: (context, snapshot) {
+      appBar: AppBar(
 
-          if (!snapshot.hasData) {
+        title: const Text(
+          'Archived Teachers',
+        ),
+
+        backgroundColor:
+            Colors.white,
+
+        elevation: 0,
+      ),
+
+      body: FutureBuilder(
+
+        future: ref.read(
+          currentSchoolProvider.future,
+        ),
+
+        builder: (context, schoolSnap) {
+
+          if (!schoolSnap.hasData) {
+
             return const Center(
-              child: CircularProgressIndicator(),
+              child:
+                  CircularProgressIndicator(),
             );
           }
 
-          final docs = snapshot.data!.docs;
+          final school =
+              schoolSnap.data!;
 
-          if (docs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+          return StreamBuilder(
+
+            stream: FirebaseFirestore
+                .instance
+                .collection('schools')
+                .doc(school.id)
+                .collection('teachers')
+                .where(
+                  'archived',
+                  isEqualTo: true,
+                )
+                .snapshots(),
+
+            builder: (context, snapshot) {
+
+              if (!snapshot.hasData) {
+
+                return const Center(
+                  child:
+                      CircularProgressIndicator(),
+                );
+              }
+
+              final docs =
+                  snapshot.data!.docs;
+
+              if (docs.isEmpty) {
+
+                return const Center(
+                  child: Text(
+                    'No Archived Teachers',
+                  ),
+                );
+              }
+
+
+
+
+return Center(
+
+  child: ConstrainedBox(
+
+    constraints:
+        const BoxConstraints(
+
+      maxWidth: 760,
+    ),
+
+    child: ListView.builder(
+
+      padding:
+          const EdgeInsets.all(
+        20,
+      ),
+
+      itemCount:
+          docs.length,
+
+      itemBuilder:
+          (context, index) {
+
+        final doc =
+            docs[index];
+
+        final data =
+            doc.data();
+
+        final name =
+            (data['name'] ?? '')
+                .toString();
+
+        final email =
+            (data['email'] ?? '')
+                .toString();
+
+        final phone =
+            (data['phone'] ?? '')
+                .toString();
+
+        return Container(
+
+          margin:
+              const EdgeInsets.only(
+            bottom: 18,
+          ),
+
+          padding:
+              const EdgeInsets.all(
+            18,
+          ),
+
+          decoration:
+              BoxDecoration(
+
+            color: Colors.white,
+
+            borderRadius:
+                BorderRadius.circular(
+              24,
+            ),
+
+            boxShadow: const [
+
+              BoxShadow(
+
+                color: Color(
+                  0x08000000,
+                ),
+
+                blurRadius: 18,
+
+                offset: Offset(
+                  0,
+                  8,
+                ),
+              ),
+            ],
+          ),
+
+          child: Column(
+
+            children: [
+
+              Row(
+
+                crossAxisAlignment:
+                    CrossAxisAlignment
+                        .start,
+
                 children: [
 
                   Container(
-                    height: 90,
-                    width: 90,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.10),
-                      shape: BoxShape.circle,
+
+                    width: 58,
+                    height: 58,
+
+                    decoration:
+                        BoxDecoration(
+
+                      color:
+                          const Color(
+                        0xffEEF2FF,
+                      ),
+
+                      borderRadius:
+                          BorderRadius.circular(
+                        18,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.archive_outlined,
-                      size: 42,
-                      color: Colors.grey,
+
+                    child: Center(
+
+                      child: Text(
+
+                        name.isNotEmpty
+                            ? name[0]
+                                .toUpperCase()
+                            : '?',
+
+                        style:
+                            const TextStyle(
+
+                          fontSize: 24,
+
+                          fontWeight:
+                              FontWeight.w700,
+
+                          color: Color(
+                            0xff5B5FEF,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
 
-                  const SizedBox(height: 20),
-
-                  const Text(
-                    "No Archived Teachers",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xff374151),
-                    ),
+                  const SizedBox(
+                    width: 16,
                   ),
 
-                  const SizedBox(height: 8),
+                  Expanded(
 
-                  Text(
-                    "Teachers you delete will appear here\nand can be restored anytime.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: Colors.grey.shade600,
+                    child: Column(
+
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+
+                      children: [
+
+                        Text(
+
+                          name,
+
+                          style:
+                              const TextStyle(
+
+                            fontSize: 17,
+
+                            fontWeight:
+                                FontWeight.w700,
+                          ),
+                        ),
+
+                        const SizedBox(
+                          height: 8,
+                        ),
+
+
+
+
+                        Row(
+
+                          children: [
+
+                            const Icon(
+                              Icons.email_outlined,
+                              size: 16,
+                              color: Color(
+                                0xff6B7280,
+                              ),
+                            ),
+
+                            const SizedBox(
+                              width: 6,
+                            ),
+
+                            Expanded(
+
+                              child: Text(
+
+                                email,
+
+                                style:
+                                    const TextStyle(
+
+                                  fontSize:
+                                      13,
+
+                                  color:
+                                      Color(
+                                    0xff6B7280,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(
+                          height: 6,
+                        ),
+
+                        Row(
+
+                          children: [
+
+                            const Icon(
+                              Icons.call_outlined,
+                              size: 16,
+                              color: Color(
+                                0xff6B7280,
+                              ),
+                            ),
+
+                            const SizedBox(
+                              width: 6,
+                            ),
+
+                            Text(
+
+                              phone,
+
+                              style:
+                                  const TextStyle(
+
+                                fontSize:
+                                    13,
+
+                                color:
+                                    Color(
+                                  0xff6B7280,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            );
-          }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(20),
-            itemCount: docs.length,
-            separatorBuilder: (_, __) =>
-                const SizedBox(height: 12),
+              const SizedBox(
+                height: 18,
+              ),
 
-            itemBuilder: (context, index) {
+Align(
 
-              final doc = docs[index];
-              final data =
-                  doc.data() as Map<String, dynamic>;
+  alignment: Alignment.centerLeft,
 
-              final name =
-                  data['name'] as String? ?? 'Unknown';
+  child: Wrap(
 
-              final email =
-                  data['email'] as String? ?? '';
+    spacing: 12,
 
-              final photoUrl =
-                  data['photoUrl'] as String? ?? '';
+    runSpacing: 12,
 
-              final archivedAt =
-                  data['archivedAt'] as Timestamp?;
+    children: [
 
-              final archivedDate = archivedAt != null
-                  ? _formatDate(archivedAt.toDate())
-                  : 'Unknown date';
+      ElevatedButton.icon(
 
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.grey.shade100,
+        onPressed: () async {
+
+          await FirebaseFirestore
+              .instance
+              .collection('schools')
+              .doc(school.id)
+              .collection('teachers')
+              .doc(doc.id)
+              .update({
+
+            'archived': false,
+          });
+        },
+
+        style:
+            ElevatedButton.styleFrom(
+
+          backgroundColor:
+              const Color(
+            0xffEEF2FF,
+          ),
+
+          foregroundColor:
+              const Color(
+            0xff5B5FEF,
+          ),
+
+          elevation: 0,
+
+          padding:
+              const EdgeInsets.symmetric(
+
+            horizontal: 18,
+            vertical: 14,
+          ),
+
+          shape:
+              RoundedRectangleBorder(
+
+            borderRadius:
+                BorderRadius.circular(
+              14,
+            ),
+          ),
+        ),
+
+        icon: const Icon(
+          Icons.restore_rounded,
+          size: 18,
+        ),
+
+        label: const Text(
+          'Restore',
+        ),
+      ),
+
+      ElevatedButton.icon(
+
+        onPressed: () async {
+
+          final ok =
+              await showDialog<bool>(
+
+            context: context,
+
+            builder: (_) {
+
+              return AlertDialog(
+
+                title: const Text(
+                  'Delete Permanently?',
+                ),
+
+                content: const Text(
+                  'This action cannot be undone.',
+                ),
+
+                actions: [
+
+                  TextButton(
+
+                    onPressed: () {
+
+                      Navigator.pop(
+                        context,
+                        false,
+                      );
+                    },
+
+                    child: const Text(
+                      'Cancel',
+                    ),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
 
-                child: Row(
-                  children: [
+                  ElevatedButton(
 
-                    CircleAvatar(
-                      radius: 28,
+                    style:
+                        ElevatedButton.styleFrom(
+
                       backgroundColor:
-                          const Color(0xffF4F5FB),
-                      backgroundImage: photoUrl.isNotEmpty
-                          ? NetworkImage(photoUrl)
-                          : null,
-                      child: photoUrl.isEmpty
-                          ? Text(
-                              name
-                                  .substring(0, 1)
-                                  .toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xff5B5FEF),
-                              ),
-                            )
-                          : null,
+                          Colors.red,
                     ),
 
-                    const SizedBox(width: 14),
+                    onPressed: () {
 
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
+                      Navigator.pop(
+                        context,
+                        true,
+                      );
+                    },
 
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xff1F2937),
-                            ),
-                          ),
-
-                          if (email.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              email,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-
-                          const SizedBox(height: 4),
-
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.archive_outlined,
-                                size: 13,
-                                color: Colors.grey.shade500,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                "Archived $archivedDate",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                    child: const Text(
+                      'Delete',
                     ),
-
-                    ElevatedButton(
-                      onPressed: () =>
-                          _restore(context, doc.id),
-
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color(0xff5B5FEF),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-
-                      child: const Text(
-                        "Restore",
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               );
+            },
+          );
+
+          if (ok != true)
+            return;
+
+          await FirebaseFirestore
+              .instance
+              .collection('schools')
+              .doc(school.id)
+              .collection('teachers')
+              .doc(doc.id)
+              .delete();
+        },
+
+        style:
+            ElevatedButton.styleFrom(
+
+          backgroundColor:
+              const Color(
+            0xffFEF2F2,
+          ),
+
+          foregroundColor:
+              const Color(
+            0xffDC2626,
+          ),
+
+          elevation: 0,
+
+          padding:
+              const EdgeInsets.symmetric(
+
+            horizontal: 18,
+            vertical: 14,
+          ),
+
+          shape:
+              RoundedRectangleBorder(
+
+            borderRadius:
+                BorderRadius.circular(
+              14,
+            ),
+          ),
+        ),
+
+        icon: const Icon(
+          Icons.delete_outline,
+          size: 18,
+        ),
+
+        label: const Text(
+          'Delete',
+        ),
+      ),
+    ],
+  ),
+),
+
+
+
+          
+            
+            
+            
+            
+            ],
+          ),
+        );
+      },
+    ),
+  ),
+);
+            
+            
+            
+            
+            
+            
+            
+            
             },
           );
         },
       ),
     );
-  }
-
-  Future<void> _restore(
-    BuildContext context,
-    String teacherId,
-  ) async {
-
-    await FirebaseFirestore.instance
-        .collection('schools')
-        .doc(schoolId)
-        .collection('teachers')
-        .doc(teacherId)
-        .update({
-      'archived': false,
-      'archivedAt': null,
-    });
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Teacher restored successfully âœ…"),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return "${date.day} ${months[date.month - 1]} ${date.year}";
   }
 }

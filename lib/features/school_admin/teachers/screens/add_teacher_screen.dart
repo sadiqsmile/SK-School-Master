@@ -15,7 +15,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  String selectedRole = "teacher";
+  final String selectedRole = "teacher";
   bool isSaving = false;
 
   Future<void> _save() async {
@@ -70,7 +70,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
           .collection('users')
           .doc(teacherUid)
           .set({
-        "role": selectedRole,
+        "role": 'Teacher',
         "schoolId": schoolId,
         "teacherId": teacherUid,
         "name": name,
@@ -229,22 +229,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
               maxLength: 10,
             ),
             const SizedBox(height: 12),
-
-            DropdownButtonFormField<String>(
-              value: selectedRole,
-              decoration: const InputDecoration(labelText: "Role"),
-              items: const [
-                DropdownMenuItem(value: "teacher", child: Text("Teacher")),
-                DropdownMenuItem(value: "mentor", child: Text("Mentor")),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => selectedRole = value);
-                }
-              },
-            ),
-
-            const SizedBox(height: 25),
+                   
 
             SizedBox(
               width: double.infinity,

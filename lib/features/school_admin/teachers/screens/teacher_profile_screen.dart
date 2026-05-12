@@ -2,8 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'edit_teacher_profile_screen.dart';
 import 'assign_subject_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:school_app/services/image_upload_service.dart';
+import 'package:flutter/foundation.dart';
 
-class TeacherProfileScreen extends StatelessWidget {
+
+class TeacherProfileScreen extends StatefulWidget {
   final String schoolId;
   final String teacherId;
 
@@ -13,15 +18,24 @@ class TeacherProfileScreen extends StatelessWidget {
     required this.teacherId,
   });
 
+@override
+State<TeacherProfileScreen> createState() =>
+    _TeacherProfileScreenState();
+}
+
+class _TeacherProfileScreenState
+    extends State<TeacherProfileScreen> {
+bool _uploadingPhoto = false;
+
   @override
   Widget build(BuildContext context) {
 
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('schools')
-          .doc(schoolId)
+          .doc(widget.schoolId)
           .collection('teachers')
-          .doc(teacherId)
+          .doc(widget.teacherId)
           .snapshots(),
 
       builder: (context, snapshot) {
@@ -79,32 +93,86 @@ class TeacherProfileScreen extends StatelessWidget {
                           child: Row(
                             children: [
 
-                              CircleAvatar(
-                                radius: 42,
-                                backgroundColor: Colors.white,
-                                backgroundImage:
-                                    (data['photoUrl'] ?? '')
-                                            .toString()
-                                            .isNotEmpty
-                                        ? NetworkImage(data['photoUrl'])
-                                        : null,
+                             Stack(
+  children: [
 
-                                child:
-                                    (data['photoUrl'] ?? '')
-                                            .toString()
-                                            .isEmpty
-                                        ? Text(
-                                            data['name']
-                                                .toString()
-                                                .substring(0, 1)
-                                                .toUpperCase(),
-                                            style: const TextStyle(
-                                              fontSize: 30,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          )
-                                        : null,
-                              ),
+    Container(
+      width: 84,
+      height: 84,
+
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white,
+          width: 3,
+        ),
+      ),
+
+      child: ClipOval(
+
+        child:
+            (data['photoUrl'] ?? '')
+                    .toString()
+                    .isNotEmpty
+
+                ? CachedNetworkImage(
+                    imageUrl:
+                        data['photoUrl'],
+                    fit: BoxFit.cover,
+
+                    placeholder:
+                        (_, __) =>
+                            _avatarFallback(data),
+
+                    errorWidget:
+                        (_, __, ___) =>
+                            _avatarFallback(data),
+                  )
+
+                : _avatarFallback(data),
+      ),
+    ),
+
+    Positioned(
+      bottom: 0,
+      right: 0,
+
+      child: InkWell(
+
+        onTap: _uploadingPhoto
+            ? null
+            : () =>
+                _updateTeacherPhoto(data),
+
+        child: Container(
+          padding: const EdgeInsets.all(6),
+
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius:
+                BorderRadius.circular(20),
+          ),
+
+          child: _uploadingPhoto
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child:
+                      CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Icon(
+                  Icons.camera_alt_rounded,
+                  size: 16,
+                  color: Color(0xff5B5FEF),
+                ),
+        ),
+      ),
+    ),
+  ],
+),
+
 
                               const SizedBox(width: 20),
 
@@ -220,8 +288,8 @@ class TeacherProfileScreen extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => AssignSubjectScreen(
-                                schoolId: schoolId,
-                                teacherId: teacherId,
+                                schoolId: widget.schoolId,
+                                teacherId: widget.teacherId,
                               ),
                             ),
                           );
@@ -240,7 +308,7 @@ class TeacherProfileScreen extends StatelessWidget {
                         _infoCard(
                           Icons.badge_outlined,
                           "Role",
-                          (data['role'] ?? '')
+                          (data['role'] ?? 'Teacher')
                               .toString()
                               .toUpperCase(),
                         ),
@@ -257,10 +325,10 @@ class TeacherProfileScreen extends StatelessWidget {
                           data['gender'] ?? '-',
                         ),
 
-                        _infoCard(
+                         _infoCard(
                           Icons.calendar_month_outlined,
                           "D.O.B",
-                          data['dob'] ?? '-',
+                          _formatDob(data['dob']),
                         ),
 
                         _infoCard(
@@ -303,34 +371,40 @@ class TeacherProfileScreen extends StatelessWidget {
                       ),
                     ),
 
-                    Builder(
-                      builder: (context) {
 
-                        final classTeacher =
-                            data['classTeacherOf'];
 
-                        if (classTeacher == null) {
-                          return const SizedBox.shrink();
-                        }
 
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
+               Builder(
+  builder: (context) {
 
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
+    final classTeacher =
+        data['classTeacherOf'];
 
-                          child: Text(
-                            "Class ${classTeacher['classId']}"
-                            "${classTeacher['sectionId']}",
-                          ),
-                        );
-                      },
-                    ),
+    if (classTeacher == null ||
+        classTeacher['classId'] == null ||
+        classTeacher['sectionId'] == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        "Class ${classTeacher['classId']}"
+        "${classTeacher['sectionId']}",
+      ),
+    );
+  },
+),
+              
+
+
 
                     Padding(
                       padding: const EdgeInsets.only(top: 22, bottom: 12),
@@ -464,6 +538,69 @@ class TeacherProfileScreen extends StatelessWidget {
     );
   }
 
+
+
+
+Future<void> _updateTeacherPhoto(
+  Map<String, dynamic> data,
+) async {
+
+  final picker = ImagePicker();
+
+  final picked = await picker.pickImage(
+    source: ImageSource.gallery,
+  );
+
+  if (picked == null) return;
+
+  setState(() {
+    _uploadingPhoto = true;
+  });
+
+  try {
+
+    final bytes =
+        await picked.readAsBytes();
+
+    final compressed =
+        await ImageUploadService.compress(
+      bytes,
+    );
+
+    final url =
+        await ImageUploadService.upload(
+      bytes: compressed,
+      storagePath:
+          'schools/${widget.schoolId}/teachers/${widget.teacherId}.jpg',
+    );
+
+    await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(widget.schoolId)
+        .collection('teachers')
+        .doc(widget.teacherId)
+        .update({
+      'photoUrl': url,
+    });
+
+  } catch (e) {
+
+    if (kDebugMode) {
+      print(e);
+    }
+
+  } finally {
+
+    if (mounted) {
+      setState(() {
+        _uploadingPhoto = false;
+      });
+    }
+  }
+}
+
+
+
   void _confirmDelete(BuildContext context) {
 
     showDialog(
@@ -500,9 +637,9 @@ class TeacherProfileScreen extends StatelessWidget {
 
                 await FirebaseFirestore.instance
                     .collection('schools')
-                    .doc(schoolId)
+                    .doc(widget.schoolId)
                     .collection('teachers')
-                    .doc(teacherId)
+                    .doc(widget.teacherId)
                     .update({
                   'archived': true,
                   'archivedAt': Timestamp.now(),
@@ -531,14 +668,71 @@ class TeacherProfileScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => EditTeacherProfileScreen(
-          schoolId: schoolId,
-          teacherId: teacherId,
-          data: data,
-        ),
+        
+        
+    builder: (_) => EditTeacherProfileScreen(
+  schoolId: widget.schoolId,
+  teacherId: widget.teacherId,
+  data: data,
+),
+
+
+
       ),
     );
   }
+
+String _formatDob(dynamic dob) {
+
+  if (dob == null || dob.toString().isEmpty) {
+    return '-';
+  }
+
+  try {
+
+    final date =
+        DateTime.parse(dob.toString());
+
+    return
+        "${date.day.toString().padLeft(2, '0')}/"
+        "${date.month.toString().padLeft(2, '0')}/"
+        "${date.year}";
+
+  } catch (e) {
+
+    return dob.toString();
+  }
+}
+
+Widget _avatarFallback(
+  Map<String, dynamic> data,
+) {
+
+  final name =
+      (data['name'] ?? '')
+          .toString();
+
+  return Container(
+    color: Colors.white,
+
+    child: Center(
+
+      child: Text(
+
+        name.isEmpty
+            ? '?'
+            : name[0].toUpperCase(),
+
+        style: const TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: Color(0xff5B5FEF),
+        ),
+      ),
+    ),
+  );
+}
+
 
   Widget _infoCard(
     IconData icon,

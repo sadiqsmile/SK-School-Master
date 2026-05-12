@@ -20,9 +20,7 @@ void main() async {
 
   await NotificationService().initialize();
 
-  FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-  );
+ 
 
   runApp(const ProviderScope(child: MyApp()));
 }

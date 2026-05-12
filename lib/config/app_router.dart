@@ -8,7 +8,7 @@ import 'package:school_app/features/school_admin/attendance/screens/attendance_r
 import 'package:school_app/features/import_export/screens/import_export_dashboard_screen.dart';
 
 import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
-
+import 'package:school_app/features/school_admin/teachers/screens/archived_teachers_screen.dart';
 
 
 import 'package:school_app/features/import_export/screens/subject_template_screen.dart';
@@ -348,27 +348,22 @@ final appRouter = GoRouter(
         child: ModulesControlScreen(),
       ),
     ),
+   
+   
     GoRoute(
-      path: '/school-admin/settings/archived-teachers',
-      builder: (context, state) => Consumer(
-        builder: (context, ref, _) {
-          final schoolIdAsync = ref.watch(schoolIdProvider);
-          return schoolIdAsync.when(
-            data: (schoolId) => RoleGuard(
-              title: 'Archived Teachers',
-              allowedRoles: const [UserRole.admin],
-              child: ArchivedTeachersScreen(schoolId: schoolId),
-            ),
-            loading: () => const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            ),
-            error: (e, _) => Scaffold(
-              body: Center(child: Text('Error: $e')),
-            ),
-          );
-        },
-      ),
-    ),
+
+  path:
+      '/school-admin/settings/archived-teachers',
+
+  builder:
+      (context, state) =>
+          const ArchivedTeachersScreen(),
+),
+
+
+
+
+
     GoRoute(
       path: '/school-admin/reports',
       builder: (context, state) => const RoleGuard(
