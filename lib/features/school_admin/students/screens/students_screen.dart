@@ -11,7 +11,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:school_app/main.dart' show messengerKey, navigatorKey;
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/current_school_provider.dart';
-import 'package:school_app/services/image_upload_service.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../services/student_import_service.dart';
 import '../services/student_template_service.dart';
 import '../services/student_service.dart';
@@ -19,6 +19,8 @@ import 'package:school_app/features/tools/rename_photos_screen.dart';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:school_app/core/services/image_service.dart';
 
 import 'package:school_app/core/utils/text_formatters.dart';
 import '../services/template_export_stub.dart'
@@ -1790,7 +1792,17 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       final admissionNo = f.name.replaceAll(RegExp(r'\.[^/.]+$'), '');
       final bytes = f.bytes;
       if (bytes == null) continue;
-      final c = await ImageUploadService.compress(bytes);
+      final c =
+    await FlutterImageCompress.compressWithList(
+  bytes,
+
+  quality: 55,
+
+  minWidth: 300,
+  minHeight: 300,
+
+  format: CompressFormat.jpeg,
+);
       compressed.add(_CompressedImage(admissionNo: admissionNo, bytes: c));
     }
 
@@ -1910,15 +1922,31 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           } catch (_) {}
         }
 
-        final url = await ImageUploadService.upload(
-          bytes: entry.bytes,
-          storagePath: 'schools/$schoolId/photos/${entry.admissionNo}.jpg',
-          onProgress: (p) {
-            fileProgress[entry.admissionNo] =
-                (p * entry.bytes.length).toInt();
-            if (mounted) dialogSetState(() {});
-          },
-        );
+     final url =
+    await ImageService.uploadImage(
+  schoolId: schoolId,
+
+  module: 'students',
+
+  type: 'profile',
+
+  fileName: entry.admissionNo,
+
+  bytes: entry.bytes,
+);
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         // Pin to full size in case the last event hasn't fired yet
         fileProgress[entry.admissionNo] = entry.bytes.length;
 
@@ -1979,11 +2007,36 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
 
       final fileBytes = file.bytes;
       if (fileBytes == null) return;
-      final compressed = await ImageUploadService.compress(fileBytes);
-      final url = await ImageUploadService.upload(
-        bytes: compressed,
-        storagePath: 'schools/$schoolId/photos/$admissionNo.jpg',
-      );
+
+      final compressed =
+    await FlutterImageCompress.compressWithList(
+  fileBytes,
+
+  quality: 55,
+
+  minWidth: 300,
+  minHeight: 300,
+
+  format: CompressFormat.jpeg,
+);
+
+
+
+
+ final url =
+    await ImageService.uploadImage(
+  schoolId: schoolId,
+
+  module: 'students',
+
+  type: 'profile',
+
+  fileName: admissionNo,
+
+  bytes: compressed,
+);
+
+
       await FirebaseFirestore.instance
           .collection('schools')
           .doc(schoolId)

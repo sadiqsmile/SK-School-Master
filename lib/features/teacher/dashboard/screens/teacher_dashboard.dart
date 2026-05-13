@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
-
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,7 +18,7 @@ import 'package:school_app/features/teacher/screens/analytics_dashboard_screen.d
 import 'package:school_app/features/teacher/screens/student_history_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_announcements_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_timetable_screen.dart';
-
+import 'package:school_app/core/services/image_service.dart';
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
 
@@ -148,57 +148,70 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
 
     if (cropped == null) return;
 
-    setState(() => isLoading = true);
+setState(() => isLoading = true);
 
-    try {
-      final ref = FirebaseStorage.instance
-          .ref()
-          .child("teacher_profiles")
-          .child("${user.uid}.jpg");
+try {
 
-      await ref.putData(
-        Uint8List.fromList(cropped),
-      );
+final compressed =
+    await FlutterImageCompress
+        .compressWithList(
 
-      final url = await ref.getDownloadURL();
+  Uint8List.fromList(cropped),
 
-      await FirebaseFirestore.instance
-          .collection("schools")
-          .doc(schoolId)
-          .collection("teachers")
-          .doc(user.uid)
-          .set({
-        "photoUrl": url,
-      }, SetOptions(merge: true));
+  quality: 55,
 
-      if (kIsWeb) {
-        webImage = cropped;
-      } else {
-        final dir =
-            await getTemporaryDirectory();
+  minWidth: 300,
+  minHeight: 300,
 
-        final file = File(
-          "${dir.path}/profile.jpg",
-        );
+  format: CompressFormat.jpeg,
+);
 
-        await file.writeAsBytes(cropped);
-        image = file;
-      }
 
-      if (mounted) setState(() {});
-    } catch (e) {
-      if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Upload Error: $e"),
-        ),
-      );
-    }
+  final url =
+      await ImageService.uploadImage(
 
-    if (mounted) {
-      setState(() => isLoading = false);
-    }
+    schoolId: schoolId,
+
+    module: 'teachers',
+
+    type: 'profile',
+
+    fileName: teacherId,
+
+    bytes: Uint8List.fromList(compressed),
+  );
+
+  await FirebaseFirestore.instance
+      .collection('schools')
+      .doc(schoolId)
+      .collection('teachers')
+      .doc(teacherId)
+      .update({
+    'photoUrl': url,
+  });
+
+  teacherData['photoUrl'] = url;
+
+  if (mounted) {
+    setState(() {});
+  }
+
+} catch (e) {
+
+  debugPrint(
+    'Teacher photo update error: $e',
+  );
+
+} finally {
+
+  if (mounted) {
+    setState(() {
+      isLoading = false;
+    });
+  }
+}
+
   }
 
   // ==========================
@@ -320,7 +333,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
               children: [
                 Icon(
                   icon,
-                  size: 30,
+                  size: 24,
                   color: textMain(),
                 ),
                 const SizedBox(
@@ -331,6 +344,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                     color: textMain(),
                     fontWeight:
                         FontWeight.w700,
+                        fontSize: 13,
                   ),
                 ),
               ],
@@ -717,11 +731,20 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
       ),
 
       body: user == null
-          ? const Center(
-              child: Text(
-                  "No User"),
+          ? const Center(child: Text("No User"),
             )
-          : SingleChildScrollView(
+          : Center(
+    child: ConstrainedBox(
+
+      constraints:
+          const BoxConstraints(
+        maxWidth: 1200,
+      ),
+
+      child: SingleChildScrollView(
+
+
+
               padding:
                   const EdgeInsets.all(
                       16),
@@ -825,7 +848,17 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
 
                   GridView.count(
                     crossAxisCount:
-                        2,
+    MediaQuery.of(context)
+            .size
+            .width >
+        1100
+    ? 5
+    : MediaQuery.of(context)
+                .size
+                .width >
+            700
+        ? 3
+        : 2,
                     shrinkWrap:
                         true,
                     physics:
@@ -834,8 +867,13 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                         14,
                     mainAxisSpacing:
                         14,
-                    childAspectRatio:
-                        1.12,
+                  childAspectRatio:
+    MediaQuery.of(context)
+            .size
+            .width >
+        1100
+    ? 1.7
+    : 1.45,
                     children: [
                       menu(
                         Icons
@@ -908,6 +946,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
                 ],
               ),
             ),
+    ),
+          ),
 
       floatingActionButtonLocation:
           FloatingActionButtonLocation
@@ -985,72 +1025,57 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     );
   }
 
-  Widget profileAvatar(User user) {
-    if (schoolId.isEmpty) {
-      return const CircleAvatar(
-        radius: 32,
-        child:
-            CircularProgressIndicator(),
-      );
-    }
 
-    return StreamBuilder<
-        DocumentSnapshot>(
-      stream: FirebaseFirestore
-          .instance
-          .collection("schools")
-          .doc(schoolId)
-          .collection("teachers")
-          .doc(user.uid)
-          .snapshots(),
-      builder: (context, snap) {
-        String? url;
+Widget profileAvatar(User user) {
+  final url = teacherData["photoUrl"];
 
-        if (snap.hasData &&
-            snap.data!.exists) {
-          final data = snap.data!
-              .data() as Map<String,
-                  dynamic>?;
+  return GestureDetector(
+    onTap: pickImage,
+    child: CircleAvatar(
+      radius: 32,
+      backgroundColor: Colors.white,
+      child: ClipOval(
+        child: SizedBox(
+          width: 64,
+          height: 64,
+          child: url != null && url.toString().isNotEmpty
+              ? CachedNetworkImage(
+  fadeInDuration: Duration.zero,
+  fadeOutDuration: Duration.zero,
+  memCacheWidth: 200,
+  memCacheHeight: 200,
+                  imageUrl: url,
+                  fit: BoxFit.cover,
 
-          url = data?["photoUrl"];
-        }
+                  placeholder: (context, url) =>
+                      const Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child:
+                          CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
 
-        ImageProvider?
-            provider;
+                  errorWidget:
+                      (context, url, error) =>
+                          const Icon(
+                    Icons.person,
+                    color: Colors.grey,
+                  ),
+                )
+              : const Icon(
+                  Icons.person,
+                  color: Colors.grey,
+                ),
+        ),
+      ),
+    ),
+  );
+}
 
-        if (webImage != null) {
-          provider = MemoryImage(
-              webImage!);
-        } else if (image !=
-            null) {
-          provider =
-              FileImage(image!);
-        } else if (url !=
-                null &&
-            url.isNotEmpty) {
-          provider =
-              NetworkImage(url);
-        }
 
-        return GestureDetector(
-          onTap: pickImage,
-          child: CircleAvatar(
-            radius: 32,
-            backgroundColor:
-                Colors.white,
-            backgroundImage:
-                provider,
-            child:
-                provider == null
-                    ? const Icon(
-                        Icons.person,
-                        color: Colors
-                            .grey,
-                      )
-                    : null,
-          ),
-        );
-      },
-    );
-  }
+
 }

@@ -255,8 +255,11 @@ final aadharNo =
 
         'aadharNo': aadharNo,
 
-        'createdAt':
-            Timestamp.now(),
+        'role': 'TEACHER',
+        
+        'photoUrl': '',
+
+        'createdAt': Timestamp.now(),
 
         'archived': false,
       });

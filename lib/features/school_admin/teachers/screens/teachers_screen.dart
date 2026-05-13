@@ -11,11 +11,127 @@ import 'teacher_profile_screen.dart';
 import '../services/teacher_export_service.dart';
 import '../services/teacher_import_service.dart';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:school_app/core/services/image_service.dart';
 
 
+
+
+Future<void> uploadTeacherPhotos(
+  BuildContext context,
+  String schoolId,
+) async {
+
+  final result =
+      await FilePicker.platform.pickFiles(
+    allowMultiple: true,
+    type: FileType.image,
+    withData: true,
+  );
+
+  if (result == null) return;
+
+  int uploaded = 0;
+
+  for (final file in result.files) {
+
+    try {
+
+      final email = file.name
+          .replaceAll(
+            RegExp(r'\.[^/.]+$'),
+            '',
+          )
+          .trim()
+          .toLowerCase();
+
+      final fileBytes = file.bytes;
+
+      if (fileBytes == null) continue;
+
+      final compressed =
+          await FlutterImageCompress
+              .compressWithList(
+
+        fileBytes,
+
+        quality: 55,
+
+        minWidth: 300,
+        minHeight: 300,
+
+        format:
+            CompressFormat.jpeg,
+      );
+
+      final teacherSnap =
+          await FirebaseFirestore.instance
+              .collection('schools')
+              .doc(schoolId)
+              .collection('teachers')
+              .where(
+                'email',
+                isEqualTo: email,
+              )
+              .limit(1)
+              .get();
+
+      if (teacherSnap.docs.isEmpty) {
+        continue;
+      }
+
+      final teacherDoc =
+          teacherSnap.docs.first;
+
+      final teacherId =
+          teacherDoc.id;
+
+      final url =
+          await ImageService.uploadImage(
+
+        schoolId: schoolId,
+
+        module: 'teachers',
+
+        type: 'profile',
+
+        fileName: teacherId,
+
+        bytes: compressed,
+      );
+
+      await teacherDoc.reference.update({
+        'photoUrl': url,
+      });
+
+      uploaded++;
+
+    } catch (e) {
+
+      debugPrint(
+        'Teacher Photo Upload Error: $e',
+      );
+    }
+  }
+
+  if (context.mounted) {
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+
+      SnackBar(
+        content: Text(
+          '$uploaded teacher photos uploaded',
+        ),
+      ),
+    );
+  }
+}
 
 class TeachersScreen extends ConsumerWidget {
   const TeachersScreen({super.key});
+
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,6 +147,7 @@ class TeachersScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         builder: (_) => _TeacherSettingsSheet(context: context),
       ),
+
       floatingActionButton:
           FloatingActionButton.extended(
         onPressed: () =>
@@ -520,29 +637,6 @@ Widget _statCard(
 
 
 
-
-
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   Widget _teacherCard({
     required BuildContext context,
     required WidgetRef ref,
@@ -983,9 +1077,14 @@ class _TeacherSettingsSheet extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      
+      
+    child: SingleChildScrollView(
+  child: Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment:
+        CrossAxisAlignment.start,
+
         children: [
           // handle bar
           Center(
@@ -1030,7 +1129,7 @@ class _TeacherSettingsSheet extends ConsumerWidget {
   title: 'Export Teachers',
   subtitle: 'Download teacher list as spreadsheet',
 
- onTap: () async {
+onTap: () async {
 
   Navigator.pop(ctx);
 
@@ -1044,26 +1143,11 @@ class _TeacherSettingsSheet extends ConsumerWidget {
     school.id,
   );
 },
-
-
-
-
-
 ),
-
-
-
-
 
           const SizedBox(height: 8),
 
-
-
-
-
-
 _SheetTile(
-
   icon: Icons.file_upload_outlined,
 
   iconColor:
@@ -1094,14 +1178,42 @@ _SheetTile(
     );
   },
 ),
-        
+
+const SizedBox(height: 8),
+
+_SheetTile(
+  icon: Icons.photo_library_outlined,
+
+  iconColor:
+      const Color(0xff2563EB),
+
+  iconBg:
+      const Color(0xffDBEAFE),
+
+  title: 'Upload Teacher Photos',
+
+  subtitle:
+      'Bulk upload teacher profile photos',
+
+ onTap: () async {
+
+  Navigator.pop(ctx);
+
+  final school =
+      await ref.read(
+    currentSchoolProvider.future,
+  );
+
+  await uploadTeacherPhotos(
+    ctx,
+    school.id,
+  );
+   
+  },
+),
 
 
-
-
-
-
-
+//------------------------------------
           const SizedBox(height: 8),
           _SheetTile(
             icon: Icons.lock_outline_rounded,
@@ -1122,6 +1234,7 @@ _SheetTile(
           ),
         ],
       ),
+    ),
     );
   }
 }

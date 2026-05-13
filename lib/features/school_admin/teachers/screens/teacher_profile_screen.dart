@@ -2,10 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'edit_teacher_profile_screen.dart';
 import 'assign_subject_screen.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:school_app/services/image_upload_service.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:school_app/core/widgets/app_cached_image.dart';
+import 'package:school_app/core/services/image_service.dart';
+
 
 
 class TeacherProfileScreen extends StatefulWidget {
@@ -110,26 +111,14 @@ bool _uploadingPhoto = false;
 
       child: ClipOval(
 
-        child:
-            (data['photoUrl'] ?? '')
-                    .toString()
-                    .isNotEmpty
+       child: AppCachedImage(
+  imageUrl: data['photoUrl'],
+  width: 84,
+  height: 84,
+  radius: 100,
+),
 
-                ? CachedNetworkImage(
-                    imageUrl:
-                        data['photoUrl'],
-                    fit: BoxFit.cover,
 
-                    placeholder:
-                        (_, __) =>
-                            _avatarFallback(data),
-
-                    errorWidget:
-                        (_, __, ___) =>
-                            _avatarFallback(data),
-                  )
-
-                : _avatarFallback(data),
       ),
     ),
 
@@ -541,17 +530,10 @@ bool _uploadingPhoto = false;
 
 
 
+
 Future<void> _updateTeacherPhoto(
   Map<String, dynamic> data,
 ) async {
-
-  final picker = ImagePicker();
-
-  final picked = await picker.pickImage(
-    source: ImageSource.gallery,
-  );
-
-  if (picked == null) return;
 
   setState(() {
     _uploadingPhoto = true;
@@ -560,18 +542,18 @@ Future<void> _updateTeacherPhoto(
   try {
 
     final bytes =
-        await picked.readAsBytes();
+        await ImageService
+            .pickCropCompressImage();
 
-    final compressed =
-        await ImageUploadService.compress(
-      bytes,
-    );
+    if (bytes == null) return;
 
     final url =
-        await ImageUploadService.upload(
-      bytes: compressed,
-      storagePath:
-          'schools/${widget.schoolId}/teachers/${widget.teacherId}.jpg',
+        await ImageService.uploadImage(
+      schoolId: widget.schoolId,
+      module: 'teachers',
+      type: 'profile',
+      fileName: widget.teacherId,
+      bytes: bytes,
     );
 
     await FirebaseFirestore.instance
@@ -598,7 +580,6 @@ Future<void> _updateTeacherPhoto(
     }
   }
 }
-
 
 
   void _confirmDelete(BuildContext context) {

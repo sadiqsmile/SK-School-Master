@@ -2,12 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:school_app/services/image_upload_service.dart';
 import '../../attendance/services/student_attendance_service.dart';
+import 'package:school_app/core/services/image_service.dart';
+import 'package:school_app/core/widgets/app_cached_image.dart';
+
 
 // ── FORMATTER ─────────────────────────────────────────────────────────────────
 
@@ -157,35 +157,83 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         .delete();
   }
 
-  Future<void> _updatePhoto(Map<String, dynamic> data) async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
-    setState(() => _uploadingPhoto = true);
-    try {
-      final bytes = await picked.readAsBytes();
-      final compressed = await ImageUploadService.compress(bytes);
-      final admissionNo = (data['admissionNo'] ?? widget.studentId).toString();
-      final url = await ImageUploadService.upload(
-        bytes: compressed,
-        storagePath: 'schools/${widget.schoolId}/photos/$admissionNo.jpg',
+Future<void> _updatePhoto(
+  Map<String, dynamic> data,
+) async {
+
+  setState(() {
+    _uploadingPhoto = true;
+  });
+
+  try {
+
+    final bytes =
+        await ImageService
+            .pickCropCompressImage();
+
+    if (bytes == null) return;
+
+    final admissionNo =
+        (data['admissionNo'] ??
+                widget.studentId)
+            .toString();
+
+    final url =
+        await ImageService.uploadImage(
+      schoolId: widget.schoolId,
+
+      module: 'students',
+
+      type: 'profile',
+
+      fileName: admissionNo,
+
+      bytes: bytes,
+    );
+
+    await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(widget.schoolId)
+        .collection('students')
+        .doc(widget.studentId)
+        .update({
+      'photoUrl': url,
+    });
+
+  } catch (e) {
+
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            'Photo update failed: $e',
+          ),
+        ),
       );
-      await FirebaseFirestore.instance
-          .collection('schools')
-          .doc(widget.schoolId)
-          .collection('students')
-          .doc(widget.studentId)
-          .update({'photoUrl': url});
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Photo update failed: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+
+  } finally {
+
+    if (mounted) {
+      setState(() {
+        _uploadingPhoto = false;
+      });
     }
   }
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -417,18 +465,18 @@ class _HeroCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2.5),
                     ),
-                    child: ClipOval(
-                      child: photoUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: photoUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => _avatarFallback(name),
-                              errorWidget: (_, __, ___) =>
-                                  _avatarFallback(name),
-                            )
-                          : _avatarFallback(name),
+                    child: photoUrl.isNotEmpty
+    ? AppCachedImage(
+        imageUrl: photoUrl,
+        width: 68,
+        height: 68,
+        radius: 100,
+      )
+    : _avatarFallback(name),
+
+                         
                     ),
-                  ),
+                  
                   if (uploadingPhoto)
                     Positioned.fill(
                       child: Container(
