@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-
+import 'package:school_app/core/widgets/app_cached_image.dart';
 import 'package:school_app/features/teacher/screens/crop_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_calendar_screen.dart';
@@ -19,6 +19,7 @@ import 'package:school_app/features/teacher/screens/student_history_screen.dart'
 import 'package:school_app/features/teacher/screens/teacher_announcements_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_timetable_screen.dart';
 import 'package:school_app/core/services/image_service.dart';
+
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
 
@@ -36,6 +37,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   String section = "";
   String teacherId = "";
   Map<String, dynamic> teacherData = {};
+  String schoolName = "";
+  String schoolLogo = "";
 
   File? image;
   Uint8List? webImage;
@@ -96,16 +99,17 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           final parts = keys.first.split("_");
 
           if (parts.length == 2) {
-            className =
-                parts[0].replaceAll("Class ", "").trim();
+            className = parts[0].replaceAll("Class ", "").trim();
             section = parts[1].trim();
           }
         }
       }
 
+
+
+
       // Save FCM token to teacher document
-      final fcmToken =
-          await FirebaseMessaging.instance.getToken();
+      final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null && schoolId.isNotEmpty && teacherId.isNotEmpty) {
         await FirebaseFirestore.instance
             .collection('schools')
@@ -148,70 +152,50 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
 
     if (cropped == null) return;
 
-setState(() => isLoading = true);
+    setState(() => isLoading = true);
 
-try {
+    try {
+      final compressed = await FlutterImageCompress.compressWithList(
+        Uint8List.fromList(cropped),
+        quality: 85,
+        minWidth: 600,
+minHeight: 600,
+        format: CompressFormat.jpeg,
+      );
 
-final compressed =
-    await FlutterImageCompress
-        .compressWithList(
+      final url = await ImageService.uploadImage(
+        schoolId: schoolId,
+        module: 'teachers',
+        type: 'profile',
+        fileName: teacherId,
+        bytes: Uint8List.fromList(compressed),
+      );
 
-  Uint8List.fromList(cropped),
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(schoolId)
+          .collection('teachers')
+          .doc(teacherId)
+          .update({
+        'photoUrl': url,
+      });
 
-  quality: 55,
+      teacherData['photoUrl'] = url;
 
-  minWidth: 300,
-  minHeight: 300,
-
-  format: CompressFormat.jpeg,
-);
-
-
-
-  final url =
-      await ImageService.uploadImage(
-
-    schoolId: schoolId,
-
-    module: 'teachers',
-
-    type: 'profile',
-
-    fileName: teacherId,
-
-    bytes: Uint8List.fromList(compressed),
-  );
-
-  await FirebaseFirestore.instance
-      .collection('schools')
-      .doc(schoolId)
-      .collection('teachers')
-      .doc(teacherId)
-      .update({
-    'photoUrl': url,
-  });
-
-  teacherData['photoUrl'] = url;
-
-  if (mounted) {
-    setState(() {});
-  }
-
-} catch (e) {
-
-  debugPrint(
-    'Teacher photo update error: $e',
-  );
-
-} finally {
-
-  if (mounted) {
-    setState(() {
-      isLoading = false;
-    });
-  }
-}
-
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint(
+        'Teacher photo update error: $e',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
   }
 
   // ==========================
@@ -225,15 +209,11 @@ final compressed =
     return h >= 18 || h < 6;
   }
 
-  Color textMain() =>
-      isDark ? Colors.white : Colors.black87;
+  Color textMain() => isDark ? Colors.white : Colors.black87;
 
-  Color textSub() =>
-      isDark ? Colors.white70 : Colors.black54;
+  Color textSub() => isDark ? Colors.white70 : Colors.black54;
 
-  Color bg() => isDark
-      ? const Color(0xFF0B0B0B)
-      : const Color(0xFFF4F5F8);
+  Color bg() => isDark ? const Color(0xFF0B0B0B) : const Color(0xFFF4F5F8);
 
   // ==========================
   // HELPERS
@@ -250,11 +230,9 @@ final compressed =
     final now = DateTime.now();
 
     int h = now.hour;
-    final m =
-        now.minute.toString().padLeft(2, '0');
+    final m = now.minute.toString().padLeft(2, '0');
 
-    final suffix =
-        h >= 12 ? "PM" : "AM";
+    final suffix = h >= 12 ? "PM" : "AM";
 
     if (h == 0) h = 12;
     if (h > 12) h -= 12;
@@ -264,8 +242,7 @@ final compressed =
 
   Widget glass({required Widget child}) {
     return ClipRRect(
-      borderRadius:
-          BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
         filter: ImageFilter.blur(
           sigmaX: 14,
@@ -274,16 +251,11 @@ final compressed =
         child: Container(
           decoration: BoxDecoration(
             color: isDark
-                ? Colors.white
-                    .withOpacity(0.07)
-                : Colors.white
-                    .withOpacity(0.80),
-            borderRadius:
-                BorderRadius.circular(24),
+                ? Colors.white.withOpacity(0.07)
+                : Colors.white.withOpacity(0.80),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isDark
-                  ? Colors.white12
-                  : Colors.black12,
+              color: isDark ? Colors.white12 : Colors.black12,
             ),
           ),
           child: child,
@@ -294,15 +266,13 @@ final compressed =
 
   Widget chip(String text, Color color) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: 18,
         vertical: 8,
       ),
       decoration: BoxDecoration(
         color: color,
-        borderRadius:
-            BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Text(
         text,
@@ -322,29 +292,25 @@ final compressed =
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius:
-            BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: glass(
           child: Center(
             child: Column(
-              mainAxisAlignment:
-                  MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   icon,
                   size: 24,
                   color: textMain(),
                 ),
-                const SizedBox(
-                    height: 12),
+                const SizedBox(height: 12),
                 Text(
                   title,
                   style: TextStyle(
                     color: textMain(),
-                    fontWeight:
-                        FontWeight.w700,
-                        fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
                   ),
                 ),
               ],
@@ -361,20 +327,13 @@ final compressed =
   void openAttendanceHub() {
     showModalBottomSheet(
       context: context,
-      backgroundColor:
-          Colors.transparent,
+      backgroundColor: Colors.transparent,
       builder: (_) {
         return Container(
-          padding:
-              const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: isDark
-                ? const Color(
-                    0xFF1A1A1A)
-                : Colors.white,
-            borderRadius:
-                const BorderRadius
-                    .vertical(
+            color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(
               top: Radius.circular(28),
             ),
           ),
@@ -385,19 +344,14 @@ final compressed =
                 Icons.check_circle,
                 "Quick Attendance",
                 () {
-                  Navigator.pop(
-                      context);
+                  Navigator.pop(context);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          AttendanceScreen(
-                        schoolId:
-                            schoolId,
-                        teacherId:
-                            teacherId,
-                        teacherData:
-                            teacherData,
+                      builder: (_) => AttendanceScreen(
+                        schoolId: schoolId,
+                        teacherId: teacherId,
+                        teacherData: teacherData,
                       ),
                     ),
                   );
@@ -407,19 +361,14 @@ final compressed =
                 Icons.calendar_month,
                 "Calendar",
                 () {
-                  Navigator.pop(
-                      context);
+                  Navigator.pop(context);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          AttendanceCalendarScreen(
-                        className:
-                            className,
-                        section:
-                            section,
-                        schoolId:
-                            schoolId,
+                      builder: (_) => AttendanceCalendarScreen(
+                        className: className,
+                        section: section,
+                        schoolId: schoolId,
                       ),
                     ),
                   );
@@ -429,19 +378,14 @@ final compressed =
                 Icons.bar_chart,
                 "Analytics",
                 () {
-                  Navigator.pop(
-                      context);
+                  Navigator.pop(context);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          AnalyticsDashboardScreen(
-                        className:
-                            className,
-                        section:
-                            section,
-                        schoolId:
-                            schoolId,
+                      builder: (_) => AnalyticsDashboardScreen(
+                        className: className,
+                        section: section,
+                        schoolId: schoolId,
                       ),
                     ),
                   );
@@ -451,19 +395,14 @@ final compressed =
                 Icons.people,
                 "Student History",
                 () {
-                  Navigator.pop(
-                      context);
+                  Navigator.pop(context);
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          StudentHistoryScreen(
-                        className:
-                            className,
-                        section:
-                            section,
-                        schoolId:
-                            schoolId,
+                      builder: (_) => StudentHistoryScreen(
+                        className: className,
+                        section: section,
+                        schoolId: schoolId,
                       ),
                     ),
                   );
@@ -490,8 +429,7 @@ final compressed =
         title,
         style: TextStyle(
           color: textMain(),
-          fontWeight:
-              FontWeight.w600,
+          fontWeight: FontWeight.w600,
         ),
       ),
       onTap: onTap,
@@ -502,32 +440,23 @@ final compressed =
   // TODAY CARD
   // ==========================
   Widget todayCard() {
-    if (schoolId.isEmpty ||
-        className.isEmpty ||
-        section.isEmpty) {
+    if (schoolId.isEmpty || className.isEmpty || section.isEmpty) {
       return glass(
         child: const Padding(
-          padding:
-              EdgeInsets.all(24),
+          padding: EdgeInsets.all(24),
           child: Center(
-            child:
-                CircularProgressIndicator(),
+            child: CircularProgressIndicator(),
           ),
         ),
       );
     }
 
-    final today = DateTime.now()
-        .toIso8601String()
-        .split("T")[0];
+    final today = DateTime.now().toIso8601String().split("T")[0];
 
-    final docId =
-        "${className}_${section}_$today";
+    final docId = "${className}_${section}_$today";
 
-    return StreamBuilder<
-        DocumentSnapshot>(
-      stream: FirebaseFirestore
-          .instance
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
           .collection("schools")
           .doc(schoolId)
           .collection("attendance")
@@ -539,56 +468,35 @@ final compressed =
         int a = 0;
         Color color = textMain();
 
-        if (DateTime.now().weekday ==
-            DateTime.sunday) {
+        if (DateTime.now().weekday == DateTime.sunday) {
           title = "Sunday";
           color = Colors.orange;
         }
 
-        if (snap.hasData &&
-            snap.data!.exists) {
-          final data = snap.data!
-              .data() as Map<String,
-                  dynamic>;
+        if (snap.hasData && snap.data!.exists) {
+          final data = snap.data!.data() as Map<String, dynamic>;
 
-          final students =
-              Map<String, dynamic>.from(
+          final students = Map<String, dynamic>.from(
             data["students"] ?? {},
           );
 
-          final vals = students.values
-              .map((e) =>
-                  e.toString()
-                      .toLowerCase())
-              .toList();
+          final vals =
+              students.values.map((e) => e.toString().toLowerCase()).toList();
 
-          p = vals
-              .where((v) =>
-                  v.contains(
-                      "present") ||
-                  v == "p")
-              .length;
+          p = vals.where((v) => v.contains("present") || v == "p").length;
 
-          a = vals
-              .where((v) =>
-                  v.contains(
-                      "absent") ||
-                  v == "a")
-              .length;
+          a = vals.where((v) => v.contains("absent") || v == "a").length;
 
           final total = p + a;
 
           if (total > 0) {
-            title =
-                "${((p / total) * 100).round()}%";
+            title = "${((p / total) * 100).round()}%";
           }
         }
 
         return glass(
           child: Padding(
-            padding:
-                const EdgeInsets.all(
-                    24),
+            padding: const EdgeInsets.all(24),
             child: Column(
               children: [
                 Text(
@@ -597,23 +505,18 @@ final compressed =
                     color: textSub(),
                   ),
                 ),
-                const SizedBox(
-                    height: 16),
+                const SizedBox(height: 16),
                 Text(
                   title,
                   style: TextStyle(
                     fontSize: 36,
-                    fontWeight:
-                        FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                     color: color,
                   ),
                 ),
-                const SizedBox(
-                    height: 18),
+                const SizedBox(height: 18),
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment
-                          .spaceEvenly,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     chip(
                       "P: $p",
@@ -638,43 +541,120 @@ final compressed =
   // ==========================
   @override
   Widget build(BuildContext context) {
-    final user =
-        FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
       backgroundColor: bg(),
-
       appBar: AppBar(
         centerTitle: true,
         elevation: 0,
-        backgroundColor:
-            Colors.transparent,
-        title: ShaderMask(
-          shaderCallback:
-              (bounds) =>
-                  const LinearGradient(
-            colors: [
-              Color(0xFF6366F1),
-              Color(0xFF06B6D4),
-            ],
-          ).createShader(bounds),
-          child: const Text(
-            "SK School Master",
+        backgroundColor: Colors.transparent,
+       
+       
+       title: StreamBuilder<DocumentSnapshot>(
+  stream: FirebaseFirestore.instance
+      .collection('schools')
+      .doc(schoolId)
+      .snapshots(),
+
+  builder: (context, snapshot) {
+
+    String liveSchoolName = "School";
+    String liveLogo = "";
+
+    if (snapshot.hasData &&
+        snapshot.data!.exists) {
+
+      final data =
+          snapshot.data!.data()
+              as Map<String, dynamic>;
+
+      liveSchoolName =
+          data['name'] ?? 'School';
+
+      final logo =
+          data['logo'] ?? '';
+
+      final updatedAt =
+          data['logoUpdatedAt'] ?? '';
+
+      liveLogo =
+          "$logo?v=$updatedAt";
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+
+        Container(
+          width: 44,
+          height: 44,
+
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius:
+                BorderRadius.circular(12),
+          ),
+
+          child: ClipRRect(
+            borderRadius:
+                BorderRadius.circular(12),
+
+            child: liveLogo.isNotEmpty
+
+                ? 
+                
+                AppCachedImage(
+
+  imageUrl: liveLogo,
+
+  width: 44,
+  height: 44,
+
+  radius: 12,
+)
+               
+
+
+
+
+
+
+                : const Icon(
+                    Icons.school,
+                  ),
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        Flexible(
+          child: Text(
+            liveSchoolName,
+
+            overflow:
+                TextOverflow.ellipsis,
+
             style: TextStyle(
-              fontSize: 28,
+              color: textMain(),
+              fontSize: 20,
               fontWeight:
-                  FontWeight.w900,
-              color: Colors.white,
+                  FontWeight.w800,
             ),
           ),
         ),
+      ],
+    );
+  },
+), 
+
+   
         actions: [
           PopupMenuButton<String>(
             icon: Icon(
               Icons.palette_outlined,
               color: textMain(),
             ),
-            
             onSelected: (v) async {
               if (v == "logout") {
                 await FirebaseAuth.instance.signOut();
@@ -695,275 +675,199 @@ final compressed =
             itemBuilder: (_) => const [
               PopupMenuItem(
                 value: "light",
-                child:
-                    Text("☀️ Light"),
+                child: Text("☀️ Light"),
               ),
               PopupMenuItem(
                 value: "dark",
-                child:
-                    Text("🌙 Dark"),
+                child: Text("🌙 Dark"),
               ),
               PopupMenuItem(
                 value: "auto",
-                child:
-                    Text("🌈 Auto"),
+                child: Text("🌈 Auto"),
               ),
- PopupMenuDivider(),
-  PopupMenuItem(
-    value: "logout",
-    child: Text("🚪 Logout"),
-  ),
-
-
-
-
+              PopupMenuDivider(),
+              PopupMenuItem(
+                value: "logout",
+                child: Text("🚪 Logout"),
+              ),
             ],
           ),
           IconButton(
             onPressed: () {},
             icon: Icon(
-              Icons
-                  .notifications_none,
+              Icons.notifications_none,
               color: textMain(),
             ),
           ),
         ],
       ),
-
       body: user == null
-          ? const Center(child: Text("No User"),
+          ? const Center(
+              child: Text("No User"),
             )
           : Center(
-    child: ConstrainedBox(
-
-      constraints:
-          const BoxConstraints(
-        maxWidth: 1200,
-      ),
-
-      child: SingleChildScrollView(
-
-
-
-              padding:
-                  const EdgeInsets.all(
-                      16),
-              child: Column(
-                children: [
-                  Align(
-                    alignment:
-                        Alignment
-                            .centerLeft,
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
-                      children: [
-                        Text(
-                          greet(),
-                          style:
-                              TextStyle(
-                            color:
-                                textMain(),
-                            fontSize:
-                                28,
-                            fontWeight:
-                                FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(
-                            height:
-                                4),
-                        Text(
-                          "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year} • ${time12()}",
-                          style:
-                              TextStyle(
-                            color:
-                                textSub(),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(
-                      height: 18),
-
-                  // PROFILE CARD
-                  glass(
-                    child: Padding(
-                      padding:
-                          const EdgeInsets
-                              .all(
-                                  18),
-                      child: Row(
-                        children: [
-                          profileAvatar(
-                              user),
-                          const SizedBox(
-                              width:
-                                  14),
-                          Expanded(
-                            child:
-                                Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment
-                                      .start,
-                              children: [
-                                Text(
-                                  teacherName,
-                                  style:
-                                      TextStyle(
-                                    color:
-                                        textMain(),
-                                    fontSize:
-                                        22,
-                                    fontWeight:
-                                        FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  email,
-                                  style:
-                                      TextStyle(
-                                    color:
-                                        textSub(),
-                                  ),
-                                ),
-                              ],
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 1200,
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              greet(),
+                              style: TextStyle(
+                                color: textMain(),
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year} • ${time12()}",
+                              style: TextStyle(
+                                color: textSub(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // PROFILE CARD
+                      glass(
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Row(
+                            children: [
+                              profileAvatar(user),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      teacherName,
+                                      style: TextStyle(
+                                        color: textMain(),
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      email,
+                                      style: TextStyle(
+                                        color: textSub(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      todayCard(),
+
+                      const SizedBox(height: 18),
+
+                      GridView.count(
+                        crossAxisCount: MediaQuery.of(context).size.width > 1100
+                            ? 5
+                            : MediaQuery.of(context).size.width > 700
+                                ? 3
+                                : 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 14,
+                        mainAxisSpacing: 14,
+                        childAspectRatio:
+                            MediaQuery.of(context).size.width > 1100
+                                ? 1.7
+                                : 1.45,
+                        children: [
+                          menu(
+                            Icons.check_circle,
+                            "Attendance",
+                            openAttendanceHub,
+                          ),
+                          menu(
+                            Icons.schedule,
+                            "Time Table",
+                            () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TeacherTimetableScreen(
+                                    schoolId: schoolId,
+                                    teacherName:
+                                        teacherData['name'] ?? teacherName,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          menu(
+                            Icons.edit_note,
+                            "Marks",
+                            () {},
+                          ),
+                          menu(
+                            Icons.people,
+                            "Students",
+                            () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => StudentHistoryScreen(
+                                    className: className,
+                                    section: section,
+                                    schoolId: schoolId,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          menu(
+                            Icons.campaign_outlined,
+                            "Announcements",
+                            () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => TeacherAnnouncementsScreen(
+                                    schoolId: schoolId,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
-                    ),
-                  ),
 
-                  const SizedBox(
-                      height: 18),
-
-                  todayCard(),
-
-                  const SizedBox(
-                      height: 18),
-
-                  GridView.count(
-                    crossAxisCount:
-    MediaQuery.of(context)
-            .size
-            .width >
-        1100
-    ? 5
-    : MediaQuery.of(context)
-                .size
-                .width >
-            700
-        ? 3
-        : 2,
-                    shrinkWrap:
-                        true,
-                    physics:
-                        const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing:
-                        14,
-                    mainAxisSpacing:
-                        14,
-                  childAspectRatio:
-    MediaQuery.of(context)
-            .size
-            .width >
-        1100
-    ? 1.7
-    : 1.45,
-                    children: [
-                      menu(
-                        Icons
-                            .check_circle,
-                        "Attendance",
-                        openAttendanceHub,
-                      ),
-                      menu(
-                        Icons.schedule,
-                        "Time Table",
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => TeacherTimetableScreen(
-                                schoolId: schoolId,
-                                teacherName: teacherData['name'] ?? teacherName,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      menu(
-                        Icons.edit_note,
-                        "Marks",
-                        () {},
-                      ),
-                      menu(
-                        Icons.people,
-                        "Students",
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) =>
-                                      StudentHistoryScreen(
-                                className:
-                                    className,
-                                section:
-                                    section,
-                                schoolId:
-                                    schoolId,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      menu(
-                        Icons.campaign_outlined,
-                        "Announcements",
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  TeacherAnnouncementsScreen(
-                                schoolId: schoolId,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                      const SizedBox(height: 120),
                     ],
                   ),
-
-                  const SizedBox(
-                      height:
-                          120),
-                ],
+                ),
               ),
             ),
-    ),
-          ),
-
-      floatingActionButtonLocation:
-          FloatingActionButtonLocation
-              .endFloat,
-
-      floatingActionButton:
-          FloatingActionButton(
-        backgroundColor:
-            const Color(
-                0xFF6366F1),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF6366F1),
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) =>
-                  AttendanceScreen(
+              builder: (_) => AttendanceScreen(
                 schoolId: schoolId,
                 teacherId: teacherId,
                 teacherData: teacherData,
@@ -971,53 +875,35 @@ final compressed =
             ),
           );
         },
-        child:
-            const Icon(Icons.check),
+        child: const Icon(Icons.check),
       ),
-
-      bottomNavigationBar:
-          Container(
-        margin:
-            const EdgeInsets.all(
-                14),
-        padding:
-            const EdgeInsets.symmetric(
+      bottomNavigationBar: Container(
+        margin: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(
           vertical: 14,
         ),
-        decoration:
-            BoxDecoration(
-          color: isDark
-              ? const Color(
-                  0xFF1B1B1B)
-              : Colors.white,
-          borderRadius:
-              BorderRadius.circular(
-                  32),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1B1B1B) : Colors.white,
+          borderRadius: BorderRadius.circular(32),
         ),
         child: Row(
-          mainAxisAlignment:
-              MainAxisAlignment
-                  .spaceEvenly,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             const Icon(
               Icons.home,
-              color: Color(
-                  0xFF6366F1),
+              color: Color(0xFF6366F1),
             ),
             Icon(
               Icons.bar_chart,
-              color:
-                  textMain(),
+              color: textMain(),
             ),
             Icon(
               Icons.calendar_today,
-              color:
-                  textMain(),
+              color: textMain(),
             ),
             Icon(
               Icons.person_outline,
-              color:
-                  textMain(),
+              color: textMain(),
             ),
           ],
         ),
@@ -1026,56 +912,84 @@ final compressed =
   }
 
 
+
+
+
 Widget profileAvatar(User user) {
-  final url = teacherData["photoUrl"];
 
-  return GestureDetector(
-    onTap: pickImage,
-    child: CircleAvatar(
-      radius: 32,
-      backgroundColor: Colors.white,
-      child: ClipOval(
-        child: SizedBox(
-          width: 64,
-          height: 64,
-          child: url != null && url.toString().isNotEmpty
-              ? CachedNetworkImage(
-  fadeInDuration: Duration.zero,
-  fadeOutDuration: Duration.zero,
-  memCacheWidth: 200,
-  memCacheHeight: 200,
-                  imageUrl: url,
-                  fit: BoxFit.cover,
+  return StreamBuilder<DocumentSnapshot>(
 
-                  placeholder: (context, url) =>
-                      const Center(
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child:
-                          CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    ),
-                  ),
+    stream: FirebaseFirestore.instance
+        .collection('schools')
+        .doc(schoolId)
+        .collection('teachers')
+        .doc(teacherId)
+        .snapshots(),
 
-                  errorWidget:
-                      (context, url, error) =>
-                          const Icon(
-                    Icons.person,
-                    color: Colors.grey,
-                  ),
-                )
-              : const Icon(
-                  Icons.person,
-                  color: Colors.grey,
-                ),
-        ),
+    builder: (context, snapshot) {
+
+      final data = snapshot.hasData
+          ? snapshot.data!.data()
+              as Map<String, dynamic>
+          : <String, dynamic>{};
+
+      final url =
+          data["photoUrl"] ?? '';
+
+      final updatedAt =
+          data["photoUpdatedAt"] ?? '';
+
+      return GestureDetector(
+
+        onTap: pickImage,
+
+
+  child: Container(
+
+    width: 92,
+height: 92,
+
+    decoration: BoxDecoration(
+
+      shape: BoxShape.circle,
+
+      border: Border.all(
+        color: Colors.white,
+        width: 2,
       ),
     ),
+
+
+
+
+
+   child: ClipOval(
+
+  child: OverflowBox(
+
+    maxWidth: 140,
+    maxHeight: 140,
+
+    child: Transform.scale(
+
+      scale: 1.15,
+
+      child: AppCachedImage(
+
+        imageUrl:
+            "$url?v=$updatedAt",
+
+        width: 92,
+        height: 92,
+
+        radius: 100,
+      ),
+    ),
+  ),
+),
+  ),
+      );
+    },
   );
 }
-
-
-
-}
+} 

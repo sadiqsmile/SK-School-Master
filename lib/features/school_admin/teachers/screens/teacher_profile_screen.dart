@@ -561,9 +561,20 @@ Future<void> _updateTeacherPhoto(
         .doc(widget.schoolId)
         .collection('teachers')
         .doc(widget.teacherId)
+       
+       
         .update({
-      'photoUrl': url,
-    });
+
+  'photoUrl': url,
+
+  'photoUpdatedAt':
+      DateTime.now()
+          .millisecondsSinceEpoch,
+});
+
+
+
+
 
   } catch (e) {
 

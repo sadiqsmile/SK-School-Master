@@ -1,9 +1,11 @@
 import 'dart:typed_data';
 
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xls;
 
-import '../../../import_export/services/file_saver_web.dart';
+
+import 'package:flutter/foundation.dart';
 
 class TeacherExportService {
 
@@ -145,9 +147,8 @@ sheet
 
     workbook.dispose();
 
-    await saveExcelFile(
-      bytes: Uint8List.fromList(bytes),
-      fileName: 'teachers.xlsx',
-    );
+    debugPrint(
+  "Teacher export currently works only on Flutter Web",
+);
   }
 }
