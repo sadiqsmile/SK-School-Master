@@ -48,25 +48,22 @@ Future<void> _loadTeacherData() async {
 
   final data = doc.data()!;
 
-  final classTeacherOf = data['classTeacherOf'];
+ final sectionTeacher = data['sectionTeacher'];
 
   setState(() {
     teacherData = data;
 
-    if (classTeacherOf != null) {
-      classId = classTeacherOf['class'];
-      sectionId = classTeacherOf['section'];
 
-      isClassTeacher = true;
-      canEditAttendance = true;
-    }
+ if (sectionTeacher != null) {
+
+  classId = sectionTeacher['classId'];
+  sectionId = sectionTeacher['section'];
+
+  isClassTeacher = true;
+  canEditAttendance = true;
+}
   });
 }
-
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -330,11 +327,24 @@ class _StudentList extends ConsumerWidget {
       error: (e, _) => Text("$e"),
       data: (snapshot) {
 
-        final filtered = snapshot.docs.where((doc) {
-          final d = doc.data();
-          return d['classId'] == classId &&
-                 d['sectionId'] == sectionId;
-        }).toList();
+
+
+      final filtered = snapshot.docs.where((doc) {
+
+  final d = doc.data();
+
+  return (
+    d['className'] == classId ||
+    d['classId'] == classId
+  ) &&
+  (
+    d['section'] == sectionId ||
+    d['sectionId'] == sectionId
+  );
+
+}).toList();
+
+
 
         if (filtered.isEmpty) {
           return const Center(child: Text("No students found"));

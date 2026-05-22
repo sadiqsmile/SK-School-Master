@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:school_app/features/school_admin/teachers/screens/teachers_screen.dart';
 
 class AddTeacherScreen extends StatefulWidget {
   const AddTeacherScreen({super.key});
@@ -19,7 +20,10 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
   bool isSaving = false;
 
   Future<void> _save() async {
-    final name = _nameController.text.trim();
+    final name =
+    _nameController.text
+        .trim()
+        .toUpperCase();
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
 
@@ -48,13 +52,40 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
 
       final schoolId = adminDoc['schoolId'];
 
-      // ✅ SECONDARY FIREBASE APP
-      final secondaryApp = await Firebase.initializeApp(
-        name: 'Secondary',
-        options: Firebase.app().options,
-      );
 
-      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+
+
+final secondaryApp =
+    await Firebase.initializeApp(
+
+  name:
+      DateTime.now()
+          .millisecondsSinceEpoch
+          .toString(),
+
+  options:
+      Firebase.app().options,
+);
+
+
+
+
+
+
+     
+
+final secondaryAuth =
+    FirebaseAuth.instanceFor(
+  app: secondaryApp,
+);
+
+
+
+
+
+
+
+
 
       // ✅ CREATE TEACHER AUTH ACCOUNT
       final userCredential =
@@ -70,7 +101,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
           .collection('users')
           .doc(teacherUid)
           .set({
-        "role": 'Teacher',
+        "role": 'teacher',
         "schoolId": schoolId,
         "teacherId": teacherUid,
         "name": name,
@@ -125,8 +156,18 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
       });
 
       // ✅ SIGN OUT SECONDARY APP
-      await secondaryAuth.signOut();
-      await secondaryApp.delete();
+     await secondaryAuth.signOut();
+
+await Future.delayed(
+  const Duration(seconds: 1),
+);
+
+await secondaryApp.delete();
+if (!mounted) return;
+
+setState(() {
+  isSaving = false;
+});
 
       if (!mounted) return;
 
@@ -139,7 +180,20 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
         ),
       );
 
-      Navigator.pop(context);
+if (!mounted) return;
+
+Navigator.pushAndRemoveUntil(
+
+  context,
+
+  MaterialPageRoute(
+
+    builder: (_) =>
+        const TeachersScreen(),
+  ),
+
+  (route) => false,
+); 
 
     } on FirebaseAuthException catch (e) {
 
@@ -165,9 +219,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
 
     }
 
-    if (mounted) {
-      setState(() => isSaving = false);
-    }
+   
   }
 
   @override
@@ -202,12 +254,31 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xffF5F7FB),
-      appBar: AppBar(
-        title: const Text("Add Staff"),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xff1E3A8A),
-        elevation: 0,
-      ),
+     
+   appBar: AppBar(
+
+  elevation: 0,
+
+  backgroundColor: Colors.transparent,
+
+  foregroundColor: Colors.black,
+
+  titleSpacing: 0,
+
+  title: const Text(
+
+    "Add Teacher",
+
+    style: TextStyle(
+      fontWeight: FontWeight.bold,
+      fontSize: 22,
+    ),
+  ),
+),
+
+
+
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

@@ -12,7 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:school_app/core/widgets/app_cached_image.dart';
 import 'package:school_app/features/teacher/screens/crop_screen.dart';
-import 'package:school_app/features/teacher/screens/attendance_screen.dart';
+import 'package:school_app/features/teacher/attendance/screens/quick_attendance_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_calendar_screen.dart';
 import 'package:school_app/features/teacher/screens/analytics_dashboard_screen.dart';
 import 'package:school_app/features/teacher/screens/student_history_screen.dart';
@@ -44,6 +44,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   Uint8List? webImage;
 
   bool isLoading = false;
+  bool dashboardReady = false;
   String themeMode = "auto";
 
   @override
@@ -75,7 +76,9 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
       teacherId = userData["teacherId"] ?? user.uid;
 
       if (schoolId.isEmpty) {
-        if (mounted) setState(() {});
+        if (mounted) {setState(() {dashboardReady = true; });
+
+}
         return;
       }
 
@@ -108,20 +111,49 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
 
 
 
-      // Save FCM token to teacher document
-      final fcmToken = await FirebaseMessaging.instance.getToken();
-      if (fcmToken != null && schoolId.isNotEmpty && teacherId.isNotEmpty) {
-        await FirebaseFirestore.instance
-            .collection('schools')
-            .doc(schoolId)
-            .collection('teachers')
-            .doc(teacherId)
-            .update({'fcmToken': fcmToken});
-      }
+   // Save FCM token to teacher document
 
-      if (mounted) setState(() {});
+if (!kIsWeb) {
+
+  final fcmToken =
+      await FirebaseMessaging.instance
+          .getToken();
+
+  if (fcmToken != null &&
+      schoolId.isNotEmpty &&
+      teacherId.isNotEmpty) {
+
+    await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(schoolId)
+        .collection('teachers')
+        .doc(teacherId)
+        .update({
+      'fcmToken': fcmToken,
+    });
+  }
+}
+
+      if (mounted) {
+
+  setState(() {
+
+    dashboardReady = true;
+  });
+}
     } catch (e) {
-      debugPrint("Load Teacher Error: $e");
+     debugPrint("Load Teacher Error: $e");
+
+if (mounted) {
+
+  setState(() {
+
+    dashboardReady = true;
+  });
+}
+    
+    
+    
     }
   }
 
@@ -345,10 +377,11 @@ minHeight: 600,
                 "Quick Attendance",
                 () {
                   Navigator.pop(context);
+                  
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => AttendanceScreen(
+                      builder: (_) => QuickAttendanceScreen(
                         schoolId: schoolId,
                         teacherId: teacherId,
                         teacherData: teacherData,
@@ -551,7 +584,15 @@ minHeight: 600,
         backgroundColor: Colors.transparent,
        
        
-       title: StreamBuilder<DocumentSnapshot>(
+       title: schoolId.isEmpty
+
+    ? const SizedBox()
+
+    : StreamBuilder<
+       
+       
+       
+       DocumentSnapshot>(
   stream: FirebaseFirestore.instance
       .collection('schools')
       .doc(schoolId)
@@ -701,10 +742,21 @@ minHeight: 600,
           ),
         ],
       ),
-      body: user == null
-          ? const Center(
-              child: Text("No User"),
-            )
+      
+     body: user == null
+
+    ? const Center(
+        child: Text("No User"),
+      )
+
+    : !dashboardReady
+
+        ? const Center(
+            child:
+                CircularProgressIndicator(),
+          )
+        
+          
           : Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(
@@ -795,11 +847,38 @@ minHeight: 600,
                                 ? 1.7
                                 : 1.45,
                         children: [
-                          menu(
-                            Icons.check_circle,
-                            "Attendance",
-                            openAttendanceHub,
-                          ),
+                          
+                          
+                        if (teacherData['classTeacherOf'] != null)
+
+  menu(
+    Icons.check_circle,
+    "Mark Attendance",
+    () {
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+        builder: (_) => QuickAttendanceScreen(
+
+            schoolId: schoolId,
+
+            teacherId: teacherId,
+
+            teacherData: teacherData,
+          ),
+        ),
+      );
+    },
+  ),
+
+menu(
+  Icons.analytics,
+  "Attendance Reports",
+  openAttendanceHub,
+),
+
+
                           menu(
                             Icons.schedule,
                             "Time Table",
@@ -867,7 +946,7 @@ minHeight: 600,
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => AttendanceScreen(
+              builder: (_) => QuickAttendanceScreen(
                 schoolId: schoolId,
                 teacherId: teacherId,
                 teacherData: teacherData,
@@ -917,7 +996,16 @@ minHeight: 600,
 
 Widget profileAvatar(User user) {
 
-  return StreamBuilder<DocumentSnapshot>(
+  if (schoolId.isEmpty ||
+      teacherId.isEmpty) {
+
+    return const SizedBox();
+  }
+
+  return StreamBuilder<
+  
+  
+  DocumentSnapshot>(
 
     stream: FirebaseFirestore.instance
         .collection('schools')
@@ -946,8 +1034,8 @@ Widget profileAvatar(User user) {
 
   child: Container(
 
-    width: 92,
-height: 92,
+    width: 70,
+height: 70,
 
     decoration: BoxDecoration(
 
@@ -967,8 +1055,8 @@ height: 92,
 
   child: OverflowBox(
 
-    maxWidth: 140,
-    maxHeight: 140,
+    maxWidth: 130,
+    maxHeight: 130,
 
     child: Transform.scale(
 
@@ -979,8 +1067,8 @@ height: 92,
         imageUrl:
             "$url?v=$updatedAt",
 
-        width: 92,
-        height: 92,
+        width: 40,
+        height: 40,
 
         radius: 100,
       ),

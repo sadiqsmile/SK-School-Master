@@ -17,196 +17,532 @@ class AttendanceScreen extends StatefulWidget {
   });
 
   @override
-  State<AttendanceScreen> createState() => _AttendanceScreenState();
+  State<AttendanceScreen> createState() =>
+      _AttendanceScreenState();
 }
 
-class _AttendanceScreenState extends State<AttendanceScreen> {
-  final AttendanceService _service = AttendanceService();
+class _AttendanceScreenState
+    extends State<AttendanceScreen> {
 
-  Map<String, dynamic>? selectedClass;
+  final AttendanceService _service =
+      AttendanceService();
+
+  String? selectedClassId;
   String? selectedSection;
-  final Map<String, String> attendanceMap = {};
 
-  List<Map<String, dynamic>> get assignedClasses {
+  final Map<String, String>
+      attendanceMap = {};
+
+  List<Map<String, dynamic>>
+      get assignedClasses {
+
     return List<Map<String, dynamic>>.from(
-      widget.teacherData['assignedClasses'] ?? [],
+      widget.teacherData[
+              'assignedClasses'] ??
+          [],
     );
   }
 
+ @override
+void initState() {
+
+  super.initState();
+
+  final classTeacherOf =
+      widget.teacherData[
+          'classTeacherOf'];
+
+  if (classTeacherOf != null) {
+
+    selectedClassId =
+        classTeacherOf[
+            'classId'];
+
+    selectedSection =
+        classTeacherOf[
+            'sectionId'];
+  }
+}
+
+
+
+
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
-      backgroundColor: const Color(0xffF8FAFC),
+
+      backgroundColor:
+          const Color(0xffF8FAFC),
 
       appBar: AppBar(
-        title: const Text("Attendance"),
-        backgroundColor: Colors.white,
+
+        title:
+            const Text("Attendance"),
+
+        backgroundColor:
+            Colors.white,
+
         elevation: 0,
       ),
 
-      floatingActionButton: selectedClass != null && selectedSection != null
-          ? FloatingActionButton.extended(
-              backgroundColor: const Color(0xff5B5FEF),
-              onPressed: _saveAttendance,
-              icon: const Icon(Icons.save),
-              label: const Text("Save"),
-            )
-          : null,
+      floatingActionButton:
+          selectedClassId != null &&
+                  selectedSection != null
+              ? FloatingActionButton
+                  .extended(
+
+                  backgroundColor:
+                      const Color(
+                    0xff5B5FEF,
+                  ),
+
+                  onPressed:
+                      _saveAttendance,
+
+                  icon: const Icon(
+                    Icons.save,
+                  ),
+
+                  label:
+                      const Text(
+                    "Save",
+                  ),
+                )
+              : null,
 
       body: Column(
         children: [
+
           _topSelectors(),
-          Expanded(child: _studentsList()),
+
+          Expanded(
+            child:
+                _studentsList(),
+          ),
         ],
       ),
     );
   }
 
   Widget _topSelectors() {
+
     return Container(
+
       color: Colors.white,
-      padding: const EdgeInsets.all(16),
+
+      padding:
+          const EdgeInsets.all(
+        16,
+      ),
+
       child: Column(
         children: [
-          DropdownButtonFormField<Map<String, dynamic>>(
-            value: selectedClass,
-            decoration: _inputDecoration("Select Class"),
-            items: assignedClasses.map((assignment) {
-              return DropdownMenuItem(
-                value: assignment,
-                child: Text(assignment['className']),
-              );
-            }).toList(),
+
+          DropdownButtonFormField<
+              String>(
+
+            value: selectedClassId,
+
+            decoration:
+                _inputDecoration(
+              "Select Class",
+            ),
+
+            items:
+                assignedClasses.map(
+              (assignment) {
+
+                return DropdownMenuItem<
+                    String>(
+
+                  value: assignment[
+                      'className'],
+
+                  child: Text(
+                    assignment[
+                        'className'],
+                  ),
+                );
+              },
+            ).toList(),
+
             onChanged: (v) {
+
               setState(() {
-                selectedClass = v;
-                selectedSection = null;
+
+                selectedClassId =
+                    v;
+
+                selectedSection =
+                    null;
               });
             },
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(
+            height: 14,
+          ),
 
-          if (selectedClass != null)
-            DropdownButtonFormField<String>(
-              value: selectedSection,
-              decoration: _inputDecoration("Select Section"),
-              items: List<String>.from(
-                selectedClass!['sections'] ?? [],
-              ).map((section) {
-                return DropdownMenuItem(
-                  value: section,
-                  child: Text(section),
-                );
-              }).toList(),
-              onChanged: (v) {
-                setState(() {
-                  selectedSection = v;
-                });
-              },
-            ),
+
+
+
+if (selectedClassId != null)
+
+  Builder(
+    builder: (context) {
+
+      Map<String, dynamic>? classData;
+
+      try {
+
+        classData =
+            assignedClasses.firstWhere(
+          (e) =>
+              e['className'] ==
+              selectedClassId,
+        );
+
+      } catch (e) {
+
+        classData = null;
+      }
+
+      final sections =
+          classData != null
+              ? List<String>.from(
+                  classData['sections'] ??
+                      [],
+                )
+              : <String>[];
+
+      return DropdownButtonFormField<
+          String>(
+
+        value: selectedSection,
+
+        decoration:
+            _inputDecoration(
+          "Select Section",
+        ),
+
+        items: sections.map(
+          (section) {
+
+            return DropdownMenuItem<
+                String>(
+
+              value: section,
+
+              child:
+                  Text(section),
+            );
+          },
+        ).toList(),
+
+        onChanged: (v) {
+
+          setState(() {
+
+            selectedSection = v;
+          });
+        },
+      );
+    },
+  ),
         ],
       ),
     );
   }
 
+
+
+
+
+
+
+
   Widget _studentsList() {
-    if (selectedClass == null || selectedSection == null) {
+
+    if (selectedClassId == null ||
+        selectedSection == null) {
+
       return _emptyState();
     }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
+    return StreamBuilder<
+        QuerySnapshot>(
+
+      stream: FirebaseFirestore
+          .instance
           .collection('schools')
           .doc(widget.schoolId)
           .collection('students')
-          .where('classId', isEqualTo: selectedClass!['classId'])
-          .where('section', isEqualTo: selectedSection)
+
+
+.where(
+  'classId',
+  isEqualTo: selectedClassId,
+)
+
+.where(
+  'section',
+  isEqualTo: selectedSection,
+)
+
           .snapshots(),
-      builder: (context, snapshot) {
+
+      builder: (
+        context,
+        snapshot,
+      ) {
+
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+
+          return const Center(
+            child:
+                CircularProgressIndicator(),
+          );
         }
 
-        final docs = snapshot.data!.docs;
+        final docs =
+            snapshot.data!.docs;
 
         if (docs.isEmpty) {
-          return const Center(child: Text("No students found"));
+
+          return const Center(
+            child: Text(
+              "No students found",
+            ),
+          );
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+
+          padding:
+              const EdgeInsets.all(
+            16,
+          ),
+
           itemCount: docs.length,
-          itemBuilder: (context, index) {
-            final doc = docs[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final studentId = doc.id;
 
-            attendanceMap.putIfAbsent(studentId, () => "Present");
+          itemBuilder:
+              (context, index) {
 
-            final currentStatus = attendanceMap[studentId];
+            final doc =
+                docs[index];
+
+            final data =
+                doc.data()
+                    as Map<String,
+                        dynamic>;
+
+            final studentId =
+                doc.id;
+
+            attendanceMap
+                .putIfAbsent(
+              studentId,
+              () => "Present",
+            );
+
+            final currentStatus =
+                attendanceMap[
+                    studentId];
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 14),
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.grey.shade100),
+
+              margin:
+                  const EdgeInsets.only(
+                bottom: 14,
               ),
+
+              padding:
+                  const EdgeInsets.all(
+                18,
+              ),
+
+              decoration:
+                  BoxDecoration(
+
+                color: Colors.white,
+
+                borderRadius:
+                    BorderRadius.circular(
+                  22,
+                ),
+
+                border: Border.all(
+                  color: Colors
+                      .grey
+                      .shade100,
+                ),
+              ),
+
               child: Row(
                 children: [
+
                   ProfileAvatar(
-                    name: (data['name'] ?? '').toString(),
-                    imageUrl: data['photoUrl']?.toString(),
+
+                    name: (data[
+                                'name'] ??
+                            '')
+                        .toString(),
+
+                    imageUrl: data[
+                            'photoUrl']
+                        ?.toString(),
+
                     radius: 24,
                   ),
-                  const SizedBox(width: 14),
+
+                  const SizedBox(
+                    width: 14,
+                  ),
+
                   Expanded(
+
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+
                       children: [
+
                         Text(
-                          data['name'] ?? '',
-                          style: const TextStyle(
+
+                          data['name'] ??
+                              '',
+
+                          style:
+                              const TextStyle(
+
                             fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xff111827),
+
+                            fontWeight:
+                                FontWeight
+                                    .w600,
+
+                            color: Color(
+                              0xff111827,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 4),
+
+                        const SizedBox(
+                          height: 4,
+                        ),
+
                         Text(
-                          data['admissionNo'] ?? '',
-                          style: TextStyle(
+
+                          data['admissionNo'] ??
+                              '',
+
+                          style:
+                              TextStyle(
+
                             fontSize: 12,
-                            color: Colors.grey.shade600,
+
+                            color: Colors
+                                .grey
+                                .shade600,
                           ),
                         ),
                       ],
                     ),
                   ),
+
                   _attendanceButton(
+
                     title: "P",
-                    color: const Color(0xffDCFCE7),
-                    textColor: const Color(0xff166534),
-                    isSelected: currentStatus == "Present",
-                    onTap: () => setState(() => attendanceMap[studentId] = "Present"),
+
+                    color: const Color(
+                      0xffDCFCE7,
+                    ),
+
+                    textColor:
+                        const Color(
+                      0xff166534,
+                    ),
+
+                    isSelected:
+                        currentStatus ==
+                            "Present",
+
+                    onTap: () {
+
+                      setState(() {
+
+                        attendanceMap[
+                                studentId] =
+                            "Present";
+                      });
+                    },
                   ),
-                  const SizedBox(width: 8),
+
+                  const SizedBox(
+                    width: 8,
+                  ),
+
                   _attendanceButton(
+
                     title: "A",
-                    color: const Color(0xffFEE2E2),
-                    textColor: const Color(0xff991B1B),
-                    isSelected: currentStatus == "Absent",
-                    onTap: () => setState(() => attendanceMap[studentId] = "Absent"),
+
+                    color: const Color(
+                      0xffFEE2E2,
+                    ),
+
+                    textColor:
+                        const Color(
+                      0xff991B1B,
+                    ),
+
+                    isSelected:
+                        currentStatus ==
+                            "Absent",
+
+                    onTap: () {
+
+                      setState(() {
+
+                        attendanceMap[
+                                studentId] =
+                            "Absent";
+                      });
+                    },
                   ),
-                  const SizedBox(width: 8),
+
+                  const SizedBox(
+                    width: 8,
+                  ),
+
                   _attendanceButton(
+
                     title: "L",
-                    color: const Color(0xffFEF3C7),
-                    textColor: const Color(0xff92400E),
-                    isSelected: currentStatus == "Leave",
-                    onTap: () => setState(() => attendanceMap[studentId] = "Leave"),
+
+                    color: const Color(
+                      0xffFEF3C7,
+                    ),
+
+                    textColor:
+                        const Color(
+                      0xff92400E,
+                    ),
+
+                    isSelected:
+                        currentStatus ==
+                            "Leave",
+
+                    onTap: () {
+
+                      setState(() {
+
+                        attendanceMap[
+                                studentId] =
+                            "Leave";
+                      });
+                    },
                   ),
                 ],
               ),
@@ -218,32 +554,68 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Widget _attendanceButton({
+
     required String title,
+
     required Color color,
+
     required Color textColor,
+
     required bool isSelected,
+
     required VoidCallback onTap,
   }) {
+
     return GestureDetector(
+
       onTap: onTap,
+
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+
+        duration:
+            const Duration(
+          milliseconds: 180,
+        ),
+
         height: 42,
         width: 42,
+
         decoration: BoxDecoration(
-          color: isSelected ? color : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+
+          color: isSelected
+              ? color
+              : Colors.white,
+
+          borderRadius:
+              BorderRadius.circular(
+            12,
+          ),
+
           border: Border.all(
-            color: isSelected ? color : Colors.grey.shade300,
+
+            color: isSelected
+                ? color
+                : Colors.grey
+                    .shade300,
+
             width: 1.5,
           ),
         ),
+
         child: Center(
+
           child: Text(
+
             title,
+
             style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: isSelected ? textColor : Colors.grey,
+
+              fontWeight:
+                  FontWeight.w700,
+
+              color: isSelected
+                  ? textColor
+                  : Colors.grey,
             ),
           ),
         ),
@@ -252,40 +624,82 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Widget _emptyState() {
+
     return Center(
+
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+
+        mainAxisAlignment:
+            MainAxisAlignment.center,
+
         children: [
+
           Container(
+
             height: 90,
             width: 90,
-            decoration: const BoxDecoration(
-              color: Color(0xffEEF2FF),
-              shape: BoxShape.circle,
+
+            decoration:
+                const BoxDecoration(
+
+              color:
+                  Color(0xffEEF2FF),
+
+              shape:
+                  BoxShape.circle,
             ),
+
             child: const Icon(
-              Icons.check_circle_outline,
+
+              Icons
+                  .check_circle_outline,
+
               size: 42,
-              color: Color(0xff5B5FEF),
+
+              color:
+                  Color(0xff5B5FEF),
             ),
           ),
-          const SizedBox(height: 20),
+
+          const SizedBox(
+            height: 20,
+          ),
+
           const Text(
+
             "Select Class & Section",
+
             style: TextStyle(
+
               fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Color(0xff374151),
+
+              fontWeight:
+                  FontWeight.w700,
+
+              color:
+                  Color(0xff374151),
             ),
           ),
-          const SizedBox(height: 8),
+
+          const SizedBox(
+            height: 8,
+          ),
+
           Text(
+
             "Choose class and section\nto mark attendance.",
-            textAlign: TextAlign.center,
+
+            textAlign:
+                TextAlign.center,
+
             style: TextStyle(
+
               fontSize: 14,
+
               height: 1.5,
-              color: Colors.grey.shade600,
+
+              color:
+                  Colors.grey.shade600,
             ),
           ),
         ],
@@ -293,14 +707,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(String label) {
+  InputDecoration
+      _inputDecoration(
+    String label,
+  ) {
+
     return InputDecoration(
+
       labelText: label,
+
       filled: true,
-      fillColor: const Color(0xffF8FAFC),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
+
+      fillColor:
+          const Color(0xffF8FAFC),
+
+      border:
+          OutlineInputBorder(
+
+        borderRadius:
+            BorderRadius.circular(
+          16,
+        ),
+
+        borderSide:
+            BorderSide.none,
       ),
     );
   }

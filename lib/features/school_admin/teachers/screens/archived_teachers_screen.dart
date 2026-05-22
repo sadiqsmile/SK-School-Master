@@ -485,13 +485,24 @@ Align(
           if (ok != true)
             return;
 
-          await FirebaseFirestore
-              .instance
-              .collection('schools')
-              .doc(school.id)
-              .collection('teachers')
-              .doc(doc.id)
-              .delete();
+         final teacherId = doc.id;
+
+await FirebaseFirestore
+    .instance
+    .collection('schools')
+    .doc(school.id)
+    .collection('teachers')
+    .doc(teacherId)
+    .delete();
+
+await FirebaseFirestore
+    .instance
+    .collection('users')
+    .doc(teacherId)
+    .delete();
+
+
+
         },
 
         style:
