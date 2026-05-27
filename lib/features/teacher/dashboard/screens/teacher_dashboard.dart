@@ -14,8 +14,8 @@ import 'package:school_app/core/widgets/app_cached_image.dart';
 import 'package:school_app/features/teacher/screens/crop_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/quick_attendance_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_calendar_screen.dart';
-import 'package:school_app/features/teacher/screens/analytics_dashboard_screen.dart';
-import 'package:school_app/features/teacher/screens/student_history_screen.dart';
+import 'package:school_app/features/teacher/attendance/analytics/attendance_analytics_screen.dart';
+import 'package:school_app/features/teacher/attendance/student_history/student_history_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_announcements_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_timetable_screen.dart';
 import 'package:school_app/core/services/image_service.dart';
@@ -372,75 +372,69 @@ minHeight: 600,
           child: Wrap(
             runSpacing: 12,
             children: [
-              tile(
-                Icons.check_circle,
-                "Quick Attendance",
-                () {
-                  Navigator.pop(context);
-                  
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => QuickAttendanceScreen(
-                        schoolId: schoolId,
-                        teacherId: teacherId,
-                        teacherData: teacherData,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              tile(
-                Icons.calendar_month,
-                "Calendar",
-                () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AttendanceCalendarScreen(
-                        className: className,
-                        section: section,
-                        schoolId: schoolId,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              tile(
-                Icons.bar_chart,
-                "Analytics",
-                () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AnalyticsDashboardScreen(
-                        className: className,
-                        section: section,
-                        schoolId: schoolId,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              tile(
-                Icons.people,
-                "Student History",
-                () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => StudentHistoryScreen(
-                        className: className,
-                        section: section,
-                        schoolId: schoolId,
-                      ),
-                    ),
-                  );
-                },
-              ),
+
+
+           tile(
+  Icons.bar_chart,
+  "Analytics",
+  () {
+
+    Navigator.pop(context);
+
+    Navigator.push(
+
+      context,
+
+      MaterialPageRoute(
+
+        builder: (_) =>
+
+            AttendanceAnalyticsScreen(
+
+          schoolId: schoolId,
+
+          classId:
+              teacherData['classTeacherOf']?['classId'] ?? '',
+
+          section:
+              teacherData['classTeacherOf']?['sectionId'] ?? '',
+        ),
+      ),
+    );
+  },
+),
+              
+      tile(
+  Icons.people,
+  "Student History",
+  () {
+
+    Navigator.pop(context);
+
+    Navigator.push(
+
+      context,
+
+      MaterialPageRoute(
+
+        builder: (_) =>
+
+            StudentHistoryScreen(
+
+          schoolId: schoolId,
+
+          classId:
+              teacherData['classTeacherOf']?['classId'] ?? '',
+
+          section:
+              teacherData['classTeacherOf']?['sectionId'] ?? '',
+        ),
+      ),
+    );
+  },
+),                 
+           
+             
             ],
           ),
         );
@@ -469,6 +463,9 @@ minHeight: 600,
     );
   }
 
+
+
+
   // ==========================
   // TODAY CARD
   // ==========================
@@ -486,15 +483,24 @@ minHeight: 600,
 
     final today = DateTime.now().toIso8601String().split("T")[0];
 
-    final docId = "${className}_${section}_$today";
-
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection("schools")
-          .doc(schoolId)
-          .collection("attendance")
-          .doc(docId)
-          .snapshots(),
+     
+stream: FirebaseFirestore.instance
+
+    .collection("schools")
+
+    .doc(schoolId)
+
+    .collection("attendance")
+
+    .doc(today)
+
+    .collection("classes")
+
+    .doc("${className}_$section")
+
+    .snapshots(),
+
       builder: (_, snap) {
         String title = "0%";
         int p = 0;
@@ -527,6 +533,7 @@ minHeight: 600,
           }
         }
 
+        int total = p + a;
         return glass(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -534,6 +541,21 @@ minHeight: 600,
               children: [
                 Text(
                   "Today's Attendance",
+                  style: TextStyle(
+                    color: textSub(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Class $className - $section",
+                  style: TextStyle(
+                    color: textMain(),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Strength: $total",
                   style: TextStyle(
                     color: textSub(),
                   ),
@@ -900,23 +922,38 @@ menu(
                             "Marks",
                             () {},
                           ),
-                          menu(
-                            Icons.people,
-                            "Students",
-                            () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => StudentHistoryScreen(
-                                    className: className,
-                                    section: section,
-                                    schoolId: schoolId,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          menu(
+                          
+                          
+                          
+                          
+                      menu(
+  Icons.people,
+  "Students",
+  () {
+
+    Navigator.push(
+
+      context,
+
+      MaterialPageRoute(
+
+        builder: (_) =>
+
+            StudentHistoryScreen(
+
+          schoolId: schoolId,
+
+          classId:
+              teacherData['classTeacherOf']?['classId'] ?? '',
+
+          section:
+              teacherData['classTeacherOf']?['sectionId'] ?? '',
+        ),
+      ),
+    );
+  },
+),
+                         menu(
                             Icons.campaign_outlined,
                             "Announcements",
                             () {

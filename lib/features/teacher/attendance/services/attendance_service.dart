@@ -42,7 +42,12 @@ class AttendanceService {
           attendance.section,
     );
 
-    await _firestore
+
+
+
+final attendanceDateDoc =
+
+    _firestore
 
         .collection('schools')
 
@@ -50,16 +55,35 @@ class AttendanceService {
 
         .collection('attendance')
 
-        .doc(attendance.date)
+        .doc(attendance.date);
 
-        .collection('classes')
+await attendanceDateDoc.set({
 
-        .doc(docId)
+  'date': attendance.date,
 
-        .set(
-          attendance.toMap(),
-        );
+  'createdAt':
+      FieldValue.serverTimestamp(),
+});
+
+await attendanceDateDoc
+
+    .collection('classes')
+
+    .doc(docId)
+
+    .set(
+      attendance.toMap(),
+    );
+
+
+
+
+
   }
+
+
+
+
 
   // =========================
   // GET TODAY ATTENDANCE
@@ -87,6 +111,7 @@ class AttendanceService {
 
       section: section,
     );
+
 
     return _firestore
 
@@ -131,6 +156,7 @@ class AttendanceService {
 
       section: section,
     );
+
 
     final doc = await _firestore
 

@@ -18,14 +18,21 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+print(
+  Firebase.app().options.projectId,
+);
+
+print(
+  Firebase.app().options.storageBucket,
+);
+
+
+
+
 FirebaseFirestore.instance.settings =
     const Settings(
-
-  persistenceEnabled: true,
-
-  cacheSizeBytes:
-      Settings.CACHE_SIZE_UNLIMITED,
-);
+      persistenceEnabled: false,
+    );
 
 
   await NotificationService().initialize();

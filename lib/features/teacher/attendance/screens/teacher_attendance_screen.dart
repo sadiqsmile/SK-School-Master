@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-
+import 'package:school_app/core/helpers/student_helper.dart';
 import 'package:school_app/features/teacher/attendance/models/attendance_status.dart';
 import 'package:school_app/features/teacher/attendance/providers/students_by_class_section_provider.dart';
 import 'package:school_app/features/teacher/attendance/services/teacher_attendance_service.dart';
@@ -318,9 +318,13 @@ class _TeacherAttendanceScreenState
                     final doc =
                         docs[i];
 
-                    final name =
-                        doc['name'] ??
-                            '';
+                   final name =
+
+    StudentHelper
+        .name(doc);
+
+
+
 
                     final status =
                         _statuses[
@@ -335,10 +339,55 @@ class _TeacherAttendanceScreenState
                       ),
                       child:
                           ListTile(
-                        title:
-                            Text(
-                          name,
-                        ),
+                        
+                        
+                       leading:
+    CircleAvatar(
+
+  backgroundColor:
+      Colors.deepPurple
+          .withOpacity(0.12),
+
+  backgroundImage:
+
+      StudentHelper
+              .hasPhoto(
+                  doc)
+
+          ? NetworkImage(
+
+              StudentHelper
+                  .photo(
+                      doc),
+            )
+
+          : null,
+
+  child:
+
+      StudentHelper
+              .hasPhoto(
+                  doc)
+
+          ? null
+
+          : Text(
+
+              StudentHelper
+                  .initial(
+                      doc),
+            ),
+),
+
+title:
+    Text(
+  name,
+),
+
+
+
+
+
                         subtitle:
                             Row(
                           children: [
