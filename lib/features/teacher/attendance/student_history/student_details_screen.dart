@@ -1,21 +1,18 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:school_app/features/teacher/attendance/student_history/student_live_analytics_service.dart';
-import 'package:school_app/core/helpers/student_helper.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:school_app/core/helpers/student_helper.dart';
+import 'package:school_app/features/teacher/attendance/student_history/student_live_analytics_service.dart';
 import 'package:school_app/providers/current_school_provider.dart';
-
+import 'package:table_calendar/table_calendar.dart';
 
 class StudentDetailsScreen
-  extends ConsumerStatefulWidget {
+    extends ConsumerStatefulWidget {
 
-  final Map<String, dynamic>
-      student;
+  final Map<String, dynamic> student;
 
   const StudentDetailsScreen({
-
     super.key,
-
     required this.student,
   });
 
@@ -26,106 +23,205 @@ class StudentDetailsScreen
 }
 
 class _StudentDetailsScreenState
-  extends ConsumerState<StudentDetailsScreen> {
+    extends ConsumerState<StudentDetailsScreen> {
 
-Map<String, dynamic>
-    analytics = {
+  Map<DateTime, String>
+      attendanceMap = {};
 
-  'percentage': 0,
+  DateTime focusedDay =
+      DateTime.now();
 
-  'present': 0,
+  DateTime selectedDay =
+      DateTime.now();
 
-  'absent': 0,
-};
+  Map<String, dynamic>
+      analytics = {
 
-bool loading = true;
+    'percentage': 0,
 
+    'present': 0,
 
+    'absent': 0,
+  };
 
+  bool loading = true;
 
+  @override
+  void initState() {
 
-@override
-void initState() {
+    super.initState();
 
-  super.initState();
+    loadAnalytics();
+  }
 
-  loadAnalytics();
-}
+  Future<void>
+      loadAnalytics() async {
 
-Future<void>
-    loadAnalytics() async {
-  try {
+    try {
 
-    final school =
-        await ref.read(
-          currentSchoolProvider
-              .future,
-        );
+      final school =
+          await ref.read(
+        currentSchoolProvider.future,
+      );
 
-    final schoolId =
-        school.id;
+      final schoolId =
+          school.id;
 
-    print(
-      'SCHOOL ID => $schoolId',
-    );
+      final studentId =
+          StudentHelper.admissionNo(
+        widget.student,
+      );
+
+      final result =
+          await StudentLiveAnalyticsService()
+              .getStudentAnalytics(
+
+        schoolId: schoolId,
+
+        studentId: studentId,
+
+        classId:
+            widget.student['classId'],
+
+        section:
+            widget.student['section'],
+      );
+
+      analytics = result;
+
+      await loadAttendanceCalendar(
+        schoolId,
+      );
+
+      setState(() {
+
+        loading = false;
+      });
+
+    } catch (e) {
+
+      print(
+        'ERROR => $e',
+      );
+    }
+  }
+
+  Future<void>
+      loadAttendanceCalendar(
+    String schoolId,
+  ) async {
 
     final studentId =
-        StudentHelper
-            .admissionNo(
-                widget.student);
+        widget.student['admissionNo'];
 
-    print(
-      'STUDENT ID => $studentId',
-    );
+    final classId =
+        widget.student['classId'];
 
-print(
-  'CLASS ID => ${widget.student['classId']}',
-);
+    final section =
+        widget.student['section'];
 
-print(
-  'SECTION => ${widget.student['section']}',
-);
+    final attendanceSnapshot =
 
+        await FirebaseFirestore
+            .instance
 
+            .collection('schools')
 
-final result =
-    await StudentLiveAnalyticsService()
-        .getStudentAnalytics(
+            .doc(schoolId)
 
-  schoolId:
-      schoolId,
+            .collection('attendance')
 
-  studentId:
-      studentId,
+            .get();
 
-  classId:
-      widget.student[
-          'classId'],
+    Map<DateTime, String>
+        temp = {};
 
-  section:
-      widget.student[
-          'section'],
-);
+    for (final dateDoc
+        in attendanceSnapshot.docs) {
 
-    print(
-      'RESULT => $result',
-    );
+      final classDoc =
+          await dateDoc.reference
+
+              .collection('classes')
+
+              .doc(
+                '${classId}_$section',
+              )
+
+              .get();
+
+      if (!classDoc.exists) {
+        continue;
+      }
+
+      final data =
+          classDoc.data();
+
+      if (data == null) {
+        continue;
+      }
+
+      final students =
+          (data['students']
+                  ?? {})
+              as Map;
+
+      final value =
+          students[studentId];
+
+      if (value == null) {
+        continue;
+      }
+
+      final date =
+          DateTime.parse(
+        dateDoc.id,
+      );
+
+      temp[
+          DateTime(
+        date.year,
+        date.month,
+        date.day,
+      )] =
+          value.toString();
+    }
 
     setState(() {
-      analytics = result;
-      loading = false;
-    });
 
-  } catch (e) {
-    print(
-      'ERROR => $e',
+      attendanceMap = temp;
+    });
+  }
+
+  Widget legend(
+    Color color,
+    String text,
+  ) {
+
+    return Row(
+
+      children: [
+
+        Container(
+
+          width: 14,
+
+          height: 14,
+
+          decoration: BoxDecoration(
+
+            color: color,
+
+            shape: BoxShape.circle,
+          ),
+        ),
+
+        const SizedBox(width: 6),
+
+        Text(text),
+      ],
     );
   }
-}
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -133,31 +229,20 @@ final result =
     final student =
         widget.student;
 
-final double percentage =
+    final double percentage =
+        (analytics['percentage']
+                as num)
+            .toDouble();
 
-    (analytics[
-            'percentage']
-        as num)
+    final int present =
+        (analytics['present']
+                as num)
+            .toInt();
 
-    .toDouble();
-            
-
-final int present =
-
-    (analytics[
-            'present']
-        as num)
-
-    .toInt();
-final int absent =
-
-    (analytics[
-            'absent']
-        as num)
-
-    .toInt();
-
-
+    final int absent =
+        (analytics['absent']
+                as num)
+            .toInt();
 
     return Scaffold(
 
@@ -171,88 +256,243 @@ final int absent =
         ),
       ),
 
-      body: SingleChildScrollView(
+      body: loading
 
-        padding:
-            const EdgeInsets.all(
-          16,
-        ),
+          ? const Center(
+              child:
+                  CircularProgressIndicator(),
+            )
 
-        child: Column(
-
-          children: [
-
-            Container(
-
-              width:
-                  double.infinity,
+          : SingleChildScrollView(
 
               padding:
                   const EdgeInsets.all(
-                20,
-              ),
-
-              decoration:
-                  BoxDecoration(
-
-                color:
-                    Colors.deepPurple,
-
-                borderRadius:
-                    BorderRadius.circular(
-                  24,
-                ),
+                16,
               ),
 
               child: Column(
 
                 children: [
 
-                 CircleAvatar(
+                  Container(
 
-  radius: 42,
+                    width:
+                        double.infinity,
 
-  backgroundColor:
-      Colors.white,
+                    padding:
+                        const EdgeInsets.all(
+                      20,
+                    ),
 
-  backgroundImage:
+                    decoration:
+                        BoxDecoration(
 
-      StudentHelper
-              .hasPhoto(
-                  student)
+                      color:
+                          Colors.deepPurple,
 
-          ? NetworkImage(
+                      borderRadius:
+                          BorderRadius.circular(
+                        24,
+                      ),
+                    ),
 
-              StudentHelper
-                  .photo(
-                      student),
-            )
+                    child: Column(
 
-          : null,
+                      children: [
 
-  child:
+                        CircleAvatar(
 
-      StudentHelper
-              .hasPhoto(
-                  student)
+                          radius: 42,
 
-          ? null
+                          backgroundColor:
+                              Colors.white,
 
-          : Text(
+                          backgroundImage:
 
-              StudentHelper
-                  .initial(
-                      student),
+                              StudentHelper
+                                      .hasPhoto(
+                                          student)
 
-              style:
-                  const TextStyle(
+                                  ? NetworkImage(
 
-                fontSize: 28,
+                                      StudentHelper
+                                          .photo(
+                                              student),
+                                    )
 
-                fontWeight:
-                    FontWeight.bold,
-              ),
-            ),
+                                  : null,
+
+                          child:
+
+                              StudentHelper
+                                      .hasPhoto(
+                                          student)
+
+                                  ? null
+
+                                  : Text(
+
+                                      StudentHelper
+                                          .initial(
+                                              student),
+
+                                      style:
+                                          const TextStyle(
+
+                                        fontSize: 28,
+
+                                        fontWeight:
+                                            FontWeight.bold,
+                                      ),
+                                    ),
+                        ),
+
+                        const SizedBox(
+                          height: 16,
+                        ),
+
+                        Text(
+
+                          StudentHelper.name(
+                            student,
+                          ),
+
+                          style:
+                              const TextStyle(
+
+                            color:
+                                Colors.white,
+
+                            fontSize: 24,
+
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(
+                          height: 6,
+                        ),
+
+                        Text(
+
+                          StudentHelper
+                              .admissionNo(
+                                  student),
+
+                          style:
+                              const TextStyle(
+
+                            color:
+                                Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 20,
+                  ),
+
+                  Row(
+
+                    children: [
+
+                      Expanded(
+
+                        child: _statCard(
+
+                          "Attendance",
+
+                          "${percentage.toStringAsFixed(0)}%",
+
+                          Colors.green,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        width: 12,
+                      ),
+
+                      Expanded(
+
+                        child: _statCard(
+
+                          "Present",
+
+                          present.toString(),
+
+                          Colors.blue,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        width: 12,
+                      ),
+
+                      Expanded(
+
+                        child: _statCard(
+
+                          "Absent",
+
+                          absent.toString(),
+
+                          Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(
+                    height: 20,
+                  ),
+
+                  Container(
+
+                    padding:
+                        const EdgeInsets.all(
+                      12,
+                    ),
+
+                    decoration:
+                        BoxDecoration(
+
+                      color: Colors.white,
+
+                      borderRadius:
+                          BorderRadius.circular(
+                        20,
+                      ),
+                    ),
+
+                    child: Column(
+
+                      children: [
+
+                        TableCalendar(
+
+headerStyle: const HeaderStyle(
+  formatButtonVisible: false,
+  titleCentered: true,
+),
+
+calendarStyle: const CalendarStyle(
+  selectedDecoration:
+      BoxDecoration(
+    color: Colors.transparent,
+    shape: BoxShape.circle,
+  ),
+  todayDecoration:
+      BoxDecoration(
+    color: Colors.transparent,
+    shape: BoxShape.circle,
+  ),
+  todayTextStyle:
+      TextStyle(
+    color: Colors.black,
+  ),
 ),
 
 
@@ -260,159 +500,292 @@ final int absent =
 
 
 
-                  const SizedBox(
-                    height: 16,
-                  ),
 
-                  Text(
 
-                    StudentHelper.name(student),
 
-                    style:
-                        const TextStyle(
+                          focusedDay:
+                              focusedDay,
 
-                      color:
-                          Colors.white,
+                          firstDay:
+                              DateTime(2025),
 
-                      fontSize: 24,
+                          lastDay:
+                              DateTime(2030),
 
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
-                  ),
+                          selectedDayPredicate:
+                              (day) {
 
-                  const SizedBox(
-                    height: 6,
-                  ),
+                            return isSameDay(
+                              selectedDay,
+                              day,
+                            );
+                          },
 
-                  Text(
+                          onDaySelected:
+                              (
+                            selected,
+                            focused,
+                          ) {
 
-                   StudentHelper
-    .admissionNo(
-        student),
+                            setState(() {
 
-                    style:
-                        const TextStyle(
+                              selectedDay =
+                                  selected;
 
-                      color:
-                          Colors.white70,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                              focusedDay =
+                                  focused;
+                            });
+                          },
 
-            const SizedBox(
-              height: 20,
-            ),
+                         calendarBuilders:
+    CalendarBuilders(
 
-            Row(
+selectedBuilder:
+    (context, day, focused) {
 
-              children: [
+  final normalized =
+      DateTime(
+    day.year,
+    day.month,
+    day.day,
+  );
 
-                Expanded(
+  final value =
+      attendanceMap[
+          normalized];
 
-                  child: _statCard(
+  Color? color;
 
-                    "Attendance",
+  if (value == 'P') {
 
-                    "${percentage.toStringAsFixed(0)}%",
+    color = Colors.green;
 
-                    Colors.green,
-                  ),
-                ),
+  } else if (value == 'A') {
 
-                const SizedBox(
-                  width: 12,
-                ),
+    color = Colors.red;
+  }
 
-                Expanded(
+  color ??= Colors.grey;
 
-                  child: _statCard(
+  return Container(
 
-                    "Present",
+    margin:
+        const EdgeInsets.all(6),
 
-                    present.toString(),
+    decoration:
+        BoxDecoration(
 
-                    Colors.blue,
-                  ),
-                ),
+      color: color,
 
-                const SizedBox(
-                  width: 12,
-                ),
+      shape: BoxShape.circle,
+    ),
 
-                Expanded(
+    child: Center(
 
-                  child: _statCard(
+      child: Text(
 
-                    "Absent",
+        '${day.day}',
 
-                   absent.toString(),
+        style:
+            const TextStyle(
 
-                    Colors.red,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(
-              height: 20,
-            ),
-
-            Container(
-
-              width:
-                  double.infinity,
-
-              padding:
-                  const EdgeInsets.all(
-                24,
-              ),
-
-              decoration:
-                  BoxDecoration(
-
-                color:
-                    Colors.white,
-
-                borderRadius:
-                    BorderRadius.circular(
-                  24,
-                ),
-              ),
-
-              child: const Column(
-
-                children: [
-
-                  Icon(
-                    Icons.calendar_month,
-                    size: 52,
-                    color:
-                        Colors.deepPurple,
-                  ),
-
-                  SizedBox(
-                    height: 16,
-                  ),
-
-                  Text(
-
-                    "Attendance Calendar Coming Next",
-
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight:
-                          FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          color: Colors.white,
         ),
       ),
+    ),
+  );
+},
+
+
+
+
+
+  defaultBuilder:
+      (context, day, focused) {
+
+    final normalized =
+        DateTime(
+      day.year,
+      day.month,
+      day.day,
+    );
+
+    final value =
+        attendanceMap[
+            normalized];
+
+    Color? color;
+
+    if (value == 'P') {
+
+      color =
+          Colors.green;
+
+    } else if (
+        value == 'A') {
+
+      color =
+          Colors.red;
+    }
+
+    if (color == null) {
+      return null;
+    }
+
+    return Container(
+
+      margin:
+          const EdgeInsets.all(
+        6,
+      ),
+
+      decoration:
+          BoxDecoration(
+
+        color: color,
+
+        shape:
+            BoxShape.circle,
+      ),
+
+      child: Center(
+
+        child: Text(
+
+          '${day.day}',
+
+          style:
+              const TextStyle(
+
+            color:
+                Colors.white,
+          ),
+        ),
+      ),
+    );
+  },
+
+  todayBuilder:
+      (context, day, focused) {
+
+    final normalized =
+        DateTime(
+      day.year,
+      day.month,
+      day.day,
+    );
+
+    final value =
+        attendanceMap[
+            normalized];
+
+    Color? color;
+
+    if (value == 'P') {
+
+      color =
+          Colors.green;
+
+    } else if (
+        value == 'A') {
+
+      color =
+          Colors.red;
+    }
+
+    if (color == null) {
+
+      return Center(
+
+        child: Text(
+          '${day.day}',
+        ),
+      );
+    }
+
+    return Container(
+
+      margin:
+          const EdgeInsets.all(
+        6,
+      ),
+
+      decoration:
+          BoxDecoration(
+
+        color: color,
+
+        shape:
+            BoxShape.circle,
+      ),
+
+      child: Center(
+
+        child: Text(
+
+          '${day.day}',
+
+          style:
+              const TextStyle(
+
+            color:
+                Colors.white,
+          ),
+        ),
+      ),
+    );
+  },
+),
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        ),
+
+                        const SizedBox(
+                          height: 12,
+                        ),
+
+                        Row(
+
+                          mainAxisAlignment:
+                              MainAxisAlignment.center,
+
+                          children: [
+
+                            legend(
+                              Colors.green,
+                              'Present',
+                            ),
+
+                            const SizedBox(
+                              width: 16,
+                            ),
+
+                            legend(
+                              Colors.red,
+                              'Absent',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 

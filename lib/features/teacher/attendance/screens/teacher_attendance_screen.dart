@@ -10,6 +10,10 @@ import 'package:school_app/providers/auth_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 import 'package:school_app/core/offline/firestore_sync_tracker.dart';
 import 'package:school_app/core/offline/firestore_sync_status_action.dart';
+import 'edit_attendance_screen.dart';
+
+
+
 
 class TeacherAttendanceScreen extends ConsumerStatefulWidget {
   const TeacherAttendanceScreen({
@@ -257,9 +261,46 @@ class _TeacherAttendanceScreenState
       appBar: AppBar(
         title:
             const Text("Attendance"),
-        actions: const [
-          FirestoreSyncStatusAction()
-        ],
+       
+
+
+       actions: [
+
+  IconButton(
+
+    icon: const Icon(Icons.edit_calendar),
+
+    onPressed: () {
+
+      Navigator.push(
+
+        context,
+
+        MaterialPageRoute(
+
+          builder: (_) => EditAttendanceScreen(
+
+            schoolId: ref
+                .read(currentSchoolProvider)
+                .value!
+                .id,
+
+            classId: widget.classId,
+
+            sectionId: widget.sectionId,
+          ),
+        ),
+      );
+    },
+  ),
+
+  const FirestoreSyncStatusAction(),
+],
+
+
+
+
+
       ),
       body: studentsAsync.when(
         loading: () => const Center(

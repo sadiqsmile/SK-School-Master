@@ -15,6 +15,7 @@ import 'package:school_app/features/teacher/screens/crop_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/quick_attendance_screen.dart';
 import 'package:school_app/features/teacher/screens/attendance_calendar_screen.dart';
 import 'package:school_app/features/teacher/attendance/analytics/attendance_analytics_screen.dart';
+import 'package:school_app/features/teacher/attendance/screens/edit_attendance_screen.dart';
 import 'package:school_app/features/teacher/attendance/student_history/student_history_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_announcements_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_timetable_screen.dart';
@@ -434,7 +435,36 @@ minHeight: 600,
   },
 ),                 
            
-             
+tile(
+  Icons.edit_calendar,
+  "Edit Attendance",
+  () {
+
+    Navigator.pop(context);
+
+    Navigator.push(
+
+      context,
+
+      MaterialPageRoute(
+
+        builder: (_) => EditAttendanceScreen(
+
+          schoolId: schoolId,
+
+          classId:
+              teacherData['classTeacherOf']?['classId'] ?? '',
+
+          sectionId:
+              teacherData['classTeacherOf']?['sectionId'] ?? '',
+        ),
+      ),
+    );
+  },
+),
+
+
+
             ],
           ),
         );
