@@ -26,10 +26,17 @@ class AttendanceAnalyticsService {
 
     int holidayDays = 0;
 
+
     int totalPresent = 0;
 
     final attendanceMap =
       <String, dynamic>{};
+
+      final Map<String, int>
+    studentPresentCount = {};
+
+final Map<String, int>
+    studentWorkingDays = {};
 
     for (int day = 1;
       day <= 31;
@@ -94,6 +101,8 @@ class AttendanceAnalyticsService {
       classStrength =
         total;
 
+     
+     
       if (holiday) {
 
         holidayDays++;
@@ -143,6 +152,37 @@ class AttendanceAnalyticsService {
           present;
       }
 
+final students =
+    Map<String, dynamic>.from(
+  data['students'] ?? {},
+);
+
+students.forEach(
+  (studentId, status) {
+
+    studentWorkingDays[
+        studentId] =
+        (studentWorkingDays[
+                studentId] ??
+            0) +
+        1;
+
+    if (status == 'P') {
+
+      studentPresentCount[
+          studentId] =
+          (studentPresentCount[
+                  studentId] ??
+              0) +
+          1;
+    }
+  },
+);
+
+
+
+
+
       } catch (e) {
 
       continue;
@@ -164,7 +204,69 @@ class AttendanceAnalyticsService {
           100;
     }
 
+final List<Map<String, dynamic>>
+    studentAttendance = [];
+
+studentWorkingDays.forEach(
+  (studentId, days) {
+
+
+
+
+    final present =
+        studentPresentCount[
+            studentId] ??
+        0;
+
+
+
+
+final percentage =
+    days > 0
+        ? (present / days) * 100
+        : 0;
+
+String studentName =
+    studentId;
+
+String photoUrl = '';
+
+studentAttendance.add({
+
+  'studentId': studentId,
+
+  'studentName': studentName,
+
+  'photoUrl': photoUrl,
+
+  'present': present,
+
+  'workingDays': days,
+
+  'percentage': percentage,
+});
+
+
+
+
+
+  },
+);
+
+studentAttendance.sort(
+  (a, b) =>
+      a['percentage']
+          .compareTo(
+    b['percentage'],
+  ),
+);
+
+
     return {
+
+'studentAttendance':
+    studentAttendance,
+
 
         'percentage': percentage,
         'workingDays': workingDays,

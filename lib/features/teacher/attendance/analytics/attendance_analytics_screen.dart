@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'attendance_analytics_service.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AttendanceAnalyticsScreen
     extends StatefulWidget {
@@ -41,9 +42,8 @@ DateTime focusedDay =
 DateTime? selectedDay;
 
 
-  Map<String, dynamic>?
-      analytics;
-
+  Map<String, dynamic>? analytics;
+Map<String, dynamic> studentsData = {};
   bool loading = true;
 
   @override
@@ -51,7 +51,8 @@ DateTime? selectedDay;
 
     super.initState();
 
-    _loadAnalytics();
+    loadStudents();
+_loadAnalytics();
   }
 
   Future<void>
@@ -84,6 +85,49 @@ DateTime? selectedDay;
       loading = false;
     });
   }
+
+
+
+
+Future<void> loadStudents() async {
+
+  final snapshot =
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .collection('students')
+          .get();
+
+  studentsData.clear();
+
+  for (final doc in snapshot.docs) {
+
+    final data = doc.data();
+
+    studentsData[
+      data['admissionNo']
+    ] = {
+
+      'name':
+          data['name'] ?? '',
+
+      'photoUrl':
+          data['photoUrl'] ?? '',
+    };
+  }
+
+  if (mounted) {
+    setState(() {});
+  }
+}
+
+
+
+
+
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -130,7 +174,18 @@ DateTime? selectedDay;
                       height: 20,
                     ),
 
-                    _dailySummaryPlaceholder(),
+                   _dailySummaryPlaceholder(),
+
+const SizedBox(height: 20),
+
+
+
+
+
+
+
+
+_lowAttendanceCard(),
                   ],
                 ),
     );
@@ -242,12 +297,15 @@ DateTime? selectedDay;
                "${analytics?['classStrength'] ?? 0}",
               ),
 
-              _statTile(
+_statTile(
+  "Present",
+  "${analytics?['totalPresent'] ?? 0}",
+),
 
-                "Holiday",
 
-               "${analytics?['holidayDays'] ?? 0}",
-              ),
+
+
+           
             ],
           ),
         ],
@@ -652,11 +710,9 @@ void _openDayDetails(
             ),
 
             if (!holiday)
-              Row(
 
-                mainAxisAlignment:
-                    MainAxisAlignment
-                        .spaceEvenly,
+             Row(mainAxisAlignment:
+      MainAxisAlignment.spaceEvenly,
 
                 children: [
 
@@ -805,6 +861,193 @@ Widget _dailySummaryPlaceholder() {
             ),
           ],
         ),
+      ],
+    ),
+  );
+}
+
+
+
+Widget _lowAttendanceCard() {
+
+  final students =
+      analytics?['studentAttendance']
+          as List<dynamic>? ?? [];
+
+  final lowStudents =
+      students
+          .where(
+            (e) =>
+                (e['percentage'] ?? 0) < 75,
+          )
+          .take(10)
+          .toList();
+
+  return Container(
+
+    padding: const EdgeInsets.all(20),
+
+    decoration: BoxDecoration(
+
+      color: Colors.white,
+
+      borderRadius:
+          BorderRadius.circular(24),
+    ),
+
+    child: Column(
+
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+
+      children: [
+
+        const Row(
+
+          children: [
+
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange,
+            ),
+
+            SizedBox(width: 8),
+
+            Text(
+
+              'Low Attendance Students',
+
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight:
+                    FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 20),
+
+        if (lowStudents.isEmpty)
+
+          const Center(
+            child: Text(
+              'No Low Attendance Students',
+            ),
+          ),
+
+        ...lowStudents.map((student) {
+
+          final percentage =
+              (student['percentage']
+                      ?? 0)
+                  .toDouble();
+
+          Color color;
+
+          if (percentage < 60) {
+            color = Colors.red;
+          } else {
+            color = Colors.orange;
+          }
+
+          return ListTile(
+
+
+
+
+
+
+
+
+leading: CircleAvatar(
+
+  radius: 22,
+
+backgroundColor:
+    const Color(0xff5B5FEF)
+        .withOpacity(0.15),
+
+  backgroundImage:
+
+      (studentsData[
+              student['studentId']]
+          ?['photoUrl'] ?? '')
+      .toString()
+      .isNotEmpty
+
+          ? NetworkImage(
+              studentsData[
+                  student['studentId']]
+              ['photoUrl'],
+            )
+
+          : null,
+
+  child:
+
+      (studentsData[
+                  student['studentId']]
+              ?['photoUrl'] ??
+          '')
+              .toString()
+              .isEmpty
+
+          ? Text(
+              (studentsData[
+                          student['studentId']]
+                      ?['name'] ??
+                  '?')
+                  .toString()
+                  .substring(0, 1)
+                  .toUpperCase(),
+              style: TextStyle(
+               color: const Color(0xff5B5FEF),
+                fontWeight: FontWeight.bold,
+              ),
+            )
+
+          : null,
+),
+
+
+
+
+
+
+
+          title: Text(
+
+  studentsData[
+      student['studentId']]
+          ?['name'] ??
+
+      student['studentId'],
+
+  style: const TextStyle(
+    fontWeight:
+        FontWeight.w600,
+  ),
+),
+
+
+subtitle: Text(
+  student['studentId'],
+),
+
+
+            trailing: Text(
+
+              '${percentage.toStringAsFixed(0)}%',
+
+              style: TextStyle(
+                color: color,
+                fontWeight:
+                    FontWeight.bold,
+              ),
+            ),
+          );
+        }),
       ],
     ),
   );
