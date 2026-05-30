@@ -64,6 +64,11 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
     try {
       email = user.email ?? "";
 
+
+
+
+//----------------------------------------------------------------
+     
       final userDoc = await FirebaseFirestore.instance
           .collection("users")
           .doc(user.uid)
@@ -90,6 +95,16 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           .doc(teacherId)
           .get();
 
+
+
+
+
+
+//---------------------------------------------
+
+
+
+
       if (teacherDoc.exists) {
         final data = teacherDoc.data()!;
         teacherName = data["name"] ?? "";
@@ -109,31 +124,8 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
         }
       }
 
-
-
-
-   // Save FCM token to teacher document
-
-if (!kIsWeb) {
-
-  final fcmToken =
-      await FirebaseMessaging.instance
-          .getToken();
-
-  if (fcmToken != null &&
-      schoolId.isNotEmpty &&
-      teacherId.isNotEmpty) {
-
-    await FirebaseFirestore.instance
-        .collection('schools')
-        .doc(schoolId)
-        .collection('teachers')
-        .doc(teacherId)
-        .update({
-      'fcmToken': fcmToken,
-    });
-  }
-}
+//----------------------------------------------------
+//--------------------------------------------------------
 
       if (mounted) {
 
@@ -142,6 +134,56 @@ if (!kIsWeb) {
     dashboardReady = true;
   });
 }
+
+
+
+
+
+
+
+
+
+
+
+   // Save FCM token to teacher document
+
+
+
+
+
+
+if (!kIsWeb) {
+
+  FirebaseMessaging.instance
+      .getToken()
+      .then((fcmToken) {
+
+    if (fcmToken != null &&
+        schoolId.isNotEmpty &&
+        teacherId.isNotEmpty) {
+
+      FirebaseFirestore.instance
+          .collection('schools')
+          .doc(schoolId)
+          .collection('teachers')
+          .doc(teacherId)
+          .update({
+        'fcmToken': fcmToken,
+      });
+    }
+  });
+}
+
+
+
+
+
+
+
+
+
+
+
     } catch (e) {
      debugPrint("Load Teacher Error: $e");
 

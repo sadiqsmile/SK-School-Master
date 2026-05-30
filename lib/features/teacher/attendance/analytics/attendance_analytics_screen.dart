@@ -46,14 +46,23 @@ DateTime? selectedDay;
 Map<String, dynamic> studentsData = {};
   bool loading = true;
 
-  @override
-  void initState() {
 
-    super.initState();
 
+@override
+void initState() {
+
+  super.initState();
+
+  _loadAnalytics();
+
+  Future.microtask(() {
     loadStudents();
-_loadAnalytics();
-  }
+  });
+}
+
+
+
+
 
   Future<void>
       _loadAnalytics() async {
@@ -95,8 +104,24 @@ Future<void> loadStudents() async {
       await FirebaseFirestore.instance
           .collection('schools')
           .doc(widget.schoolId)
-          .collection('students')
-          .get();
+       .collection('students')
+.where(
+  'classId',
+  isEqualTo: widget.classId,
+)
+.where(
+  'section',
+  isEqualTo: widget.section,
+)
+.get();
+
+
+print(
+  'Students loaded: ${snapshot.docs.length}',
+);
+
+
+
 
   studentsData.clear();
 

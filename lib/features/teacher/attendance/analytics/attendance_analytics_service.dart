@@ -38,156 +38,167 @@ class AttendanceAnalyticsService {
 final Map<String, int>
     studentWorkingDays = {};
 
-    for (int day = 1;
-      day <= 31;
-      day++) {
+  final today = DateTime.now();
 
-      try {
+final maxDay =
+    (year == today.year &&
+            month == today.month)
+        ? today.day
+        : DateTime(
+            year,
+            month + 1,
+            0,
+          ).day;
 
-      final date =
-        DateTime(
-        year,
-        month,
-        day,
-      );
 
-      if (date.month !=
-        month) {
-        continue;
-      }
 
-      final dateKey =
-        "${date.year}-"
-        "${date.month.toString().padLeft(2, '0')}-"
-        "${date.day.toString().padLeft(2, '0')}";
 
-      final docId =
-        "${classId}_$section";
+//---------------------------------------------
+final futures =
+    <Future<DocumentSnapshot<Map<String, dynamic>>>>[];
+final dateKeys = <String>[];
 
-      final classDoc =
-        await _firestore
-          .collection(
-            'schools')
-          .doc(schoolId)
-          .collection(
-            'attendance')
-          .doc(dateKey)
-          .collection(
-            'classes')
-          .doc(docId)
-          .get();
+for (int day = 1; day <= maxDay; day++) {
 
-      if (!classDoc.exists) {
-        continue;
-      }
+final date = DateTime(
+year,
+month,
+day,
+);
 
-      final data =
-        classDoc.data()!;
+if (date.month != month) {
+continue;
+}
 
-      final holiday =
-        data['isHoliday']
-          ?? false;
+final dateKey =
+"${date.year}-"
+"${date.month.toString().padLeft(2, '0')}-"
+"${date.day.toString().padLeft(2, '0')}";
 
-      int present =
-        (data['presentCount']
-            ?? 0)
-          .toInt();
+final docId =
+"${classId}_$section";
 
-      int total =
-        (data['totalStudents']
-            ?? 0)
-          .toInt();
+dateKeys.add(dateKey);
 
-      classStrength =
-        total;
+futures.add(
+_firestore
+.collection('schools')
+.doc(schoolId)
+.collection('attendance')
+.doc(dateKey)
+.collection('classes')
+.doc(docId)
+.get(),
+);
+}
 
-     
-     
-      if (holiday) {
+final List<
+    DocumentSnapshot<
+        Map<String, dynamic>>>
+    docs =
+        await Future.wait(
+  futures,
+);
 
-        holidayDays++;
+for (int i = 0; i < docs.length; i++) {
 
-        attendanceMap[
-          dateKey] = {
+final classDoc = docs[i];
 
-        'holiday': true,
+final dateKey = dateKeys[i];
 
-        'percentage': 0,
+if (!classDoc.exists) {
+continue;
+}
 
-        'present': 0,
+final data =
+    classDoc.data()
+        as Map<String, dynamic>;
 
-        'absent': 0,
-        };
+final holiday =
+data['isHoliday'] ?? false;
 
-      } else {
+int present =
+(data['presentCount'] ?? 0)
+.toInt();
 
-        workingDays++;
+int total =
+(data['totalStudents'] ?? 0)
+.toInt();
 
-        final dayPercentage =
+classStrength = total;
 
-          total > 0
+if (holiday) {
 
-            ? (present /
-                total) *
-              100
 
-            : 0;
+holidayDays++;
 
-        attendanceMap[
-          dateKey] = {
+attendanceMap[dateKey] = {
 
-        'holiday': false,
+  'holiday': true,
+  'percentage': 0,
+  'present': 0,
+  'absent': 0,
+};
 
-        'percentage':
-          dayPercentage,
 
-        'present':
-          present,
+} else {
 
-        'absent':
-          total - present,
-        };
 
-        totalPresent +=
-          present;
-      }
+workingDays++;
+
+final dayPercentage =
+    total > 0
+        ? (present / total) * 100
+        : 0;
+
+attendanceMap[dateKey] = {
+
+  'holiday': false,
+  'percentage': dayPercentage,
+  'present': present,
+  'absent': total - present,
+};
+
+totalPresent += present;
+
+
+}
 
 final students =
-    Map<String, dynamic>.from(
-  data['students'] ?? {},
+Map<String, dynamic>.from(
+data['students'] ?? {},
 );
 
 students.forEach(
-  (studentId, status) {
+(studentId, status) {
 
-    studentWorkingDays[
+
+  studentWorkingDays[
+      studentId] =
+      (studentWorkingDays[
+              studentId] ??
+          0) +
+      1;
+
+  if (status == 'P') {
+
+    studentPresentCount[
         studentId] =
-        (studentWorkingDays[
+        (studentPresentCount[
                 studentId] ??
             0) +
         1;
+  }
+},
 
-    if (status == 'P') {
 
-      studentPresentCount[
-          studentId] =
-          (studentPresentCount[
-                  studentId] ??
-              0) +
-          1;
-    }
-  },
 );
+}
 
 
 
+//-------------------------------------------------------
 
-
-      } catch (e) {
-
-      continue;
-      }
-    }
 
     double percentage = 0;
 

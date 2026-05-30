@@ -136,56 +136,77 @@ class _StudentDetailsScreenState
     Map<DateTime, String>
         temp = {};
 
-    for (final dateDoc
-        in attendanceSnapshot.docs) {
 
-      final classDoc =
-          await dateDoc.reference
 
-              .collection('classes')
+//---------------------------------------------
 
-              .doc(
-                '${classId}_$section',
-              )
+final futures =
+    attendanceSnapshot.docs.map(
+  (dateDoc) {
 
-              .get();
+    return dateDoc.reference
+        .collection('classes')
+        .doc(
+          '${classId}_$section',
+        )
+        .get();
+  },
+).toList();
 
-      if (!classDoc.exists) {
-        continue;
-      }
+final classDocs =
+    await Future.wait(
+  futures,
+);
 
-      final data =
-          classDoc.data();
+for (int i = 0;
+    i < classDocs.length;
+    i++) {
 
-      if (data == null) {
-        continue;
-      }
+  final classDoc =
+      classDocs[i];
 
-      final students =
-          (data['students']
-                  ?? {})
-              as Map;
+  final dateDoc =
+      attendanceSnapshot.docs[i];
 
-      final value =
-          students[studentId];
+  if (!classDoc.exists) {
+    continue;
+  }
 
-      if (value == null) {
-        continue;
-      }
+  final data =
+      classDoc.data();
 
-      final date =
-          DateTime.parse(
-        dateDoc.id,
-      );
+  if (data == null) {
+    continue;
+  }
 
-      temp[
-          DateTime(
-        date.year,
-        date.month,
-        date.day,
-      )] =
-          value.toString();
-    }
+  final students =
+      (data['students'] ?? {})
+          as Map;
+
+  final value =
+      students[studentId];
+
+  if (value == null) {
+    continue;
+  }
+
+  final date =
+      DateTime.parse(
+    dateDoc.id,
+  );
+
+  temp[
+      DateTime(
+    date.year,
+    date.month,
+    date.day,
+  )] =
+      value.toString();
+}
+
+
+//---------------------------------------------
+
 
     setState(() {
 

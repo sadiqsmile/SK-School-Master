@@ -44,6 +44,7 @@ class _QuickAttendanceScreenState
   bool isHoliday = false;
 
   bool loading = true;
+  bool isSunday = false;
 
   bool alreadySaved = false;
 
@@ -54,14 +55,26 @@ double todayPercentage = 0;
 List<QueryDocumentSnapshot>
     studentDocs = [];
 
+
+
   @override
   void initState() {
 
     super.initState();
 
+isSunday =
+    DateTime.now().weekday ==
+    DateTime.sunday;
+
+
     final classTeacherOf =
         widget.teacherData[
             'classTeacherOf'];
+
+
+
+
+
 
     if (classTeacherOf != null) {
 
@@ -81,6 +94,20 @@ List<QueryDocumentSnapshot>
 
 Future<void>
     _loadTodayAttendance() async {
+
+if (DateTime.now().weekday ==
+    DateTime.sunday) {
+
+  setState(() {
+
+    isHoliday = true;
+    loading = false;
+  });
+
+  return;
+}
+
+
 
   final dateKey =
       "${DateTime.now().year}-"
@@ -157,6 +184,55 @@ _updatePercentage();
         ),
       );
     }
+
+if (isSunday) {
+
+  return Scaffold(
+
+    appBar: AppBar(
+      title: const Text(
+        "Quick Attendance",
+      ),
+    ),
+
+    body: const Center(
+
+      child: Column(
+
+        mainAxisAlignment:
+            MainAxisAlignment.center,
+
+        children: [
+
+          Icon(
+            Icons.weekend,
+            size: 80,
+            color: Colors.orange,
+          ),
+
+          SizedBox(height: 16),
+
+          Text(
+            "Attendance Disabled",
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight:
+                  FontWeight.bold,
+            ),
+          ),
+
+          SizedBox(height: 8),
+
+          Text(
+            "Today is Sunday",
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
 
     if (classId == null ||
         section == null) {
@@ -1045,7 +1121,21 @@ void _updatePercentage() {
 
 
   Future<void>
-      _saveAttendance() async {
+      _saveAttendance()
+      
+      
+           
+      
+      
+       async {
+
+
+if (DateTime.now().weekday ==
+    DateTime.sunday) {
+
+  return;
+}
+
 
     final exists =
         await _service
