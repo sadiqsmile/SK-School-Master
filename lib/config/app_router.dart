@@ -6,28 +6,18 @@ import 'package:school_app/features/school_admin/attendance/screens/attendance_r
 import 'package:school_app/features/school_admin/fees/screens/add_fee_screen.dart';
 import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
 import 'package:school_app/features/import_export/screens/import_export_dashboard_screen.dart';
-
 import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
 import 'package:school_app/features/school_admin/teachers/screens/archived_teachers_screen.dart';
-
-
 import 'package:school_app/features/import_export/screens/subject_template_screen.dart';
-
 import 'package:school_app/features/import_export/screens/import_classes_screen.dart';
-
 import 'package:school_app/features/import_export/screens/export_classes_screen.dart';
-
 import 'package:school_app/features/import_export/screens/student_import_screen.dart';
-
 import 'package:school_app/features/import_export/screens/teacher_import_screen.dart';
-
 import 'package:school_app/features/import_export/screens/attendance_import_export_screen.dart';
-
 import 'package:school_app/features/import_export/screens/exam_import_export_screen.dart';
-
 import 'package:school_app/features/import_export/screens/marks_import_export_screen.dart';
-
 import 'package:school_app/features/import_export/screens/timetable_import_export_screen.dart';
+import 'package:school_app/features/school_admin/exams/screens/grade_templates_screen.dart';
 // config/app_router.dart
 
 import 'package:school_app/features/school_admin/classes/screens/class_students_screen.dart';
@@ -67,7 +57,7 @@ import 'package:school_app/features/school_admin/notifications/screens/notificat
 import 'package:school_app/features/school_admin/settings/screens/modules_control_screen.dart';
 import 'package:school_app/features/import_export/screens/import_export_screen.dart';
 import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
-
+import 'package:school_app/features/school_admin/exams/screens/exams_dashboard_screen.dart';
 import 'package:school_app/features/school_admin/academic_setup/screens/academic_setup_dashboard.dart';
 import 'package:school_app/features/parent/screens/parent_login_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/teacher_attendance_screen.dart';
@@ -76,7 +66,7 @@ import 'package:school_app/features/teacher/screens/teacher_class_home_screen.da
 import 'package:school_app/features/teacher/dashboard/screens/teacher_dashboard.dart';
 import 'package:school_app/features/teacher/screens/teacher_students_screen.dart';
 import 'package:school_app/features/teacher/risk/screens/class_risk_screen.dart';
-
+import 'package:school_app/features/school_admin/exams/screens/exams_screen.dart';
 import 'package:school_app/core/rbac/role_guard.dart';
 import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/models/user_role.dart';
@@ -117,7 +107,8 @@ final appRouter = GoRouter(
     return null;
   },
 
- 
+
+
   routes: [
     GoRoute(
       path: '/class-students',
@@ -321,15 +312,19 @@ final appRouter = GoRouter(
         ),
       ),
     ),
+    
     GoRoute(
       path: '/school-admin/exam-types',
       builder: (context, state) => const RoleGuard(
         title: 'Exam Types',
         allowedRoles: [UserRole.admin],
         requiredModules: [SchoolModuleKey.exams],
-        child: ExamTypesScreen(),
+        child: ExamsDashboardScreen(),
       ),
     ),
+    
+    //----EXAM----------------------------------------------------------
+    
     GoRoute(
       path: '/school-admin/marks-card-templates',
       builder: (context, state) => const RoleGuard(
@@ -339,6 +334,30 @@ final appRouter = GoRouter(
         child: MarksCardTemplatesScreen(),
       ),
     ),
+
+
+GoRoute(
+  path: '/school-admin/grade-templates',
+  builder: (context, state) => const RoleGuard(
+    title: 'Grade Templates',
+    allowedRoles: [UserRole.admin],
+    requiredModules: [SchoolModuleKey.exams],
+    child: GradeTemplatesScreen(),
+  ),
+),
+
+
+GoRoute(
+  path: '/school-admin/exams',
+  builder: (context, state) => const RoleGuard(
+    title: 'Exams',
+    allowedRoles: [UserRole.admin],
+    requiredModules: [SchoolModuleKey.exams],
+    child: ExamsScreen(),
+  ),
+),
+
+
 
     GoRoute(
       path: '/school-admin/settings/modules',

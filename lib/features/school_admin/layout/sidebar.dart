@@ -99,14 +99,19 @@ class Sidebar extends StatelessWidget {
                   title: const Text('Announcements'),
                   onTap: () => context.go('/school-admin/announcements'),
                 ),
+                
+                
+                
                 ListTile(
                   leading: const Icon(
                     Icons.category_rounded,
                     color: Color(0xFF1E40AF),
                   ),
-                  title: const Text('Exam Types'),
+                  title: const Text('Exams Types'),
                   onTap: () => context.go('/school-admin/exam-types'),
                 ),
+
+
                 ListTile(
                   leading: const Icon(
                     Icons.bar_chart_rounded,

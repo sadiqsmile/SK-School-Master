@@ -77,7 +77,26 @@ class AdminLayout extends ConsumerWidget {
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.all(20),
-                                child: page,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (Navigator.canPop(context))
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 12),
+                                        child: Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: TextButton.icon(
+                                            icon: const Icon(Icons.arrow_back),
+                                            label: const Text('Back'),
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    Expanded(child: page),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -89,7 +108,9 @@ class AdminLayout extends ConsumerWidget {
               ],
             ),
     );
+  
   }
+
 
   // MOBILE HEADER
   Widget _mobileHeader(BuildContext context, String title) {
@@ -106,12 +127,31 @@ class AdminLayout extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            Builder(
-              builder: (context) => IconButton(
-                icon: const Icon(Icons.menu_rounded),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
+           
+         Navigator.canPop(context)
+
+? IconButton(
+    icon: const Icon(
+      Icons.arrow_back_rounded,
+    ),
+    onPressed: () {
+      Navigator.pop(context);
+    },
+  )
+
+: Builder(
+    builder: (context) => IconButton(
+      icon: const Icon(
+        Icons.menu_rounded,
+      ),
+      onPressed: () =>
+          Scaffold.of(context)
+              .openDrawer(),
+    ),
+  ),
+
+
+           
             Expanded(
               child: Text(
                 title,

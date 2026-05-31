@@ -232,9 +232,9 @@ class _Tile extends ConsumerWidget {
         return Icons.account_balance_wallet_rounded;
       case 'Announcements':
         return Icons.campaign_rounded;
-      case 'Exam Types':
+      case 'Exams':
         return Icons.quiz_rounded;
-      case 'Marks Card Templates':
+      case 'Marks Card':
         return Icons.description_rounded;
       case 'Reports':
         return Icons.bar_chart_rounded;
@@ -269,10 +269,10 @@ class _Tile extends ConsumerWidget {
         return const Color(0xFF14B8A6);
       case 'Announcements':
         return const Color(0xFFF97316);
-      case 'Exam Types':
+      case 'Exams':
         return const Color(0xFFEAB308);
-      case 'Marks Card Templates':
-        return const Color(0xFF64748B);
+      case 'Marks Card':
+        return const Color.fromARGB(255, 152, 211, 86);
       case 'Reports':
         return const Color(0xFF0EA5E9);
       case 'Analytics':

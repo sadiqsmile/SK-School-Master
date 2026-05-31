@@ -113,14 +113,14 @@ class AppNavigation {
 
           if (m.exams)
             const AppNavEntry.item(
-              label: 'Exam Types',
+              label: 'Exams',
               icon: Icons.quiz_rounded,
               route: '/school-admin/exam-types',
             ),
 
           if (m.exams)
             const AppNavEntry.item(
-              label: 'Marks Card Templates',
+              label: 'Marks Card',
               icon: Icons.description_rounded,
               route: '/school-admin/marks-card-templates',
             ),
