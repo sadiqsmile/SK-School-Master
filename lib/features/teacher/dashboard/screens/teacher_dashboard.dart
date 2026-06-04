@@ -20,6 +20,7 @@ import 'package:school_app/features/teacher/attendance/student_history/student_h
 import 'package:school_app/features/teacher/screens/teacher_announcements_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_timetable_screen.dart';
 import 'package:school_app/core/services/image_service.dart';
+import 'package:school_app/features/teacher/attendance/reports/screens/attendance_reports_home_screen.dart';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -475,8 +476,10 @@ minHeight: 600,
       ),
     );
   },
-),                 
-           
+),        
+
+
+    if (teacherData['classTeacherOf'] != null)       
 tile(
   Icons.edit_calendar,
   "Edit Attendance",
@@ -920,11 +923,21 @@ stream: FirebaseFirestore.instance
                         ),
                       ),
 
-                      const SizedBox(height: 18),
 
-                      todayCard(),
 
-                      const SizedBox(height: 18),
+
+                  const SizedBox(height: 18),
+
+if (teacherData['classTeacherOf'] != null)
+  todayCard(),
+
+if (teacherData['classTeacherOf'] != null)
+  const SizedBox(height: 18),
+
+
+
+
+
 
                       GridView.count(
                         crossAxisCount: MediaQuery.of(context).size.width > 1100
@@ -969,9 +982,22 @@ stream: FirebaseFirestore.instance
 menu(
   Icons.analytics,
   "Attendance Reports",
-  openAttendanceHub,
-),
+  () {
 
+    Navigator.push(
+
+      context,
+
+      MaterialPageRoute(
+
+        builder: (_) =>
+    AttendanceReportsHomeScreen(
+      schoolId: schoolId,
+    ),
+      ),
+    );
+  },
+),
 
                           menu(
                             Icons.schedule,
@@ -998,10 +1024,31 @@ menu(
                           
                           
                           
-                      menu(
+                     menu(
   Icons.people,
+
   "Students",
+
   () {
+
+    if (teacherData[
+            'classTeacherOf'] ==
+        null) {
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+
+        const SnackBar(
+
+          content: Text(
+            'Only Class Teachers can access class students',
+          ),
+        ),
+      );
+
+      return;
+    }
 
     Navigator.push(
 
@@ -1010,21 +1057,30 @@ menu(
       MaterialPageRoute(
 
         builder: (_) =>
-
             StudentHistoryScreen(
 
           schoolId: schoolId,
 
           classId:
-              teacherData['classTeacherOf']?['classId'] ?? '',
+              teacherData[
+                      'classTeacherOf']
+                  ['classId'],
 
           section:
-              teacherData['classTeacherOf']?['sectionId'] ?? '',
+              teacherData[
+                      'classTeacherOf']
+                  ['sectionId'],
         ),
       ),
     );
   },
-),
+),                 
+                         
+                         
+                         
+                         
+                         
+                         
                          menu(
                             Icons.campaign_outlined,
                             "Announcements",
@@ -1049,22 +1105,56 @@ menu(
               ),
             ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF6366F1),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => QuickAttendanceScreen(
-                schoolId: schoolId,
-                teacherId: teacherId,
-                teacherData: teacherData,
-              ),
+      
+   floatingActionButton:
+    teacherData['classTeacherOf'] == null
+
+        ? null
+
+        : FloatingActionButton(
+
+            backgroundColor:
+                const Color(
+                  0xFF6366F1,
+                ),
+
+            onPressed: () {
+
+              Navigator.push(
+
+                context,
+
+                MaterialPageRoute(
+
+                  builder: (_) =>
+                      QuickAttendanceScreen(
+
+                    schoolId:
+                        schoolId,
+
+                    teacherId:
+                        teacherId,
+
+                    teacherData:
+                        teacherData,
+                  ),
+                ),
+              );
+            },
+
+            child: const Icon(
+              Icons.check,
             ),
-          );
-        },
-        child: const Icon(Icons.check),
-      ),
+          ),
+      
+      
+      
+      
+      
+      
+      
+      
+      
       bottomNavigationBar: Container(
         margin: const EdgeInsets.all(14),
         padding: const EdgeInsets.symmetric(

@@ -55,14 +55,56 @@ class _AssignTeacherScreenState
       final schoolId = await getSchoolId();
       final className = selectedClassName;
       final classKey = "${className}_${selectedSection}";
-      await FirebaseFirestore.instance
-          .collection('schools')
-          .doc(schoolId)
-          .collection('teachers')
-          .doc(widget.teacherId)
-          .update({
-        "assignmentKeys": FieldValue.arrayUnion([classKey])
-      });
+      
+      
+   await FirebaseFirestore.instance
+    .collection('schools')
+    .doc(schoolId)
+    .collection('teachers')
+    .doc(widget.teacherId)
+    .update({
+
+  "assignmentKeys":
+      FieldValue.arrayUnion(
+          [classKey]),
+
+  "classTeacherOf": {
+
+    "classId":
+        selectedClassId,
+
+    "className":
+        selectedClassName,
+
+    "sectionId":
+        selectedSection,
+
+    "sectionName":
+        selectedSection,
+  },
+});
+
+
+await FirebaseFirestore.instance
+    .collection('users')
+    .doc(widget.teacherId)
+    .update({
+
+  "classTeacherOf": {
+
+    "classId":
+        selectedClassId,
+
+    "className":
+        selectedClassName,
+
+    "sectionId":
+        selectedSection,
+
+    "sectionName":
+        selectedSection,
+  },
+});
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Assigned Successfully")),
@@ -77,6 +119,14 @@ class _AssignTeacherScreenState
 
     setState(() => isSaving = false);
   }
+
+
+
+
+
+
+
+
 
   @override
   Widget build(BuildContext context) {

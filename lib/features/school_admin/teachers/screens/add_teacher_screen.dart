@@ -16,7 +16,7 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  final String selectedRole = "teacher";
+String selectedRole = "teacher";
   bool isSaving = false;
 
   Future<void> _save() async {
@@ -101,7 +101,8 @@ final secondaryAuth =
           .collection('users')
           .doc(teacherUid)
           .set({
-        "role": 'teacher',
+       "role": selectedRole,
+"classTeacherOf": null,
         "schoolId": schoolId,
         "teacherId": teacherUid,
         "name": name,
@@ -135,6 +136,7 @@ final secondaryAuth =
         "phone": phone,
         "photoUrl": "",
         "role": selectedRole,
+        "classTeacherOf": null,
         "teacherId": teacherUid,
         "schoolId": schoolId,
         "gender": "",
@@ -284,6 +286,8 @@ Navigator.pushAndRemoveUntil(
         child: Column(
           children: [
             _input(controller: _nameController, label: "Name"),
+           
+           
             const SizedBox(height: 12),
 
             _input(
@@ -299,12 +303,53 @@ Navigator.pushAndRemoveUntil(
               type: TextInputType.number,
               maxLength: 10,
             ),
+            
+            
+            
             const SizedBox(height: 12),
-                   
+             DropdownButtonFormField<String>(
+
+  value: selectedRole,
+
+  decoration: const InputDecoration(
+    labelText: 'Role',
+    border: OutlineInputBorder(),
+  ),
+
+  items: const [
+
+    DropdownMenuItem(
+      value: 'teacher',
+      child: Text('Teacher'),
+    ),
+
+    DropdownMenuItem(
+      value: 'mentor',
+      child: Text('Mentor'),
+    ),
+  ],
+
+  onChanged: (value) {
+
+    setState(() {
+
+      selectedRole = value!;
+    });
+  },
+),
+
+const SizedBox(height: 12),
 
             SizedBox(
               width: double.infinity,
               height: 50,
+
+
+
+
+
+
+
               child: ElevatedButton(
                 onPressed: isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(

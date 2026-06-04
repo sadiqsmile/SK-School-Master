@@ -4,7 +4,7 @@ import 'package:school_app/features/school_admin/teachers/screens/assign_teacher
 import 'package:school_app/features/school_admin/fees/screens/fee_list_screen.dart';
 import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
 import 'package:school_app/features/school_admin/fees/screens/add_fee_screen.dart';
-import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
+
 import 'package:school_app/features/import_export/screens/import_export_dashboard_screen.dart';
 import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
 import 'package:school_app/features/school_admin/teachers/screens/archived_teachers_screen.dart';
@@ -19,7 +19,7 @@ import 'package:school_app/features/import_export/screens/marks_import_export_sc
 import 'package:school_app/features/import_export/screens/timetable_import_export_screen.dart';
 import 'package:school_app/features/school_admin/exams/screens/grade_templates_screen.dart';
 // config/app_router.dart
-
+import 'package:school_app/features/school_admin/groups/screens/groups_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/class_students_screen.dart';
 import 'package:school_app/features/school_admin/teachers/screens/add_teacher_screen.dart';
 import 'package:go_router/go_router.dart';
@@ -37,7 +37,7 @@ import 'package:school_app/features/school_admin/students/screens/edit_student_s
 import 'package:school_app/features/school_admin/students/screens/student_profile_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/classes_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/add_class_screen.dart';
-import 'package:school_app/features/school_admin/classes/screens/sections_screen.dart';
+
 import 'package:school_app/features/school_admin/attendance/screens/attendance_screen.dart';
 import 'package:school_app/features/school_admin/academic/screens/promote_students_screen.dart';
 import 'package:school_app/features/school_admin/homework/screens/homework_screen.dart';
@@ -45,7 +45,7 @@ import 'package:school_app/features/school_admin/fees/screens/fees_screen.dart';
 import 'package:school_app/features/school_admin/announcements/screens/announcements_screen.dart';
 import 'package:school_app/features/school_admin/exams/screens/exam_types_screen.dart';
 import 'package:school_app/features/school_admin/exams/screens/marks_card_templates_screen.dart';
-import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
+
 import 'package:school_app/features/school_admin/reports/screens/exam_reports_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/fee_reports_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/reports_screen.dart';
@@ -56,7 +56,7 @@ import 'package:school_app/features/school_admin/analytics/screens/student_risk_
 import 'package:school_app/features/school_admin/notifications/screens/notifications_screen.dart';
 import 'package:school_app/features/school_admin/settings/screens/modules_control_screen.dart';
 import 'package:school_app/features/import_export/screens/import_export_screen.dart';
-import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
+
 import 'package:school_app/features/school_admin/exams/screens/exams_dashboard_screen.dart';
 import 'package:school_app/features/school_admin/academic_setup/screens/academic_setup_dashboard.dart';
 import 'package:school_app/features/parent/screens/parent_login_screen.dart';
@@ -73,7 +73,7 @@ import 'package:school_app/models/user_role.dart';
 import 'package:school_app/main.dart' show navigatorKey;
 import 'package:school_app/features/school_admin/students/screens/restore_students_screen.dart';
 import 'package:school_app/features/school_admin/students/screens/bulk_delete_students_screen.dart';
-import 'package:school_app/features/school_admin/teachers/screens/archived_teachers_screen.dart';
+
 import 'package:school_app/providers/school_admin_provider.dart' show schoolIdProvider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -184,7 +184,12 @@ final appRouter = GoRouter(
     ),
 
 
-
+GoRoute(
+  path: '/groups',
+  builder: (context, state) {
+    return const GroupsScreen();
+  },
+),
     
     GoRoute(
       path: '/school-admin/teachers',
@@ -255,19 +260,8 @@ final appRouter = GoRouter(
         child: AddClassScreen(),
       ),
     ),
-    GoRoute(
-      path: '/sections/:classId',
-      builder: (context, state) {
-        final raw = state.pathParameters['classId'] ?? '';
-        final classId = Uri.decodeComponent(raw);
-        return RoleGuard(
-          title: 'Sections',
-          allowedRoles: const [UserRole.admin],
-          requiredModules: const [SchoolModuleKey.students],
-          child: SectionsScreen(classId: classId),
-        );
-      },
-    ),
+   
+
     GoRoute(
       path: '/school-admin/attendance',
       pageBuilder: (context, state) => NoTransitionPage(

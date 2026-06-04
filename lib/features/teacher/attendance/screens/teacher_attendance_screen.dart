@@ -219,12 +219,37 @@ class _TeacherAttendanceScreenState
 
   @override
   Widget build(BuildContext context) {
-    final assignments =
-        ref.watch(
-            teacherAssignmentsProvider);
+  
+  
+   final assignments =
+    ref.watch(
+        teacherAssignmentsProvider);
 
-    final isAssigned =
-        assignments.any(
+
+final profileAsync =
+    ref.watch(
+      teacherProfileProvider,
+    );
+
+final isMentor =
+    profileAsync.maybeWhen(
+
+      data: (doc) {
+
+        final data =
+            doc.data();
+
+        return data?['role'] ==
+            'mentor';
+      },
+
+      orElse: () => false,
+    );
+
+
+
+final isAssigned =
+    assignments.any(
       (a) =>
           a.classId ==
               widget.classId &&
@@ -232,18 +257,24 @@ class _TeacherAttendanceScreenState
               widget.sectionId,
     );
 
-    if (!isAssigned) {
-      return Scaffold(
-        appBar: AppBar(
-          title:
-              const Text("Attendance"),
-        ),
-        body: const Center(
-          child: Text(
-              "Not assigned"),
-        ),
-      );
-    }
+if (!isAssigned &&
+    !isMentor) {
+
+  return Scaffold(
+
+    appBar: AppBar(
+      title: const Text(
+        "Attendance",
+      ),
+    ),
+
+    body: const Center(
+      child: Text(
+        "Not assigned",
+      ),
+    ),
+  );
+}
 
     final studentsAsync = ref.watch(
       studentsByClassSectionProvider(
@@ -264,39 +295,50 @@ class _TeacherAttendanceScreenState
        
 
 
-       actions: [
+actions: [
 
   IconButton(
 
-    icon: const Icon(Icons.edit_calendar),
+    icon: const Icon(
+      Icons.edit_calendar,
+    ),
 
-    onPressed: () {
+    onPressed:
+        (isMentor || isAssigned)
 
-      Navigator.push(
+            ? () {
 
-        context,
+                Navigator.push(
 
-        MaterialPageRoute(
+                  context,
 
-          builder: (_) => EditAttendanceScreen(
+                  MaterialPageRoute(
 
-            schoolId: ref
-                .read(currentSchoolProvider)
-                .value!
-                .id,
+                    builder: (_) =>
+                        EditAttendanceScreen(
 
-            classId: widget.classId,
+                      schoolId: ref
+                          .read(
+                            currentSchoolProvider,
+                          )
+                          .value!
+                          .id,
 
-            sectionId: widget.sectionId,
-          ),
-        ),
-      );
-    },
+                      classId:
+                          widget.classId,
+
+                      sectionId:
+                          widget.sectionId,
+                    ),
+                  ),
+                );
+              }
+
+            : null,
   ),
 
   const FirestoreSyncStatusAction(),
 ],
-
 
 
 

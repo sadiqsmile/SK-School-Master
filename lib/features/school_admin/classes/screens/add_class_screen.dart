@@ -2,28 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-const Map<String, List<String>> classGroups = {
-  "Primary Section": [
-    "Class 1",
-    "Class 2",
-    "Class 3",
-    "Class 4",
-    "Class 5",
-  ],
-  "Middle Section": [
-    "Class 6",
-    "Class 7",
-    "Class 8",
-  ],
-  "High School": [
-    "Class 9",
-    "Class 10",
-  ],
-  "PU College": [
-    "1st PUC",
-    "2nd PUC",
-  ],
-};
+
+
 
 class AddClassScreen extends StatefulWidget {
   const AddClassScreen({super.key});
@@ -33,8 +13,11 @@ class AddClassScreen extends StatefulWidget {
 }
 
 class _AddClassScreenState extends State<AddClassScreen> {
-  String? selectedClass;
-  String? selectedGroup;
+  String? selectedGroupId;
+String? selectedGroupName;
+
+final classController =
+    TextEditingController();
   List<String> sections = [];
   final sectionController = TextEditingController();
   bool isSaving = false;
@@ -86,7 +69,9 @@ class _AddClassScreenState extends State<AddClassScreen> {
     }
   }
   Future<void> _saveClass() async {
-    if (selectedClass == null || selectedGroup == null || sections.isEmpty) {
+    if (classController.text.trim().isEmpty ||
+    selectedGroupId == null ||
+    sections.isEmpty) {
       return;
     }
 
@@ -101,7 +86,17 @@ class _AddClassScreenState extends State<AddClassScreen> {
           .collection('classes');
 
       final existingClass = await classRef
-          .where('name', isEqualTo: selectedClass)
+         
+         .where(
+  'searchName',
+  isEqualTo:
+      classController.text
+          .trim()
+          .toLowerCase(),
+)
+
+
+
           .limit(1)
           .get();
 
@@ -115,18 +110,86 @@ class _AddClassScreenState extends State<AddClassScreen> {
           ...sections,
         ].toSet().toList();
 
-        await doc.reference.update({
-          "sections": mergedSections,
-          "group": selectedGroup,
-        });
+  await doc.reference.update({
+
+  "name":
+      classController.text.trim(),
+
+  "searchName":
+      classController.text
+          .trim()
+          .toLowerCase(),
+
+  "groupId":
+      selectedGroupId,
+
+  "groupName":
+      selectedGroupName,
+
+  "sections":
+      mergedSections,
+});
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
       } else {
         // ✅ CREATE NEW
-        await classRef.add({
-          "name": selectedClass,
-          "group": selectedGroup,
-          "sections": sections,
-          "createdAt": FieldValue.serverTimestamp(),
-        });
+    await classRef.add({
+
+  "name":
+      classController.text.trim(),
+
+  "searchName":
+      classController.text
+          .trim()
+          .toLowerCase(),
+
+  "groupId":
+      selectedGroupId,
+
+  "groupName":
+      selectedGroupName,
+
+  "sections":
+      sections,
+
+  "studentCount": 0,
+
+  "isActive": true,
+
+  "order": 999,
+
+  "createdAt":
+      FieldValue.serverTimestamp(),
+});
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
       }
 
       if (!mounted) return;
@@ -160,37 +223,105 @@ class _AddClassScreenState extends State<AddClassScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+           
+           
+
             // ── Group dropdown ──────────────────────────────
-            DropdownButtonFormField<String>(
-              value: selectedGroup,
-              decoration: _inputDecoration("Group"),
-              items: classGroups.keys.map((group) {
-                return DropdownMenuItem(value: group, child: Text(group));
-              }).toList(),
-              onChanged: (v) {
-                setState(() {
-                  selectedGroup = v;
-                  selectedClass = null;
-                });
-              },
-            ),
+FutureBuilder<String>(
+  future: getSchoolId(),
+
+  builder: (context, schoolSnapshot) {
+
+    if (!schoolSnapshot.hasData) {
+      return const CircularProgressIndicator();
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+
+      stream: FirebaseFirestore.instance
+          .collection('schools')
+          .doc(schoolSnapshot.data!)
+          .collection('groups')
+          .orderBy('order')
+          .snapshots(),
+
+      builder: (context, snapshot) {
+
+        if (!snapshot.hasData) {
+          return const SizedBox();
+        }
+
+        final docs = snapshot.data!.docs;
+
+        return DropdownButtonFormField<String>(
+
+          value: selectedGroupId,
+
+          decoration:
+              _inputDecoration(
+            'Group',
+          ),
+
+          items: docs.map((doc) {
+
+            final data =
+                doc.data()
+                    as Map<String, dynamic>;
+
+            return DropdownMenuItem<String>(
+
+              value: doc.id,
+
+              child: Text(
+                data['name'] ?? '',
+              ),
+            );
+          }).toList(),
+
+          onChanged: (value) {
+
+            final selected =
+                docs.firstWhere(
+              (e) => e.id == value,
+            );
+
+            final data =
+                selected.data()
+                    as Map<String, dynamic>;
+
+            setState(() {
+
+              selectedGroupId =
+                  value;
+
+              selectedGroupName =
+                  data['name'];
+            });
+          },
+        );
+      },
+    );
+  },
+),
+
+
+
 
             const SizedBox(height: 18),
 
             // ── Class dropdown (depends on group) ───────────
-            if (selectedGroup != null)
-              DropdownButtonFormField<String>(
-                value: selectedClass,
-                decoration: _inputDecoration("Class"),
-                items: classGroups[selectedGroup]!.map((cls) {
-                  return DropdownMenuItem(value: cls, child: Text(cls));
-                }).toList(),
-                onChanged: (v) {
-                  setState(() {
-                    selectedClass = v;
-                  });
-                },
-              ),
+           
+           TextField(
+  controller: classController,
+  decoration:
+      _inputDecoration(
+    'Class Name',
+  ),
+),
+
+
+
+
 
             const SizedBox(height: 18),
 
@@ -254,7 +385,22 @@ class _AddClassScreenState extends State<AddClassScreen> {
                   onTap: () {
                     if (sectionController.text.trim().isEmpty) return;
                     setState(() {
-                      sections.add(sectionController.text.trim());
+                     
+                    final section =
+    sectionController.text
+        .trim()
+        .toUpperCase();
+
+if (sections.contains(section)) {
+  return;
+}
+
+sections.add(section);
+
+
+
+
+
                       sectionController.clear();
                     });
                   },

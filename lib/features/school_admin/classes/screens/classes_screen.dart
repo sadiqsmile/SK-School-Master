@@ -14,15 +14,818 @@ class ClassesScreen extends ConsumerStatefulWidget {
 }
 
 class _ClassesScreenState extends ConsumerState<ClassesScreen> {
-  Future<void> _deleteClass(String classId) async {
-    final schoolId = ref.read(currentSchoolProvider).value!.id;
-    await FirebaseFirestore.instance
-        .collection('schools')
-        .doc(schoolId)
-        .collection('classes')
-        .doc(classId)
-        .delete();
+ 
+Future<void> _deleteClass(
+  String classId,
+) async {
+
+  final schoolId =
+      ref.read(
+        currentSchoolProvider,
+      ).value!.id;
+
+  final classDoc =
+      await FirebaseFirestore
+          .instance
+          .collection('schools')
+          .doc(schoolId)
+          .collection('classes')
+          .doc(classId)
+          .get();
+
+  final data =
+      classDoc.data() ?? {};
+
+  final studentCount =
+      data['studentCount'] ?? 0;
+
+  if (studentCount > 0) {
+
+    if (mounted) {
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+
+        const SnackBar(
+          content: Text(
+            'Cannot delete class with students',
+          ),
+        ),
+      );
+    }
+
+    return;
   }
+
+  await FirebaseFirestore.instance
+      .collection('schools')
+      .doc(schoolId)
+      .collection('classes')
+      .doc(classId)
+      .delete();
+}
+
+
+
+
+Future<void> _showEditClassDialog(
+  String classId,
+  Map<String, dynamic> data,
+) async {
+
+  final nameController =
+      TextEditingController(
+    text: data['name'] ?? '',
+  );
+
+  List<String> sections =
+      List<String>.from(
+    data['sections'] ?? [],
+  );
+
+  final sectionController =
+      TextEditingController();
+
+  String selectedGroupId =
+      data['groupId'] ?? '';
+
+  String selectedGroupName =
+      data['groupName'] ?? '';
+
+  final schoolId =
+      ref.read(
+        currentSchoolProvider,
+      ).value!.id;
+
+  await showDialog(
+
+    context: context,
+
+    builder: (dialogContext) {
+
+      return StatefulBuilder(
+
+        builder: (
+          context,
+          setDialogState,
+        ) {
+
+          return AlertDialog(
+
+            title: const Text(
+              'Edit Class',
+            ),
+
+            content:
+                SingleChildScrollView(
+
+              child: SizedBox(
+
+                width: 450,
+
+                child: Column(
+
+                  mainAxisSize:
+                      MainAxisSize.min,
+
+                  children: [
+
+                    StreamBuilder<
+                        QuerySnapshot>(
+
+                      stream:
+                          FirebaseFirestore
+                              .instance
+                              .collection(
+                                'schools',
+                              )
+                              .doc(
+                                schoolId,
+                              )
+                              .collection(
+                                'groups',
+                              )
+                              .orderBy(
+                                'order',
+                              )
+                              .snapshots(),
+
+                      builder: (
+                        context,
+                        snapshot,
+                      ) {
+
+                        if (!snapshot
+                            .hasData) {
+
+                          return const SizedBox();
+                        }
+
+                        final groups =
+                            snapshot
+                                .data!
+                                .docs;
+
+                        return DropdownButtonFormField<
+                            String>(
+
+                          value:
+                              selectedGroupId,
+
+                          decoration:
+                              const InputDecoration(
+                            labelText:
+                                'Group',
+                          ),
+
+                          items:
+                              groups.map(
+                            (doc) {
+
+                              final g =
+                                  doc.data()
+                                      as Map<String, dynamic>;
+
+                              return DropdownMenuItem<
+                                  String>(
+
+                                value:
+                                    doc.id,
+
+                                child:
+                                    Text(
+                                  g['name'] ??
+                                      '',
+                                ),
+                              );
+                            },
+                          ).toList(),
+
+                          onChanged:
+                              (value) {
+
+                            final group =
+                                groups.firstWhere(
+                              (
+                                e,
+                              ) =>
+                                  e.id ==
+                                  value,
+                            );
+
+                            final g =
+                                group.data()
+                                    as Map<String, dynamic>;
+
+                            setDialogState(
+                              () {
+
+                                selectedGroupId =
+                                    value!;
+
+                                selectedGroupName =
+                                    g['name'];
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+
+                    const SizedBox(
+                      height: 16,
+                    ),
+
+                    TextField(
+
+                      controller:
+                          nameController,
+
+                      decoration:
+                          const InputDecoration(
+                        labelText:
+                            'Class Name',
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: 16,
+                    ),
+
+                    Wrap(
+
+                      spacing: 8,
+
+                      runSpacing: 8,
+
+                      children:
+                          sections.map(
+                        (
+                          section,
+                        ) {
+
+                          return Chip(
+
+                            label:
+                                Text(
+                              section,
+                            ),
+
+                            onDeleted:
+                                () {
+
+                              setDialogState(
+                                () {
+
+                                  sections.remove(
+                                    section,
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ).toList(),
+                    ),
+
+                    const SizedBox(
+                      height: 16,
+                    ),
+
+                    Row(
+
+                      children: [
+
+                        Expanded(
+
+                          child:
+                              TextField(
+
+                            controller:
+                                sectionController,
+
+                            decoration:
+                                const InputDecoration(
+                              labelText:
+                                  'Section',
+                            ),
+                          ),
+                        ),
+
+                        IconButton(
+
+                          onPressed:
+                              () {
+
+                            final section =
+                                sectionController
+                                    .text
+                                    .trim()
+                                    .toUpperCase();
+
+                            if (section
+                                .isEmpty) {
+                              return;
+                            }
+
+                            if (sections
+                                .contains(
+                              section,
+                            )) {
+                              return;
+                            }
+
+                            setDialogState(
+                              () {
+
+                                sections.add(
+                                  section,
+                                );
+
+                                sectionController
+                                    .clear();
+                              },
+                            );
+                          },
+
+                          icon:
+                              const Icon(
+                            Icons.add,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            actions: [
+
+              TextButton(
+
+                onPressed: () {
+
+                  Navigator.pop(
+                    dialogContext,
+                  );
+                },
+
+                child: const Text(
+                  'Cancel',
+                ),
+              ),
+
+              ElevatedButton(
+
+                onPressed: () async {
+
+                  await FirebaseFirestore
+                      .instance
+                      .collection(
+                        'schools',
+                      )
+                      .doc(
+                        schoolId,
+                      )
+                      .collection(
+                        'classes',
+                      )
+                      .doc(
+                        classId,
+                      )
+                      .update({
+
+                    'name':
+                        nameController
+                            .text
+                            .trim(),
+
+                    'searchName':
+                        nameController
+                            .text
+                            .trim()
+                            .toLowerCase(),
+
+                    'groupId':
+                        selectedGroupId,
+
+                    'groupName':
+                        selectedGroupName,
+
+                    'sections':
+                        sections,
+                  });
+
+                  if (mounted) {
+
+                    Navigator.pop(
+                      dialogContext,
+                    );
+                  }
+                },
+
+                child: const Text(
+                  'Save',
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+
+
+
+Future<void> _showManageGroupsDialog() async {
+
+  final schoolId =
+      ref.read(
+        currentSchoolProvider,
+      ).value!.id;
+
+  await showDialog(
+
+    context: context,
+
+    builder: (_) {
+
+      return AlertDialog(
+
+        title: const Text(
+          'Manage Groups',
+        ),
+
+        content: SizedBox(
+
+          width: 500,
+
+          child: StreamBuilder<
+              QuerySnapshot>(
+
+            stream:
+                FirebaseFirestore
+                    .instance
+                    .collection(
+                      'schools',
+                    )
+                    .doc(
+                      schoolId,
+                    )
+                    .collection(
+                      'groups',
+                    )
+                    .orderBy(
+                      'order',
+                    )
+                    .snapshots(),
+
+            builder: (
+              context,
+              snapshot,
+            ) {
+
+              if (!snapshot
+                  .hasData) {
+
+                return const Center(
+                  child:
+                      CircularProgressIndicator(),
+                );
+              }
+
+              final docs =
+                  snapshot
+                      .data!
+                      .docs;
+
+              return ListView.builder(
+
+                shrinkWrap: true,
+
+                itemCount:
+                    docs.length,
+
+                itemBuilder:
+                    (
+                  context,
+                  index,
+                ) {
+
+                  final data =
+                      docs[index]
+                          .data()
+                          as Map<String,
+                              dynamic>;
+
+                  return ListTile(
+
+                    title: Text(
+                      data['name'] ??
+                          '',
+                    ),
+
+                    trailing:
+                        PopupMenuButton<
+                            String>(
+
+                      onSelected:
+                          (
+                        value,
+                      ) async {
+
+                        final docId =
+                            docs[index]
+                                .id;
+
+                        if (value ==
+                            'delete') {
+
+                          await FirebaseFirestore
+                              .instance
+                              .collection(
+                                'schools',
+                              )
+                              .doc(
+                                schoolId,
+                              )
+                              .collection(
+                                'groups',
+                              )
+                              .doc(
+                                docId,
+                              )
+                              .delete();
+                        }
+
+                        if (value ==
+                            'edit') {
+
+                          final controller =
+                              TextEditingController(
+                            text:
+                                data['name'],
+                          );
+
+                          final result =
+                              await showDialog<
+                                  String>(
+
+                            context:
+                                context,
+
+                            builder:
+                                (_) {
+
+                              return AlertDialog(
+
+                                title:
+                                    const Text(
+                                  'Edit Group',
+                                ),
+
+                                content:
+                                    TextField(
+                                  controller:
+                                      controller,
+                                ),
+
+                                actions: [
+
+                                  TextButton(
+
+                                    onPressed:
+                                        () {
+
+                                      Navigator.pop(
+                                        context,
+                                      );
+                                    },
+
+                                    child:
+                                        const Text(
+                                      'Cancel',
+                                    ),
+                                  ),
+
+                                  ElevatedButton(
+
+                                    onPressed:
+                                        () {
+
+                                      Navigator.pop(
+                                        context,
+                                        controller
+                                            .text
+                                            .trim(),
+                                      );
+                                    },
+
+                                    child:
+                                        const Text(
+                                      'Save',
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+
+                          if (result !=
+                                  null &&
+                              result
+                                  .isNotEmpty) {
+
+                            await FirebaseFirestore
+                                .instance
+                                .collection(
+                                  'schools',
+                                )
+                                .doc(
+                                  schoolId,
+                                )
+                                .collection(
+                                  'groups',
+                                )
+                                .doc(
+                                  docId,
+                                )
+                                .update({
+
+                              'name':
+                                  result,
+
+                              'searchName':
+                                  result
+                                      .toLowerCase(),
+                            });
+                          }
+                        }
+                      },
+
+                      itemBuilder:
+                          (_) => [
+
+                        const PopupMenuItem(
+                          value:
+                              'edit',
+                          child:
+                              Text(
+                            'Edit',
+                          ),
+                        ),
+
+                        const PopupMenuItem(
+                          value:
+                              'delete',
+                          child:
+                              Text(
+                            'Delete',
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+
+        actions: [
+
+          ElevatedButton.icon(
+
+            onPressed: () async {
+
+              final controller =
+                  TextEditingController();
+
+              final result =
+                  await showDialog<
+                      String>(
+
+                context: context,
+
+                builder: (_) {
+
+                  return AlertDialog(
+
+                    title:
+                        const Text(
+                      'Add Group',
+                    ),
+
+                    content:
+                        TextField(
+                      controller:
+                          controller,
+                    ),
+
+                    actions: [
+
+                      TextButton(
+
+                        onPressed:
+                            () {
+
+                          Navigator.pop(
+                            context,
+                          );
+                        },
+
+                        child:
+                            const Text(
+                          'Cancel',
+                        ),
+                      ),
+
+                      ElevatedButton(
+
+                        onPressed:
+                            () {
+
+                          Navigator.pop(
+                            context,
+                            controller
+                                .text
+                                .trim(),
+                          );
+                        },
+
+                        child:
+                            const Text(
+                          'Save',
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+
+              if (result != null &&
+                  result.isNotEmpty) {
+
+                await FirebaseFirestore
+                    .instance
+                    .collection(
+                      'schools',
+                    )
+                    .doc(
+                      schoolId,
+                    )
+                    .collection(
+                      'groups',
+                    )
+                    .add({
+
+                  'name': result,
+
+                  'searchName':
+                      result
+                          .toLowerCase(),
+
+                  'order':
+                      DateTime.now()
+                          .millisecondsSinceEpoch,
+
+                  'isActive':
+                      true,
+                });
+              }
+            },
+
+            icon: const Icon(
+              Icons.add,
+            ),
+
+            label: const Text(
+              'Add Group',
+            ),
+          ),
+
+          TextButton(
+
+            onPressed: () {
+
+              Navigator.pop(
+                context,
+              );
+            },
+
+            child: const Text(
+              'Close',
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   Future<void> _showDeleteDialog(String classId) async {
     showDialog(
@@ -49,9 +852,15 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
               const Text("Delete Class"),
             ],
           ),
-          content: const Text(
-            "This action cannot be undone.\n\nDeleting this class may affect:\n\u2022 Students\n\u2022 Attendance\n\u2022 Timetables\n\u2022 Homework",
-          ),
+
+
+       content: const Text(
+  "Delete this class?\n\n"
+  "Classes containing students "
+  "cannot be deleted.",
+),
+
+
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -85,7 +894,11 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
     final schoolAsync = ref.watch(currentSchoolProvider);
 
     return AdminLayout(
-      title: 'Classes',
+  title: 'Classes',
+
+
+
+ 
 
       body: schoolAsync.when(
         data: (school) {
@@ -94,8 +907,10 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                 .collection('schools')
                 .doc(school.id)
                 .collection('classes')
-                .orderBy('name')
+                .orderBy('order')
                 .snapshots(),
+            
+            
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
@@ -103,19 +918,134 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
 
               final docs = snapshot.data!.docs;
 
-              if (docs.isEmpty) {
-                return const Center(child: Text("No classes added"));
-              }
 
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
+
+           if (docs.isEmpty) {
+
+  return Center(
+    child: Column(
+
+      mainAxisAlignment:
+          MainAxisAlignment.center,
+
+      children: [
+
+        ElevatedButton.icon(
+
+          onPressed: () {
+            _showManageGroupsDialog();
+          },
+
+          icon: const Icon(
+            Icons.settings,
+          ),
+
+          label: const Text(
+            'Manage Groups',
+          ),
+        ),
+
+        const SizedBox(
+          height: 20,
+        ),
+
+        ElevatedButton.icon(
+
+          onPressed: () {
+            context.push(
+              '/add-class',
+            );
+          },
+
+          icon: const Icon(
+            Icons.add,
+          ),
+
+          label: const Text(
+            'Add Class',
+          ),
+        ),
+
+        const SizedBox(
+          height: 20,
+        ),
+
+        const Text(
+          "No classes added",
+        ),
+      ],
+    ),
+  );
+}
+
+
+
+
+
+
+
+             return Column(
+  children: [
+
+    Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+
+        mainAxisAlignment:
+            MainAxisAlignment.end,
+
+        children: [
+
+          ElevatedButton.icon(
+
+            onPressed: () {
+              _showManageGroupsDialog();
+            },
+
+            icon: const Icon(
+              Icons.settings,
+            ),
+
+            label: const Text(
+              'Manage Groups',
+            ),
+          ),
+
+          const SizedBox(
+            width: 12,
+          ),
+
+          ElevatedButton.icon(
+
+            onPressed: () {
+              context.push(
+                '/add-class',
+              );
+            },
+
+            icon: const Icon(
+              Icons.add,
+            ),
+
+            label: const Text(
+              'Add Class',
+            ),
+          ),
+        ],
+      ),
+    ),
+
+    Expanded(
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: docs.length,
+        itemBuilder: (context, index) {
                   final doc = docs[index];
                   final data = doc.data() as Map<String, dynamic>;
 
                   final name = data['name'] ?? '';
-                  final group = data['group'] ?? '';
+                  final group =
+    data['groupName'] ?? '';
                   final sections =
                       List<String>.from(data['sections'] ?? []);
 
@@ -207,44 +1137,78 @@ class _ClassesScreenState extends ConsumerState<ClassesScreen> {
                           const SizedBox(width: 12),
 
                           // Delete button
-                          GestureDetector(
-                            onTap: () => _showDeleteDialog(doc.id),
-                            child: Tooltip(
-                              message: "Delete Class",
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xffFEF2F2),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: const Icon(
-                                  Icons.delete_outline,
-                                  color: Color(0xffDC2626),
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
+                          
+                    PopupMenuButton<String>(
+
+  onSelected: (value) {
+
+    if (value == 'delete') {
+
+      _showDeleteDialog(doc.id);
+    }
+
+    if (value == 'edit') {
+
+      _showEditClassDialog(
+        doc.id,
+        data,
+      );
+    }
+  },
+
+  itemBuilder: (_) => [
+
+    const PopupMenuItem(
+      value: 'edit',
+      child: Text(
+        'Edit',
+      ),
+    ),
+
+    const PopupMenuItem(
+      value: 'delete',
+      child: Text(
+        'Delete',
+      ),
+    ),
+  ],
+),
                         ],
                       ),
                     ),
                   );
                 },
-              );
-            },
+              ),
+            ),
+          ],
+        );
+      },
+
+                      
+
           );
         },
+
         loading: () =>
-            const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text("Error: $e")),
+            const Center(
+              child: CircularProgressIndicator(),
+            ),
+
+        error: (e, _) =>
+            Center(
+              child: Text(
+                "Error: $e",
+              ),
+            ),
       ),
 
+
       /// ➕ ADD BUTTON
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/add-class'),
-        icon: const Icon(Icons.add),
-        label: const Text("Add Class"),
-      ),
+   floatingActionButton: FloatingActionButton.extended(
+  onPressed: () => context.push('/add-class'),
+  icon: const Icon(Icons.add),
+  label: const Text("Add Class"),
+),
     );
   }
 }
