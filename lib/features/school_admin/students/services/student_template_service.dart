@@ -25,7 +25,9 @@ class StudentTemplateService {
     final sheet = workbook.worksheets[0];
 
     final headers = [
-       'ADMISSION_NO',
+  'SL_NO',
+   'ROLL_NO',
+  'ADMISSION_NO',
   'STUDENT_NAME',
   'CLASS',
   'SECTION',
@@ -42,8 +44,8 @@ class StudentTemplateService {
   'PARENT_PHONE',
   'ADDRESS',
   'ACADEMIC_YEAR',
-      ...customFields,
-    ];
+  ...customFields,
+];
 
     for (int i = 0; i < headers.length; i++) {
       sheet.getRangeByIndex(1, i + 1).setText(headers[i]);
@@ -52,6 +54,88 @@ class StudentTemplateService {
     sheet.getRangeByIndex(1, 1, 1, headers.length)
         .cellStyle
         .bold = true;
+
+sheet.getRangeByName('A2').setText('1');
+sheet.getRangeByName('B2').setText('701');
+sheet.getRangeByName('C2').setText('ADM001');
+sheet.getRangeByName('D2').setText('RAHUL KUMAR');
+sheet.getRangeByName('E2').setText('Class 7');
+sheet.getRangeByName('F2').setText('A');
+sheet.getRangeByName('G2').setText('DAY');
+sheet.getRangeByName('H2').setText('15-06-2013');
+sheet.getRangeByName('I2').setText('MALE');
+sheet.getRangeByName('J2').setText('O+');
+sheet.getRangeByName('K2').setText('NO');
+sheet.getRangeByName('L2').setText('YES');
+
+sheet.getRangeByName('M2').setText('ROUTE 1');
+sheet.getRangeByName('N2').setText('STOP 1');
+sheet.getRangeByName('O2').setText('KA01AB1234');
+
+sheet.getRangeByName('P2').setText('RAMESH KUMAR');
+sheet.getRangeByName('Q2').setText('9876543210');
+sheet.getRangeByName('R2').setText('SAGAR');
+sheet.getRangeByName('S2').setText('2026-27');
+
+sheet.getRangeByName('A3').setText('2');
+sheet.getRangeByName('B3').setText('702');
+sheet.getRangeByName('C3').setText('ADM002');
+sheet.getRangeByName('D3').setText('PRIYA SHARMA');
+sheet.getRangeByName('E3').setText('Class 7');
+sheet.getRangeByName('F3').setText('A');
+sheet.getRangeByName('G3').setText('HOSTEL');
+sheet.getRangeByName('H3').setText('20-08-2013');
+sheet.getRangeByName('I3').setText('F');
+sheet.getRangeByName('J3').setText('B+');
+sheet.getRangeByName('K3').setText('NO');
+sheet.getRangeByName('L3').setText('NO');
+
+sheet.getRangeByName('P3').setText('SURESH SHARMA');
+sheet.getRangeByName('Q3').setText('9876543211');
+sheet.getRangeByName('R3').setText('SAGAR');
+sheet.getRangeByName('S3').setText('2026-27');
+
+
+
+final instructionSheet =
+    workbook.worksheets.addWithName(
+  'Instructions',
+);
+
+instructionSheet.getRangeByName('A1').setText(
+  'CLASS: Use exact class names created in the app',
+);
+
+instructionSheet.getRangeByName('A2').setText(
+  'Examples: Class 1, Class 7, LKG, UKG',
+);
+
+instructionSheet.getRangeByName('A3').setText(
+  'SECTION: A, B, C',
+);
+
+instructionSheet.getRangeByName('A4').setText(
+  'DAY/HOSTEL: DAY or HOSTEL',
+);
+
+instructionSheet.getRangeByName('A5').setText(
+  'GENDER: MALE or FEMALE',
+);
+
+instructionSheet.getRangeByName('A6').setText(
+  'MESS: YES or NO',
+);
+
+instructionSheet.getRangeByName('A7').setText(
+  'TRANSPORT: YES or NO',
+);
+
+instructionSheet.getRangeByName('A8').setText(
+  'Do not modify column headers',
+);
+
+
+
 
     final bytes = workbook.saveAsStream();
     workbook.dispose();

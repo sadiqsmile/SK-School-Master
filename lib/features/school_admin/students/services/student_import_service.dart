@@ -43,26 +43,33 @@ class StudentImportService {
 
       if (row.isEmpty) continue;
 
-      rows.add({
-        "admissionNo": row[0]?.value?.toString() ?? "",
-  "name": row[1]?.value?.toString() ?? "",
-  "className": row[2]?.value?.toString() ?? "",
-  "section": row[3]?.value?.toString() ?? "",
-  
- "type": row[4]?.value?.toString().trim() ?? "",
-"dob": _formatExcelDate(row[5]?.value),
 
-  "gender": row[6]?.value?.toString() ?? "",
-  "bloodGroup": row[7]?.value?.toString() ?? "",
-  "mess": row[8]?.value?.toString() ?? "",
-  "transport": row[9]?.value?.toString() ?? "",
-  "route": row[10]?.value?.toString() ?? "",
-  "stop": row[11]?.value?.toString() ?? "",
-  "vehicleNo": row[12]?.value?.toString() ?? "",
-  "parentName": row[13]?.value?.toString() ?? "",
-  "parentPhone": row[14]?.value?.toString() ?? "",
-  "address": row[15]?.value?.toString() ?? "",
-  "academicYear": row[16]?.value?.toString() ?? "",
+
+
+
+  rows.add({
+  "rollNo": row[1]?.value?.toString() ?? "",
+  "admissionNo": row[2]?.value?.toString() ?? "",
+  "name": row[3]?.value?.toString() ?? "",
+  "className":
+    ((row[4]?.value?.toString().trim() ?? '')
+            .startsWith('Class'))
+        ? (row[4]?.value?.toString().trim() ?? '')
+        : 'Class ${row[4]?.value?.toString().trim() ?? ''}',
+  "section": row[5]?.value?.toString() ?? "",
+  "type": row[6]?.value?.toString().trim() ?? "",
+  "dob": _formatExcelDate(row[7]?.value),
+  "gender": row[8]?.value?.toString() ?? "",
+  "bloodGroup": row[9]?.value?.toString() ?? "",
+  "mess": row[10]?.value?.toString() ?? "",
+  "transport": row[11]?.value?.toString() ?? "",
+  "route": row[12]?.value?.toString() ?? "",
+  "stop": row[13]?.value?.toString() ?? "",
+  "vehicleNo": row[14]?.value?.toString() ?? "",
+  "parentName": row[15]?.value?.toString() ?? "",
+  "parentPhone": row[16]?.value?.toString() ?? "",
+  "address": row[17]?.value?.toString() ?? "",
+  "academicYear": row[18]?.value?.toString() ?? "",
       });
     }
 

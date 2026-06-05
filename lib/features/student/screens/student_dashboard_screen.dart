@@ -5,7 +5,7 @@ import '../../parent/screens/parent_attendance_screen.dart';
 import '../../parent/screens/parent_homework_screen.dart';
 import '../../parent/screens/parent_marks_analytics_screen.dart';
 import '../../student/screens/report_card_screen.dart';
-import 'student_timetable_screen.dart';
+// import 'student_timetable_screen.dart';
 
 class StudentDashboardScreen extends StatelessWidget {
   final String schoolId;

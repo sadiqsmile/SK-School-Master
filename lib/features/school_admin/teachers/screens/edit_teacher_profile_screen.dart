@@ -40,13 +40,11 @@ class _EditTeacherProfileScreenState
 
   List<String> assignedClasses = [];
 
+  List<QueryDocumentSnapshot> classDocs = [];
+
   bool isSaving = false;
 
-  final List<String> allClasses = [
-    for (int i = 1; i <= 12; i++)
-      for (String s in ["A", "B", "C", "D"])
-        "${i}_$s",
-  ];
+List<String> allClasses = [];
 
   @override
   void initState() {
@@ -99,6 +97,10 @@ class _EditTeacherProfileScreenState
     assignedClasses = List<String>.from(
       d['assignmentKeys'] ?? [],
     );
+
+_loadClasses();
+
+
   }
 
   @override
@@ -114,6 +116,46 @@ class _EditTeacherProfileScreenState
     emergencyController.dispose();
     super.dispose();
   }
+
+
+Future<void> _loadClasses() async {
+
+  final snap = await FirebaseFirestore.instance
+      .collection('schools')
+      .doc(widget.schoolId)
+      .collection('classes')
+      .get();
+
+  final temp = <String>[];
+
+  for (final doc in snap.docs) {
+
+    final data = doc.data();
+
+    final className =
+        (data['name'] ?? '').toString();
+
+    final sections =
+        List<String>.from(
+      data['sections'] ?? [],
+    );
+
+    for (final section in sections) {
+      temp.add('$className $section');
+    }
+  }
+
+if (mounted) {
+  setState(() {
+
+    classDocs = snap.docs;
+
+    allClasses = temp;
+
+  });
+}
+
+}
 
   Future<void> _save() async {
 
@@ -453,22 +495,40 @@ if (userSnap.exists) {
                         value: classTeacherClass,
                         decoration: _dropDecor("Class"),
 
-                        items: List.generate(12, (i) {
 
-                          final c = (i + 1).toString();
 
-                          return DropdownMenuItem(
-                            value: c,
-                            child: Text("Class $c"),
-                          );
 
-                        }),
+                     items: classDocs.map((doc) {
 
-                        onChanged: (v) {
-                          setState(
-                            () => classTeacherClass = v,
-                          );
-                        },
+  final data =
+      doc.data() as Map<String, dynamic>;
+
+  final className =
+      (data['name'] ?? '').toString();
+
+  return DropdownMenuItem(
+    value: className,
+    child: Text(className),
+  );
+
+}).toList(),
+
+
+
+
+
+                     onChanged: (v) {
+
+  setState(() {
+
+    classTeacherClass = v;
+    classTeacherSection = null;
+
+  });
+},
+
+
+
                       ),
                     ),
 
@@ -481,22 +541,65 @@ if (userSnap.exists) {
                         decoration:
                             _dropDecor("Section"),
 
-                        items: ["A", "B", "C", "D"]
-                            .map((e) {
+                       items: (() {
 
-                          return DropdownMenuItem(
-                            value: e,
-                            child: Text(e),
-                          );
+if (classDocs.isEmpty) {
+  return <DropdownMenuItem<String>>[];
+}
 
-                        }).toList(),
+final match = classDocs.where((d) {
 
-                        onChanged: (v) {
-                          setState(
-                            () =>
-                                classTeacherSection = v,
-                          );
-                        },
+  final data =
+      d.data() as Map<String, dynamic>;
+
+  return data['name'] ==
+      classTeacherClass;
+
+}).toList();
+
+if (match.isEmpty) {
+  return <DropdownMenuItem<String>>[];
+}
+
+final selectedClass = match.first;
+
+
+
+
+  final data =
+      selectedClass.data()
+          as Map<String, dynamic>;
+
+  final sections =
+      List<String>.from(
+    data['sections'] ?? [],
+  );
+
+  return sections.map((e) {
+
+    return DropdownMenuItem(
+      value: e,
+      child: Text(e),
+    );
+
+  }).toList();
+
+})(),
+
+                          
+
+onChanged: (v) {
+
+  setState(() {
+
+    classTeacherSection = v;
+
+  });
+},
+
+
+
+
                       ),
                     ),
                   ],
@@ -512,64 +615,68 @@ if (userSnap.exists) {
 
                 const SizedBox(height: 20),
 
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
 
-                  children: allClasses.map((cls) {
 
-                    final selected =
-                        assignedClasses.contains(cls);
 
-                    return GestureDetector(
-                      onTap: () {
+     Wrap(
+  spacing: 10,
+  runSpacing: 10,
 
-                        setState(() {
-                          if (selected) {
-                            assignedClasses.remove(cls);
-                          } else {
-                            assignedClasses.add(cls);
-                          }
-                        });
-                      },
+  children: allClasses.map((cls) {
 
-                      child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
+    final selected =
+        assignedClasses.contains(cls);
 
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? const Color(0xff5B5FEF)
-                              : Colors.white,
+    return GestureDetector(
+      onTap: () {
 
-                          borderRadius:
-                              BorderRadius.circular(14),
+        setState(() {
+          if (selected) {
+            assignedClasses.remove(cls);
+          } else {
+            assignedClasses.add(cls);
+          }
+        });
+      },
 
-                          border: Border.all(
-                            color: selected
-                                ? const Color(0xff5B5FEF)
-                                : Colors.grey.shade300,
-                          ),
-                        ),
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 10,
+        ),
 
-                        child: Text(
-                          cls.replaceAll("_", " "),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xff5B5FEF)
+              : Colors.white,
 
-                          style: TextStyle(
-                            color: selected
-                                ? Colors.white
-                                : Colors.black87,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    );
+          borderRadius:
+              BorderRadius.circular(14),
 
-                  }).toList(),
-                ),
+          border: Border.all(
+            color: selected
+                ? const Color(0xff5B5FEF)
+                : Colors.grey.shade300,
+          ),
+        ),
+
+        child: Text(
+          cls.replaceAll("_", " "),
+
+          style: TextStyle(
+            color: selected
+                ? Colors.white
+                : Colors.black87,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+
+  }).toList(),
+),
+
 
                 // ── SAVE BUTTON ───────────────────
                 const SizedBox(height: 40),

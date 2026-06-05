@@ -1,4 +1,5 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+﻿// features/teacher/screens/attendance_screen.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:school_app/core/widgets/profile_avatar.dart';
 
@@ -17,108 +18,66 @@ class AttendanceScreen extends StatefulWidget {
   });
 
   @override
-  State<AttendanceScreen> createState() =>
-      _AttendanceScreenState();
+  State<AttendanceScreen> createState() => _AttendanceScreenState();
 }
 
-class _AttendanceScreenState
-    extends State<AttendanceScreen> {
-
-  final AttendanceService _service =
-      AttendanceService();
+class _AttendanceScreenState extends State<AttendanceScreen> {
+  final AttendanceService _service = AttendanceService();
 
   String? selectedClassId;
   String? selectedSection;
 
-  final Map<String, String>
-      attendanceMap = {};
+  final Map<String, String> attendanceMap = {};
 
-  List<Map<String, dynamic>>
-      get assignedClasses {
-
+  List<Map<String, dynamic>> get assignedClasses {
     return List<Map<String, dynamic>>.from(
-      widget.teacherData[
-              'assignedClasses'] ??
-          [],
+      widget.teacherData['assignedClasses'] ?? [],
     );
   }
 
- @override
-void initState() {
+  @override
+  void initState() {
+    super.initState();
 
-  super.initState();
 
-  final classTeacherOf =
-      widget.teacherData[
-          'classTeacherOf'];
 
-  if (classTeacherOf != null) {
+    final classTeacherOf = widget.teacherData['classTeacherOf'];
 
-    selectedClassId =
-        classTeacherOf[
-            'classId'];
+    if (classTeacherOf != null) {
+      selectedClassId = classTeacherOf['classId'];
 
-    selectedSection =
-        classTeacherOf[
-            'sectionId'];
+      selectedSection = classTeacherOf['sectionId'];
+    }
   }
-}
-
-
-
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
-      backgroundColor:
-          const Color(0xffF8FAFC),
-
+      backgroundColor: const Color(0xffF8FAFC),
       appBar: AppBar(
-
-        title:
-            const Text("Attendance"),
-
-        backgroundColor:
-            Colors.white,
-
+        title: const Text("Attendance"),
+        backgroundColor: Colors.white,
         elevation: 0,
       ),
-
-      floatingActionButton:
-          selectedClassId != null &&
-                  selectedSection != null
-              ? FloatingActionButton
-                  .extended(
-
-                  backgroundColor:
-                      const Color(
-                    0xff5B5FEF,
-                  ),
-
-                  onPressed:
-                      _saveAttendance,
-
-                  icon: const Icon(
-                    Icons.save,
-                  ),
-
-                  label:
-                      const Text(
-                    "Save",
-                  ),
-                )
-              : null,
-
+      floatingActionButton: selectedClassId != null && selectedSection != null
+          ? FloatingActionButton.extended(
+              backgroundColor: const Color(
+                0xff5B5FEF,
+              ),
+              onPressed: _saveAttendance,
+              icon: const Icon(
+                Icons.save,
+              ),
+              label: const Text(
+                "Save",
+              ),
+            )
+          : null,
       body: Column(
         children: [
-
           _topSelectors(),
-
           Expanded(
-            child:
-                _studentsList(),
+            child: _studentsList(),
           ),
         ],
       ),
@@ -126,421 +85,244 @@ void initState() {
   }
 
   Widget _topSelectors() {
-
     return Container(
-
       color: Colors.white,
-
-      padding:
-          const EdgeInsets.all(
+      padding: const EdgeInsets.all(
         16,
       ),
-
       child: Column(
         children: [
-
-          DropdownButtonFormField<
-              String>(
-
+          DropdownButtonFormField<String>(
             value: selectedClassId,
-
-            decoration:
-                _inputDecoration(
+            decoration: _inputDecoration(
               "Select Class",
             ),
-
-            items:
-                assignedClasses.map(
+            items: assignedClasses.map(
               (assignment) {
-
-                return DropdownMenuItem<
-                    String>(
-
-                  value: assignment[
-                      'className'],
-
+                return DropdownMenuItem<String>(
+                  value: assignment['className'],
                   child: Text(
-                    assignment[
-                        'className'],
+                    assignment['className'],
                   ),
                 );
               },
             ).toList(),
-
             onChanged: (v) {
-
               setState(() {
+                selectedClassId = v;
 
-                selectedClassId =
-                    v;
-
-                selectedSection =
-                    null;
+                selectedSection = null;
               });
             },
           ),
-
           const SizedBox(
             height: 14,
           ),
+          if (selectedClassId != null)
+            Builder(
+              builder: (context) {
+                Map<String, dynamic>? classData;
 
+                try {
+                  classData = assignedClasses.firstWhere(
+                    (e) => e['className'] == selectedClassId,
+                  );
+                } catch (e) {
+                  classData = null;
+                }
 
+                final sections = classData != null
+                    ? List<String>.from(
+                        classData['sections'] ?? [],
+                      )
+                    : <String>[];
 
-
-if (selectedClassId != null)
-
-  Builder(
-    builder: (context) {
-
-      Map<String, dynamic>? classData;
-
-      try {
-
-        classData =
-            assignedClasses.firstWhere(
-          (e) =>
-              e['className'] ==
-              selectedClassId,
-        );
-
-      } catch (e) {
-
-        classData = null;
-      }
-
-      final sections =
-          classData != null
-              ? List<String>.from(
-                  classData['sections'] ??
-                      [],
-                )
-              : <String>[];
-
-      return DropdownButtonFormField<
-          String>(
-
-        value: selectedSection,
-
-        decoration:
-            _inputDecoration(
-          "Select Section",
-        ),
-
-        items: sections.map(
-          (section) {
-
-            return DropdownMenuItem<
-                String>(
-
-              value: section,
-
-              child:
-                  Text(section),
-            );
-          },
-        ).toList(),
-
-        onChanged: (v) {
-
-          setState(() {
-
-            selectedSection = v;
-          });
-        },
-      );
-    },
-  ),
+                return DropdownButtonFormField<String>(
+                  value: selectedSection,
+                  decoration: _inputDecoration(
+                    "Select Section",
+                  ),
+                  items: sections.map(
+                    (section) {
+                      return DropdownMenuItem<String>(
+                        value: section,
+                        child: Text(section),
+                      );
+                    },
+                  ).toList(),
+                  onChanged: (v) {
+                    setState(() {
+                      selectedSection = v;
+                    });
+                  },
+                );
+              },
+            ),
         ],
       ),
     );
   }
 
-
-
-
-
-
-
-
   Widget _studentsList() {
-
-    if (selectedClassId == null ||
-        selectedSection == null) {
-
+    if (selectedClassId == null || selectedSection == null) {
       return _emptyState();
     }
 
-    return StreamBuilder<
-        QuerySnapshot>(
+    print("Teacher School ID: ${widget.schoolId}");
 
-      stream: FirebaseFirestore
-          .instance
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
           .collection('schools')
           .doc(widget.schoolId)
           .collection('students')
-
-
-.where(
-  'classId',
-  isEqualTo: selectedClassId,
-)
-
-.where(
-  'section',
-  isEqualTo: selectedSection,
-)
-
           .snapshots(),
-
       builder: (
         context,
         snapshot,
       ) {
-
         if (!snapshot.hasData) {
-
           return const Center(
-            child:
-                CircularProgressIndicator(),
+            child: CircularProgressIndicator(),
           );
         }
 
-        final docs =
-            snapshot.data!.docs;
+        final docs = snapshot.data!.docs;
 
         if (docs.isEmpty) {
-
-          return const Center(
-            child: Text(
-              "No students found",
+          return Container(
+            color: Colors.red,
+            child: Center(
+              child: Text(
+                "ZERO DOCS\nSchool=${widget.schoolId}",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                ),
+              ),
             ),
           );
         }
 
         return ListView.builder(
-
-          padding:
-              const EdgeInsets.all(
+          padding: const EdgeInsets.all(
             16,
           ),
-
           itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final doc = docs[index];
 
-          itemBuilder:
-              (context, index) {
+            final data = doc.data() as Map<String, dynamic>;
 
-            final doc =
-                docs[index];
+            final studentId = doc.id;
 
-            final data =
-                doc.data()
-                    as Map<String,
-                        dynamic>;
-
-            final studentId =
-                doc.id;
-
-            attendanceMap
-                .putIfAbsent(
+            attendanceMap.putIfAbsent(
               studentId,
               () => "Present",
             );
 
-            final currentStatus =
-                attendanceMap[
-                    studentId];
+            final currentStatus = attendanceMap[studentId];
 
             return Container(
-
-              margin:
-                  const EdgeInsets.only(
+              margin: const EdgeInsets.only(
                 bottom: 14,
               ),
-
-              padding:
-                  const EdgeInsets.all(
+              padding: const EdgeInsets.all(
                 18,
               ),
-
-              decoration:
-                  BoxDecoration(
-
+              decoration: BoxDecoration(
                 color: Colors.white,
-
-                borderRadius:
-                    BorderRadius.circular(
+                borderRadius: BorderRadius.circular(
                   22,
                 ),
-
                 border: Border.all(
-                  color: Colors
-                      .grey
-                      .shade100,
+                  color: Colors.grey.shade100,
                 ),
               ),
-
               child: Row(
                 children: [
-
                   ProfileAvatar(
-
-                    name: (data[
-                                'name'] ??
-                            '')
-                        .toString(),
-
-                    imageUrl: data[
-                            'photoUrl']
-                        ?.toString(),
-
+                    name: (data['name'] ?? '').toString(),
+                    imageUrl: data['photoUrl']?.toString(),
                     radius: 24,
                   ),
-
                   const SizedBox(
                     width: 14,
                   ),
-
                   Expanded(
-
                     child: Column(
-
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
-
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
                         Text(
-
-                          data['name'] ??
-                              '',
-
-                          style:
-                              const TextStyle(
-
+                          data['name'] ?? '',
+                          style: const TextStyle(
                             fontSize: 15,
-
-                            fontWeight:
-                                FontWeight
-                                    .w600,
-
+                            fontWeight: FontWeight.w600,
                             color: Color(
                               0xff111827,
                             ),
                           ),
                         ),
-
                         const SizedBox(
                           height: 4,
                         ),
-
                         Text(
-
-                          data['admissionNo'] ??
-                              '',
-
-                          style:
-                              TextStyle(
-
+                          data['admissionNo'] ?? '',
+                          style: TextStyle(
                             fontSize: 12,
-
-                            color: Colors
-                                .grey
-                                .shade600,
+                            color: Colors.grey.shade600,
                           ),
                         ),
                       ],
                     ),
                   ),
-
                   _attendanceButton(
-
                     title: "P",
-
                     color: const Color(
                       0xffDCFCE7,
                     ),
-
-                    textColor:
-                        const Color(
+                    textColor: const Color(
                       0xff166534,
                     ),
-
-                    isSelected:
-                        currentStatus ==
-                            "Present",
-
+                    isSelected: currentStatus == "Present",
                     onTap: () {
-
                       setState(() {
-
-                        attendanceMap[
-                                studentId] =
-                            "Present";
+                        attendanceMap[studentId] = "Present";
                       });
                     },
                   ),
-
                   const SizedBox(
                     width: 8,
                   ),
-
                   _attendanceButton(
-
                     title: "A",
-
                     color: const Color(
                       0xffFEE2E2,
                     ),
-
-                    textColor:
-                        const Color(
+                    textColor: const Color(
                       0xff991B1B,
                     ),
-
-                    isSelected:
-                        currentStatus ==
-                            "Absent",
-
+                    isSelected: currentStatus == "Absent",
                     onTap: () {
-
                       setState(() {
-
-                        attendanceMap[
-                                studentId] =
-                            "Absent";
+                        attendanceMap[studentId] = "Absent";
                       });
                     },
                   ),
-
                   const SizedBox(
                     width: 8,
                   ),
-
                   _attendanceButton(
-
                     title: "L",
-
                     color: const Color(
                       0xffFEF3C7,
                     ),
-
-                    textColor:
-                        const Color(
+                    textColor: const Color(
                       0xff92400E,
                     ),
-
-                    isSelected:
-                        currentStatus ==
-                            "Leave",
-
+                    isSelected: currentStatus == "Leave",
                     onTap: () {
-
                       setState(() {
-
-                        attendanceMap[
-                                studentId] =
-                            "Leave";
+                        attendanceMap[studentId] = "Leave";
                       });
                     },
                   ),
@@ -554,68 +336,36 @@ if (selectedClassId != null)
   }
 
   Widget _attendanceButton({
-
     required String title,
-
     required Color color,
-
     required Color textColor,
-
     required bool isSelected,
-
     required VoidCallback onTap,
   }) {
-
     return GestureDetector(
-
       onTap: onTap,
-
       child: AnimatedContainer(
-
-        duration:
-            const Duration(
+        duration: const Duration(
           milliseconds: 180,
         ),
-
         height: 42,
         width: 42,
-
         decoration: BoxDecoration(
-
-          color: isSelected
-              ? color
-              : Colors.white,
-
-          borderRadius:
-              BorderRadius.circular(
+          color: isSelected ? color : Colors.white,
+          borderRadius: BorderRadius.circular(
             12,
           ),
-
           border: Border.all(
-
-            color: isSelected
-                ? color
-                : Colors.grey
-                    .shade300,
-
+            color: isSelected ? color : Colors.grey.shade300,
             width: 1.5,
           ),
         ),
-
         child: Center(
-
           child: Text(
-
             title,
-
             style: TextStyle(
-
-              fontWeight:
-                  FontWeight.w700,
-
-              color: isSelected
-                  ? textColor
-                  : Colors.grey,
+              fontWeight: FontWeight.w700,
+              color: isSelected ? textColor : Colors.grey,
             ),
           ),
         ),
@@ -624,82 +374,44 @@ if (selectedClassId != null)
   }
 
   Widget _emptyState() {
-
     return Center(
-
       child: Column(
-
-        mainAxisAlignment:
-            MainAxisAlignment.center,
-
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-
           Container(
-
             height: 90,
             width: 90,
-
-            decoration:
-                const BoxDecoration(
-
-              color:
-                  Color(0xffEEF2FF),
-
-              shape:
-                  BoxShape.circle,
+            decoration: const BoxDecoration(
+              color: Color(0xffEEF2FF),
+              shape: BoxShape.circle,
             ),
-
             child: const Icon(
-
-              Icons
-                  .check_circle_outline,
-
+              Icons.check_circle_outline,
               size: 42,
-
-              color:
-                  Color(0xff5B5FEF),
+              color: Color(0xff5B5FEF),
             ),
           ),
-
           const SizedBox(
             height: 20,
           ),
-
           const Text(
-
             "Select Class & Section",
-
             style: TextStyle(
-
               fontSize: 20,
-
-              fontWeight:
-                  FontWeight.w700,
-
-              color:
-                  Color(0xff374151),
+              fontWeight: FontWeight.w700,
+              color: Color(0xff374151),
             ),
           ),
-
           const SizedBox(
             height: 8,
           ),
-
           Text(
-
             "Choose class and section\nto mark attendance.",
-
-            textAlign:
-                TextAlign.center,
-
+            textAlign: TextAlign.center,
             style: TextStyle(
-
               fontSize: 14,
-
               height: 1.5,
-
-              color:
-                  Colors.grey.shade600,
+              color: Colors.grey.shade600,
             ),
           ),
         ],
@@ -707,30 +419,18 @@ if (selectedClassId != null)
     );
   }
 
-  InputDecoration
-      _inputDecoration(
+  InputDecoration _inputDecoration(
     String label,
   ) {
-
     return InputDecoration(
-
       labelText: label,
-
       filled: true,
-
-      fillColor:
-          const Color(0xffF8FAFC),
-
-      border:
-          OutlineInputBorder(
-
-        borderRadius:
-            BorderRadius.circular(
+      fillColor: const Color(0xffF8FAFC),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(
           16,
         ),
-
-        borderSide:
-            BorderSide.none,
+        borderSide: BorderSide.none,
       ),
     );
   }

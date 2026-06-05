@@ -48,21 +48,26 @@ Future<void> _loadTeacherData() async {
 
   final data = doc.data()!;
 
- final sectionTeacher = data['sectionTeacher'];
-
-  setState(() {
-    teacherData = data;
 
 
- if (sectionTeacher != null) {
 
-  classId = sectionTeacher['classId'];
-  sectionId = sectionTeacher['section'];
+
+
+final classTeacherOf = data['classTeacherOf'];
+
+if (classTeacherOf != null) {
+
+  classId = classTeacherOf['className'];
+  sectionId = classTeacherOf['sectionName'];
 
   isClassTeacher = true;
   canEditAttendance = true;
 }
-  });
+
+
+
+
+  
 }
 
   @override
@@ -85,13 +90,17 @@ Future<void> _loadTeacherData() async {
       children: [
         const Icon(Icons.class_),
         const SizedBox(width: 10),
-        Text(
-          "Class $classId - $sectionId",
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+       Text(
+  "$classId - $sectionId",
+)
+      
+      
+      
+      
+      
+      
+      
+      
       ],
     ),
   ),
@@ -327,11 +336,21 @@ class _StudentList extends ConsumerWidget {
       error: (e, _) => Text("$e"),
       data: (snapshot) {
 
+print('Attendance Class = $classId');
+print('Attendance Section = $sectionId');
 
-
-      final filtered = snapshot.docs.where((doc) {
+     final filtered = snapshot.docs.where((doc) {
 
   final d = doc.data();
+
+  print('Attendance Class = $classId');
+  print('Attendance Section = $sectionId');
+
+  print(
+    'Student: ${d['name']} | '
+    'className=${d['className']} | '
+    'section=${d['section']}'
+  );
 
   return (
     d['className'] == classId ||
@@ -345,10 +364,25 @@ class _StudentList extends ConsumerWidget {
 }).toList();
 
 
+      if (filtered.isEmpty) {
+  return Center(
+    child: Text(
+      '''
+No students found
 
-        if (filtered.isEmpty) {
-          return const Center(child: Text("No students found"));
-        }
+Teacher Class:
+$classId
+
+Teacher Section:
+$sectionId
+
+Total Students:
+${snapshot.docs.length}
+''',
+      textAlign: TextAlign.center,
+    ),
+  );
+}
 
         if (studentList.isEmpty) {
           final list = filtered.map((doc) {

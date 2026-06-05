@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿// features/school_admin/classes/screens/class_students_screen.dart
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -11,7 +12,8 @@ class ClassStudentsScreen extends ConsumerStatefulWidget {
   const ClassStudentsScreen({super.key, required this.className});
 
   @override
-  ConsumerState<ClassStudentsScreen> createState() => _ClassStudentsScreenState();
+  ConsumerState<ClassStudentsScreen> createState() =>
+      _ClassStudentsScreenState();
 }
 
 class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
@@ -19,12 +21,15 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
 
   List<String> get _classNameVariants {
     final name = widget.className;
-    final stripped = name.replaceAll(RegExp(r'^Class\s+', caseSensitive: false), '').trim();
+    final stripped =
+        name.replaceAll(RegExp(r'^Class\s+', caseSensitive: false), '').trim();
     return stripped == name ? [name] : [name, stripped];
   }
 
   @override
   Widget build(BuildContext context) {
+    print('OPENED CLASS = ${widget.className}');
+
     final schoolAsync = ref.watch(currentSchoolProvider);
 
     return schoolAsync.when(
@@ -34,7 +39,6 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
               .collection('schools')
               .doc(school.id)
               .collection('students')
-              .where('className', whereIn: _classNameVariants)
               .snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
@@ -47,16 +51,62 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
             final allDocs = snapshot.data!.docs;
 
             final sectionSet = <String>{};
+
             for (final doc in allDocs) {
-              final s = (doc.data() as Map<String, dynamic>)['section']?.toString() ?? '';
-              if (s.isNotEmpty) sectionSet.add(s);
+              final s = (doc.data() as Map<String, dynamic>)['section']
+                      ?.toString()
+                      .trim()
+                      .toUpperCase() ??
+                  '';
+
+              if (s.isNotEmpty) {
+                sectionSet.add(s);
+              }
             }
+
             final sections = ['All', ...sectionSet.toList()..sort()];
 
+            final classNumber =
+                widget.className.replaceAll('Class ', '').trim();
+
+            final classStudents = allDocs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+
+              final studentClass = (data['className'] ?? '').toString().trim();
+
+              return studentClass == widget.className ||
+                  studentClass ==
+                      widget.className.replaceAll('Class ', '').trim();
+            }).toList();
+
+
+
+classStudents.sort((a, b) {
+  final aName =
+      ((a.data() as Map<String, dynamic>)['name'] ?? '')
+          .toString()
+          .toUpperCase();
+
+  final bName =
+      ((b.data() as Map<String, dynamic>)['name'] ?? '')
+          .toString()
+          .toUpperCase();
+
+  return aName.compareTo(bName);
+});
+
+
+
+
+
+
+
+
             final docs = selectedSection == 'All'
-                ? allDocs
-                : allDocs.where((doc) {
+                ? classStudents
+                : classStudents.where((doc) {
                     final data = doc.data() as Map<String, dynamic>;
+
                     return data['section'] == selectedSection;
                   }).toList();
 
@@ -98,7 +148,9 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
                                 selected: isSelected,
                                 selectedColor: const Color(0xff5B5FEF),
                                 labelStyle: TextStyle(
-                                  color: isSelected ? Colors.white : const Color(0xff374151),
+                                  color: isSelected
+                                      ? Colors.white
+                                      : const Color(0xff374151),
                                   fontWeight: FontWeight.w600,
                                 ),
                                 onSelected: (_) {
@@ -110,9 +162,7 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
                         ),
                       ),
                     ),
-
                   const SizedBox(height: 8),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Align(
@@ -127,9 +177,7 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   if (docs.isEmpty)
                     const Expanded(
                       child: Center(child: Text('No students found')),
@@ -140,10 +188,12 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: docs.length,
                         itemBuilder: (context, index) {
-                          final data = docs[index].data() as Map<String, dynamic>;
+                          final data =
+                              docs[index].data() as Map<String, dynamic>;
                           final name = (data['name'] ?? '').toString();
                           final section = (data['section'] ?? '').toString();
-                          final admissionNo = (data['admissionNo'] ?? '').toString();
+                          final admissionNo =
+                              (data['admissionNo'] ?? '').toString();
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 10),
@@ -162,7 +212,8 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
                                   decoration: BoxDecoration(
                                     color: const Color(0xffF3F4F6),
                                     borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: Colors.grey.shade300),
+                                    border:
+                                        Border.all(color: Colors.grey.shade300),
                                   ),
                                   child: Text(
                                     '${index + 1}',
@@ -182,7 +233,8 @@ class _ClassStudentsScreenState extends ConsumerState<ClassStudentsScreen> {
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         name,

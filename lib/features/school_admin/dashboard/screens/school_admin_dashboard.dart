@@ -7,6 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/features/school_admin/dashboard/providers/dashboard_providers.dart';
 import 'package:school_app/providers/current_school_provider.dart';
+import 'package:school_app/features/school_admin/settings/screens/admin_settings_screen.dart';
+
+
 
 class SchoolAdminDashboard extends ConsumerWidget {
   const SchoolAdminDashboard({super.key});
@@ -16,7 +19,20 @@ class SchoolAdminDashboard extends ConsumerWidget {
     final schoolAsync = ref.watch(currentSchoolProvider);
 
     return AdminLayout(
-      title: 'Dashboard',
+  title: 'Dashboard',
+
+  onSettingsPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            const AdminSettingsScreen(),
+      ),
+    );
+  },
+
+
+
       body: schoolAsync.when(
         data: (school) {
           final schoolId = school.id;

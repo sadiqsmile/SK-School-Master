@@ -149,10 +149,37 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
               final students = docs.where((e) {
                 final d = e.data() as Map<String, dynamic>;
                 final name = (d['name'] ?? '').toString().toLowerCase();
-                final className = (d['className'] ?? '').toString();
-                final section = (d['section'] ?? '').toString();
-                if (!_matchGroup(className, selectedGroup)) return false;
-                if (selectedClass != 'All' && className != selectedClass) return false;
+                
+               final className =
+    (d['className'] ?? '')
+        .toString()
+        .trim();
+
+final normalizedClassName =
+    className.replaceAll('Class ', '').trim();
+                
+                if (selectedClass != 'All' &&
+    normalizedClassName != selectedClass) {
+  return false;
+}
+                
+              final section =
+    (d['section'] ?? '')
+        .toString()
+        .trim()
+        .toUpperCase();
+
+if (selectedSection != 'All' &&
+    section != selectedSection.toUpperCase()) {
+  return false;
+}
+
+
+
+
+
+
+
                 if (selectedSection != 'All' && section != selectedSection) return false;
                 if (!name.contains(search.toLowerCase())) return false;
                 if (facilityFilter != 'All') {
@@ -171,11 +198,29 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 }
                 return true;
               }).toList();
-              students.sort((a, b) {
-                final an = ((a.data() as Map<String, dynamic>)['name'] ?? '').toString();
-                final bn = ((b.data() as Map<String, dynamic>)['name'] ?? '').toString();
-                return an.compareTo(bn);
-              });
+
+
+
+
+           students.sort((a, b) {
+  final aName =
+      ((a.data() as Map<String, dynamic>)['name'] ?? '')
+          .toString()
+          .toUpperCase();
+
+  final bName =
+      ((b.data() as Map<String, dynamic>)['name'] ?? '')
+          .toString()
+          .toUpperCase();
+
+  return aName.compareTo(bName);
+});
+
+
+
+
+
+
               final groupCount = docs.where((e) {
                 final d = e.data() as Map<String, dynamic>;
                 return _matchGroup((d['className'] ?? '').toString(), selectedGroup);
@@ -271,7 +316,23 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           const SizedBox(height: 18),
           Row(
             children: [
-              Expanded(child: _dataCard(icon: Icons.group, label: 'Total', value: students.length.toString(), color: Colors.blue)),
+              
+              
+              
+             Expanded(
+  child: _dataCard(
+    icon: Icons.group,
+    label: 'Total',
+    value: docs.length.toString(),
+    color: Colors.blue,
+  ),
+),
+
+
+
+
+
+
               const SizedBox(width: 16),
               Expanded(child: _dataCard(icon: Icons.school, label: groupLabel, value: selectedGroup == 'All' ? '-' : groupCount.toString(), color: Colors.purple)),
               const SizedBox(width: 16),
@@ -596,7 +657,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
             // ── Stat cards ────────────────────────────────────────────────
             Row(
               children: [
-                Expanded(child: _dataCard(icon: Icons.group, label: 'Total', value: students.length.toString(), color: Colors.blue)),
+                Expanded(child: _dataCard(icon: Icons.group, label: 'Total', value: docs.length.toString(), color: Colors.blue)),
                 const SizedBox(width: 12),
                 Expanded(child: _dataCard(icon: Icons.school, label: groupLabel, value: selectedGroup == 'All' ? '-' : groupCount.toString(), color: Colors.purple)),
                 const SizedBox(width: 12),
@@ -877,7 +938,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       height: 88,
       child: Row(
         children: [
-          Expanded(child: _statCard(icon: Icons.people_outline, title: 'Total', value: _cStudents.length.toString(), color: Colors.blue.shade50)),
+          Expanded(child: _statCard(icon: Icons.people_outline, title: 'Total', value: _cDocs.length.toString(), color: Colors.blue.shade50)),
           const SizedBox(width: 12),
           Expanded(child: _statCard(icon: Icons.category_outlined, title: shortGroup(_cGroupLabel, true), value: selectedGroup == 'All' ? '0' : _cGroupCount.toString(), color: Colors.purple.shade50)),
           const SizedBox(width: 12),
@@ -1380,7 +1441,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
               const SizedBox(height: 12),
               _exportCard(
                 icon: Icons.description,
-                title: 'Import Template',
+                title: 'Download Template',
                 subtitle: 'Download blank format',
                 color: Colors.blueGrey,
                 onTap: () async {

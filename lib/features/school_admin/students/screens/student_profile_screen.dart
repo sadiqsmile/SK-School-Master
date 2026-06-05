@@ -1,4 +1,5 @@
-﻿import 'dart:typed_data';
+﻿// features/school_admin/students/screens/student_profile_screen.dart
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -7,7 +8,6 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../attendance/services/student_attendance_service.dart';
 import 'package:school_app/core/services/image_service.dart';
 import 'package:school_app/core/widgets/app_cached_image.dart';
-
 
 // ── FORMATTER ─────────────────────────────────────────────────────────────────
 
@@ -90,7 +90,15 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
 
   Future<bool> _updateStudent() async {
     if (!_formKey.currentState!.validate()) return false;
+
     final name = _nameController.text.trim();
+
+    final className = _classNameController.text.trim();
+
+    final classId = className.replaceAll('Class ', '').trim();
+
+    final section = _sectionController.text.trim().toUpperCase();
+
     try {
       await FirebaseFirestore.instance
           .collection('schools')
@@ -101,8 +109,10 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         'name': name,
         'nameLower': name.toLowerCase(),
         'admissionNo': _admissionNoController.text.trim(),
-        'className': _classNameController.text.trim(),
-        'section': _sectionController.text.trim(),
+        'className': className,
+        'classId': classId,
+        'section': section,
+        'classKey': 'Class $classId $section',
         'gender': _genderController.text.trim(),
         'dob': _dobController.text.trim(),
         'bloodGroup': _bloodGroupController.text.trim(),
@@ -110,17 +120,18 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         'parentName': _parentNameController.text.trim(),
         'parentPhone': _parentPhoneController.text.trim(),
         'address': _addressController.text.trim(),
-        // Facility fields
         'hostel': _overviewKey.currentState?._isHostel ?? false,
         'dayScholar': _overviewKey.currentState?._isDayScholar ?? false,
         'mess': _overviewKey.currentState?._isMess ?? false,
         'bus': _overviewKey.currentState?._isBus ?? false,
       });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Student updated')),
         );
       }
+
       return true;
     } catch (e) {
       if (mounted) {
@@ -157,83 +168,54 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         .delete();
   }
 
-Future<void> _updatePhoto(
-  Map<String, dynamic> data,
-) async {
-
-  setState(() {
-    _uploadingPhoto = true;
-  });
-
-  try {
-
-    final bytes =
-        await ImageService
-            .pickCropCompressImage();
-
-    if (bytes == null) return;
-
-    final admissionNo =
-        (data['admissionNo'] ??
-                widget.studentId)
-            .toString();
-
-    final url =
-        await ImageService.uploadImage(
-      schoolId: widget.schoolId,
-
-      module: 'students',
-
-      type: 'profile',
-
-      fileName: admissionNo,
-
-      bytes: bytes,
-    );
-
-    await FirebaseFirestore.instance
-        .collection('schools')
-        .doc(widget.schoolId)
-        .collection('students')
-        .doc(widget.studentId)
-        .update({
-      'photoUrl': url,
+  Future<void> _updatePhoto(
+    Map<String, dynamic> data,
+  ) async {
+    setState(() {
+      _uploadingPhoto = true;
     });
 
-  } catch (e) {
+    try {
+      final bytes = await ImageService.pickCropCompressImage();
 
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Photo update failed: $e',
-          ),
-        ),
+      if (bytes == null) return;
+
+      final admissionNo = (data['admissionNo'] ?? widget.studentId).toString();
+
+      final url = await ImageService.uploadImage(
+        schoolId: widget.schoolId,
+        module: 'students',
+        type: 'profile',
+        fileName: admissionNo,
+        bytes: bytes,
       );
-    }
 
-  } finally {
-
-    if (mounted) {
-      setState(() {
-        _uploadingPhoto = false;
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(widget.schoolId)
+          .collection('students')
+          .doc(widget.studentId)
+          .update({
+        'photoUrl': url,
       });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Photo update failed: $e',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploadingPhoto = false;
+        });
+      }
     }
   }
-}
-
-
-
-
-
-
-
-
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -283,15 +265,13 @@ Future<void> _updatePhoto(
                                 'Move this student to the recycle bin?'),
                             actions: [
                               TextButton(
-                                onPressed: () =>
-                                    Navigator.pop(context, false),
+                                onPressed: () => Navigator.pop(context, false),
                                 child: const Text('Cancel'),
                               ),
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.red),
-                                onPressed: () =>
-                                    Navigator.pop(context, true),
+                                onPressed: () => Navigator.pop(context, true),
                                 child: const Text('Delete',
                                     style: TextStyle(color: Colors.white)),
                               ),
@@ -315,90 +295,99 @@ Future<void> _updatePhoto(
                 child: Form(
                   key: _formKey,
                   child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _HeroCard(
-                      data: data,
-                      uploadingPhoto: _uploadingPhoto,
-                      onUpdatePhoto: _updatePhoto,
-                      isEditing: _isEditing,
-                      onEdit: data.isEmpty
-                          ? null
-                          : () async {
-                              if (_isEditing) {
-                                final ok = await _updateStudent();
-                                if (!ok) return; // keep edit mode open on validation failure
-                              }
-                              setState(() => _isEditing = !_isEditing);
-                            },
-                    ),
-                    const SizedBox(height: 16),
-                    DefaultTabController(
-                      length: 3,
-                      child: Column(
-                        children: [
-                          TabBar(
-                            indicator: const UnderlineTabIndicator(
-                              borderSide: BorderSide(
-                                width: 3,
-                                color: Color(0xFF6366F1),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HeroCard(
+                        data: data,
+                        uploadingPhoto: _uploadingPhoto,
+                        onUpdatePhoto: _updatePhoto,
+                        isEditing: _isEditing,
+                        onEdit: data.isEmpty
+                            ? null
+                            : () async {
+                                if (_isEditing) {
+                                  final ok = await _updateStudent();
+                                  if (!ok)
+                                    return; // keep edit mode open on validation failure
+                                }
+                                setState(() => _isEditing = !_isEditing);
+                              },
+                      ),
+                      const SizedBox(height: 16),
+                      DefaultTabController(
+                        length: 3,
+                        child: Column(
+                          children: [
+                            TabBar(
+                              indicator: const UnderlineTabIndicator(
+                                borderSide: BorderSide(
+                                  width: 3,
+                                  color: Color(0xFF6366F1),
+                                ),
+                                insets: EdgeInsets.symmetric(horizontal: 20),
                               ),
-                              insets: EdgeInsets.symmetric(horizontal: 20),
-                            ),
-                            indicatorSize: TabBarIndicatorSize.label,
-                            labelColor: const Color(0xFF6366F1),
-                            unselectedLabelColor: Colors.grey,
-                            labelStyle: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                            ),
-                            tabs: const [
-                              Tab(icon: Icon(Icons.person), text: 'Overview'),
-                              Tab(icon: Icon(Icons.calendar_today), text: 'Attendance'),
-                              Tab(icon: Icon(Icons.bar_chart), text: 'Marks'),
-                            ],
-                          ),
-                          const Divider(height: 1),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.65,
-                            child: TabBarView(
-                              children: [
-                                _OverviewTab(
-                                  key: _overviewKey,
-                                  data: data,
-                                  isEditing: _isEditing,
-                                  controllers: {
-                                    'name': _nameController,
-                                    'admissionNo': _admissionNoController,
-                                    'className': _classNameController,
-                                    'section': _sectionController,
-                                    'gender': _genderController,
-                                    'dob': _dobController,
-                                    'bloodGroup': _bloodGroupController,
-                                    'academicYear': _academicYearController,
-                                    'parentName': _parentNameController,
-                                    'parentPhone': _parentPhoneController,
-                                    'address': _addressController,
-                                  },
-                                ),
-                                _AttendanceTab(
-                                  studentId: (data['admissionNo'] ?? widget.studentId).toString(),
-                                  schoolId: widget.schoolId,
-                                  className: (data['class'] ?? data['className'] ?? '').toString(),
-                                  section: (data['section'] ?? '').toString(),
-                                ),
-                                _MarksTab(
-                                  studentId: widget.studentId,
-                                  schoolId: widget.schoolId,
-                                ),
+                              indicatorSize: TabBarIndicatorSize.label,
+                              labelColor: const Color(0xFF6366F1),
+                              unselectedLabelColor: Colors.grey,
+                              labelStyle: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              tabs: const [
+                                Tab(icon: Icon(Icons.person), text: 'Overview'),
+                                Tab(
+                                    icon: Icon(Icons.calendar_today),
+                                    text: 'Attendance'),
+                                Tab(icon: Icon(Icons.bar_chart), text: 'Marks'),
                               ],
                             ),
-                          ),
-                        ],
+                            const Divider(height: 1),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.65,
+                              child: TabBarView(
+                                children: [
+                                  _OverviewTab(
+                                    key: _overviewKey,
+                                    data: data,
+                                    isEditing: _isEditing,
+                                    controllers: {
+                                      'name': _nameController,
+                                      'admissionNo': _admissionNoController,
+                                      'className': _classNameController,
+                                      'section': _sectionController,
+                                      'gender': _genderController,
+                                      'dob': _dobController,
+                                      'bloodGroup': _bloodGroupController,
+                                      'academicYear': _academicYearController,
+                                      'parentName': _parentNameController,
+                                      'parentPhone': _parentPhoneController,
+                                      'address': _addressController,
+                                    },
+                                    schoolId: widget.schoolId,
+                                  ),
+                                  _AttendanceTab(
+                                    studentId: (data['admissionNo'] ??
+                                            widget.studentId)
+                                        .toString(),
+                                    schoolId: widget.schoolId,
+                                    className: (data['class'] ??
+                                            data['className'] ??
+                                            '')
+                                        .toString(),
+                                    section: (data['section'] ?? '').toString(),
+                                  ),
+                                  _MarksTab(
+                                    studentId: widget.studentId,
+                                    schoolId: widget.schoolId,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -466,17 +455,14 @@ class _HeroCard extends StatelessWidget {
                       border: Border.all(color: Colors.white, width: 2.5),
                     ),
                     child: photoUrl.isNotEmpty
-    ? AppCachedImage(
-        imageUrl: photoUrl,
-        width: 68,
-        height: 68,
-        radius: 100,
-      )
-    : _avatarFallback(name),
-
-                         
-                    ),
-                  
+                        ? AppCachedImage(
+                            imageUrl: photoUrl,
+                            width: 68,
+                            height: 68,
+                            radius: 100,
+                          )
+                        : _avatarFallback(name),
+                  ),
                   if (uploadingPhoto)
                     Positioned.fill(
                       child: Container(
@@ -531,7 +517,8 @@ class _HeroCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     if (classLabel.isNotEmpty)
                       Row(children: [
-                        const Icon(Icons.school, size: 14, color: Colors.white70),
+                        const Icon(Icons.school,
+                            size: 14, color: Colors.white70),
                         const SizedBox(width: 4),
                         Text(classLabel,
                             style: const TextStyle(
@@ -594,12 +581,14 @@ class _OverviewTab extends StatefulWidget {
   final Map<String, dynamic> data;
   final bool isEditing;
   final Map<String, TextEditingController> controllers;
+  final String schoolId;
 
   const _OverviewTab({
     super.key,
     required this.data,
     required this.isEditing,
     required this.controllers,
+    required this.schoolId,
   });
 
   @override
@@ -607,11 +596,50 @@ class _OverviewTab extends StatefulWidget {
 }
 
 class _OverviewTabState extends State<_OverviewTab> {
-  static const List<String> _classList = [
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'I-PU', 'II-PU',
-  ];
+  List<String> _classList = [];
+
+  Future<void> _loadClasses() async {
+    final schoolId = widget.schoolId;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('schools')
+        .doc(schoolId)
+        .collection('classes')
+        .get();
+
+    _classList.clear();
+    _sectionsMap.clear();
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+
+      final name = (data['name'] ?? '').toString();
+
+      final sections = List<String>.from(
+        data['sections'] ?? [],
+      );
+
+      _classList.add(name);
+
+      _sectionsMap[name] = sections;
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Map<String, List<String>> _sectionsMap = {};
+
   static const List<String> _bloodGroups = [
-    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-',
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-',
   ];
   static const List<String> _genders = ['BOY', 'GIRL'];
 
@@ -631,7 +659,10 @@ class _OverviewTabState extends State<_OverviewTab> {
   @override
   void initState() {
     super.initState();
-    _initLocalState(); // always init so view mode shows correct values
+
+    _loadClasses();
+
+    _initLocalState();
   }
 
   @override
@@ -696,7 +727,8 @@ class _OverviewTabState extends State<_OverviewTab> {
     if (hostelRaw is bool) {
       _isHostel = hostelRaw;
     } else {
-      _isHostel = (data['type'] ?? '').toString().trim().toLowerCase() == 'hostel';
+      _isHostel =
+          (data['type'] ?? '').toString().trim().toLowerCase() == 'hostel';
     }
     final dayScholarRaw = data['dayScholar'];
     _isDayScholar = dayScholarRaw is bool ? dayScholarRaw : !_isHostel;
@@ -711,17 +743,20 @@ class _OverviewTabState extends State<_OverviewTab> {
     if (busRaw is bool) {
       _isBus = busRaw;
     } else {
-      final transStr = (data['transport'] ?? busRaw ?? '').toString().trim().toLowerCase();
+      final transStr =
+          (data['transport'] ?? busRaw ?? '').toString().trim().toLowerCase();
       _isBus = transStr == 'yes' || transStr == 'y';
     }
   }
 
-  List<String> _getSections(String? className) {
-    if (className == null) return [];
-    if (className == 'I-PU' || className == 'II-PU') {
-      return ['A', 'B'];
+  List<String> _getSections(
+    String? className,
+  ) {
+    if (className == null) {
+      return [];
     }
-    return ['A', 'B', 'C', 'D'];
+
+    return _sectionsMap[className] ?? [];
   }
 
   List<String> _getAcademicYears() {
@@ -732,8 +767,7 @@ class _OverviewTabState extends State<_OverviewTab> {
     });
   }
 
-  String _ddmmyyyy(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}-'
+  String _ddmmyyyy(DateTime d) => '${d.day.toString().padLeft(2, '0')}-'
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.year}';
 
@@ -801,8 +835,8 @@ class _OverviewTabState extends State<_OverviewTab> {
               widget.controllers['section']?.text = '';
             });
           }),
-          _dropdownRow('Section', _getSections(_selectedClass), _selectedSection,
-              (val) {
+          _dropdownRow(
+              'Section', _getSections(_selectedClass), _selectedSection, (val) {
             setState(() {
               _selectedSection = val;
               widget.controllers['section']?.text = val ?? '';
@@ -818,8 +852,7 @@ class _OverviewTabState extends State<_OverviewTab> {
             });
           })
         else
-          _fieldRow('Gender',
-              _expandGender((data['gender'] ?? '').toString())),
+          _fieldRow('Gender', _expandGender((data['gender'] ?? '').toString())),
         if (widget.isEditing)
           _dobRow()
         else
@@ -1022,8 +1055,7 @@ class _OverviewTabState extends State<_OverviewTab> {
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               suffixIcon: const Icon(Icons.calendar_today, size: 16),
             ),
-            style:
-                const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
             onTap: () async {
               final initial = _selectedDob ?? DateTime(2010);
               final picked = await showDatePicker(
@@ -1048,7 +1080,8 @@ class _OverviewTabState extends State<_OverviewTab> {
 
   Widget _phoneRow() {
     final value = (widget.data['parentPhone'] ?? '').toString();
-    if (!widget.isEditing && value.trim().isEmpty) return const SizedBox.shrink();
+    if (!widget.isEditing && value.trim().isEmpty)
+      return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Column(
@@ -1078,8 +1111,7 @@ class _OverviewTabState extends State<_OverviewTab> {
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 counterText: '',
               ),
-              style:
-                  const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
               validator: (v) {
                 if (v == null || v.isEmpty) return null;
                 if (v.length != 10) return 'Enter 10-digit number';
@@ -1104,8 +1136,7 @@ class _OverviewTabState extends State<_OverviewTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
             value: value,
@@ -1220,14 +1251,14 @@ class _OverviewTabState extends State<_OverviewTab> {
     TextEditingController? controller,
     List<TextInputFormatter>? formatters,
   }) {
-    if (!widget.isEditing && value.trim().isEmpty) return const SizedBox.shrink();
+    if (!widget.isEditing && value.trim().isEmpty)
+      return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 4),
           if (widget.isEditing && controller != null)
             TextFormField(
@@ -1247,14 +1278,12 @@ class _OverviewTabState extends State<_OverviewTab> {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               ),
-              style:
-                  const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
             )
           else
             Text(
               value.isEmpty ? '—' : value,
-              style:
-                  const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
             ),
           const Divider(height: 16),
         ],
@@ -1437,66 +1466,64 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                 ],
               ),
             ),
-          if (absentDates.isNotEmpty) ...
-            [
-              const SizedBox(height: 24),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.red.shade100),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.event_busy,
-                            color: Colors.red, size: 20),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Absent Details',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    ...absentDates.map((date) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              '${date.day.toString().padLeft(2, '0')} '
-                              '${_monthName(date.month)} '
-                              '${date.year}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-                ),
+          if (absentDates.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.red.shade100),
               ),
-            ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.event_busy, color: Colors.red, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Absent Details',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  ...absentDates.map((date) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '${date.day.toString().padLeft(2, '0')} '
+                            '${_monthName(date.month)} '
+                            '${date.year}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
           Center(
             child: ConstrainedBox(
@@ -1611,8 +1638,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: totalCells,
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 7,
                           crossAxisSpacing: isMobile ? 4 : 6,
                           mainAxisSpacing: isMobile ? 4 : 6,
@@ -1756,8 +1782,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                           reservedSize: 20,
                           getTitlesWidget: (value, meta) {
                             final index = value.toInt();
-                            if (index < 0 ||
-                                index >= analytics.length) {
+                            if (index < 0 || index >= analytics.length) {
                               return const SizedBox();
                             }
                             final percentage =
@@ -1828,8 +1853,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
                       analytics.length,
                       (index) {
                         final item = analytics[index];
-                        final percentage =
-                            (item['percentage'] ?? 0).toDouble();
+                        final percentage = (item['percentage'] ?? 0).toDouble();
 
                         Color barColor;
                         if (percentage >= 75) {
@@ -1901,20 +1925,20 @@ class _AttendanceTabState extends State<_AttendanceTab> {
               IconButton(
                 icon: const Icon(Icons.chevron_left),
                 onPressed: () => setState(() {
-                  _selectedMonth = DateTime(
-                      _selectedMonth.year, _selectedMonth.month - 1);
+                  _selectedMonth =
+                      DateTime(_selectedMonth.year, _selectedMonth.month - 1);
                 }),
               ),
               Text(
                 '${_monthName(_selectedMonth.month)} ${_selectedMonth.year}',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w600, fontSize: 15),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
                 onPressed: () => setState(() {
-                  _selectedMonth = DateTime(
-                      _selectedMonth.year, _selectedMonth.month + 1);
+                  _selectedMonth =
+                      DateTime(_selectedMonth.year, _selectedMonth.month + 1);
                 }),
               ),
             ],
@@ -1955,8 +1979,19 @@ class _AttendanceTabState extends State<_AttendanceTab> {
 
   String _monthName(int month) {
     const names = [
-      '', 'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      '',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return names[month];
   }

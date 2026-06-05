@@ -224,22 +224,27 @@ class StudentService {
           defaultAcademicYear;
     }
 
-    final classId =
-        (normalized['classId'] ?? '')
-            .toString();
 
-    final sectionId =
-        (normalized['section'] ?? '')
-            .toString();
 
-    final ck = classKeyFrom(
-      classId,
-      sectionId,
-    );
+final className =
+    (normalized['className'] ?? '')
+        .toString()
+        .trim();
 
-    if (ck != 'class__') {
-      normalized['classKey'] = ck;
-    }
+final sectionId =
+    (normalized['section'] ?? '')
+        .toString()
+        .trim()
+        .toUpperCase();
+
+if (className.isNotEmpty &&
+    sectionId.isNotEmpty) {
+
+  normalized['classKey'] =
+      '${className.toLowerCase().replaceAll(' ', '_')}_$sectionId';
+}
+
+
 
     if (normalized['name'] != null) {
       normalized['name'] =
