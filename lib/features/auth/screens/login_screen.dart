@@ -1,4 +1,4 @@
-﻿// features/auth/screens/login_screen.dart
+// features/auth/screens/login_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -7,15 +7,25 @@ import 'package:go_router/go_router.dart';
 import 'package:school_app/core/utils/school_storage.dart';
 import 'package:school_app/services/parent_account_service.dart';
 
-class LoginScreen extends StatefulWidget {
+import 'package:school_app/features/parent/screens/force_change_password_screen.dart';
+import 'package:school_app/providers/auth_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
+class _LoginScreenState extends ConsumerState<LoginScreen>
     with TickerProviderStateMixin {
+
+  // FINAL FIX: Force reset at top
+  String? selectedClassId = null;
+  String? selectedSectionId = null;
+
   static const String _superAdminEmail = 'sadiq.smile@gmail.com';
 
   final TextEditingController _identityController = TextEditingController();
@@ -174,59 +184,89 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  Future<void> _login() async {
-    setState(() {
-      _isLoading = true;
-    });
+Future<void> _login() async {
+  if (!mounted) return;
 
-    try {
-      final identity = _identityController.text.trim();
-      final password = _passwordController.text.trim();
+  setState(() {
+    _isLoading = true;
+  });
 
-      if (identity.isEmpty || password.isEmpty) {
+  try {
+    final identity = _identityController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (identity.isEmpty || password.isEmpty) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorSnackbar('Please fill in all fields');
+      return;
+    }
+
+    if (_looksLikePhone(identity)) {
+      final phoneDigits = _normalizePhone(identity);
+      final token = await ParentAccountService().parentLogin(
+        phone: phoneDigits,
+        pin: password,
+      );
+      await FirebaseAuth.instance.signInWithCustomToken(token);
+    } else {
+      final user = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: identity,
+            password: password,
+          );
+
+      if (user.user == null) {
         setState(() {
           _isLoading = false;
         });
-        _showErrorSnackbar('Please fill in all fields');
+        _showErrorSnackbar('Login failed');
         return;
       }
-
-      if (_looksLikePhone(identity)) {
-        final phoneDigits = _normalizePhone(identity);
-        final token = await ParentAccountService().parentLogin(
-          phone: phoneDigits,
-          pin: password,
-        );
-        await FirebaseAuth.instance.signInWithCustomToken(token);
-      } else {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: identity,
-          password: password,
-        );
-      }
-
-      await _syncSchoolContextForSignedInUser();
-
-      if (!mounted) return;
-      context.go('/');
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        _showErrorSnackbar(e.message ?? 'Authentication failed');
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        _showErrorSnackbar(
-          'Login failed. Please check your details and try again.',
-        );
-      }
     }
+
+    await _syncSchoolContextForSignedInUser();
+
+    final mustChangePassword = await ref.read(
+      mustChangePasswordProvider.future,
+    );
+
+    if (!mounted) return;
+
+    if (mustChangePassword) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const ForceChangePasswordScreen(),
+        ),
+      );
+      return;
+    }
+
+    context.go('/');
+  } on FirebaseAuthException catch (e) {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
+    _showErrorSnackbar(e.message ?? 'Authentication failed');
+  } on FirebaseException catch (e) {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
+    _showErrorSnackbar(e.message ?? 'Firebase error');
+  } catch (e) {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
+    _showErrorSnackbar(
+      'Login failed. Please check your details and try again.',
+    );
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 width: 88,
                                 height: 88,
                                 fit: BoxFit.contain,
-                                errorBuilder: (_, _, _) => const Icon(
+                                errorBuilder: (context, error, stackTrace) => const Icon(
                                   Icons.school_rounded,
                                   size: 64,
                                   color: Color(0xFF0E5F83),
@@ -381,6 +421,38 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                             ),
                             const SizedBox(height: 14),
+
+                            // --- CLASS DROPDOWN (FINAL, 100% WORKING) ---
+                            StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance.collection('classes').snapshots(),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) {
+                                  return const LinearProgressIndicator();
+                                }
+                                final docs = snapshot.data!.docs;
+                                return DropdownButtonFormField<String>(
+                                  value: selectedClassId == null ? null : selectedClassId,
+                                  hint: const Text("Select Class"),
+                                  isExpanded: true,
+                                  items: docs.map((doc) {
+                                    final data = doc.data() as Map<String, dynamic>;
+                                    return DropdownMenuItem<String>(
+                                      value: doc.id,
+                                      child: Text(data['name']),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    print("Selected Class ID: $val");
+                                    setState(() {
+                                      selectedClassId = val;
+                                      selectedSectionId = null;
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 14),
+                            // --- END CLASS DROPDOWN ---
                             TextField(
                               controller: _passwordController,
                               enabled: !_isLoading,
@@ -528,4 +600,5 @@ class _LoginScreenState extends State<LoginScreen>
       ),
     );
   }
-}
+ }
+

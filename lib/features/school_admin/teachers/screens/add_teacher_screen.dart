@@ -1,7 +1,8 @@
-// features/school_admin/teachers/screens/add_teacher_screen.dart
-// features/school_admin/teachers/screens/add_teacher_screen.dart
-
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:school_app/features/school_admin/teachers/screens/teachers_screen.dart';
 
 class AddTeacherScreen extends StatefulWidget {
   const AddTeacherScreen({super.key});
@@ -15,11 +16,14 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  String selectedRole = "teacher";
+String selectedRole = "teacher";
   bool isSaving = false;
 
   Future<void> _save() async {
-    final name = _nameController.text.trim();
+    final name =
+    _nameController.text
+        .trim()
+        .toUpperCase();
     final email = _emailController.text.trim();
     final phone = _phoneController.text.trim();
 
@@ -32,88 +36,324 @@ class _AddTeacherScreenState extends State<AddTeacherScreen> {
 
     setState(() => isSaving = true);
 
-    /// 🔥 (Next step we will connect Firebase here)
+    try {
+      // 🔐 Temporary password
+      final password =
+          email.length >= 6 ? email.substring(0, 6) : "123456";
 
-    await Future.delayed(const Duration(seconds: 1));
+      // 🔥 Current Admin
+      final currentAdmin = FirebaseAuth.instance.currentUser!;
+      final adminUid = currentAdmin.uid;
 
-    if (!mounted) return;
+      final adminDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(adminUid)
+          .get();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          "${selectedRole == "mentor" ? "Mentor" : "Teacher"} Added Successfully ✅",
+      final schoolId = adminDoc['schoolId'];
+
+
+
+
+final secondaryApp =
+    await Firebase.initializeApp(
+
+  name:
+      DateTime.now()
+          .millisecondsSinceEpoch
+          .toString(),
+
+  options:
+      Firebase.app().options,
+);
+
+
+
+
+
+
+     
+
+final secondaryAuth =
+    FirebaseAuth.instanceFor(
+  app: secondaryApp,
+);
+
+
+
+
+
+
+
+
+
+      // ✅ CREATE TEACHER AUTH ACCOUNT
+      final userCredential =
+          await secondaryAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final teacherUid = userCredential.user!.uid;
+
+      // ✅ USERS COLLECTION
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(teacherUid)
+          .set({
+       "role": selectedRole,
+"classTeacherOf": null,
+        "schoolId": schoolId,
+        "teacherId": teacherUid,
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "gender": "",
+        "dob": null,
+        "qualification": "",
+        "experience": "",
+        "address": "",
+        "joiningDate": null,
+        "emergencyContact": "",
+        "subjects": [],
+        "isActive": true,
+        "isDeleted": false,
+        "mustChangePassword": true,
+        "createdBy": adminUid,
+        "createdAt": FieldValue.serverTimestamp(),
+        "updatedAt": FieldValue.serverTimestamp(),
+      });
+
+      // ✅ TEACHERS COLLECTION
+      await FirebaseFirestore.instance
+          .collection('schools')
+          .doc(schoolId)
+          .collection('teachers')
+          .doc(teacherUid)
+          .set({
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "photoUrl": "",
+        "role": selectedRole,
+        "classTeacherOf": null,
+        "teacherId": teacherUid,
+        "schoolId": schoolId,
+        "gender": "",
+        "dob": null,
+        "qualification": "",
+        "experience": "",
+        "address": "",
+        "joiningDate": null,
+        "emergencyContact": "",
+        "subjects": [],
+        "assignmentKeys": [],
+        "isActive": true,
+        "isDeleted": false,
+        "archived": false,
+        "mustChangePassword": true,
+        "createdBy": adminUid,
+        "createdAt": FieldValue.serverTimestamp(),
+        "updatedAt": FieldValue.serverTimestamp(),
+      });
+
+      // ✅ SIGN OUT SECONDARY APP
+     await secondaryAuth.signOut();
+
+await Future.delayed(
+  const Duration(seconds: 1),
+);
+
+await secondaryApp.delete();
+if (!mounted) return;
+
+setState(() {
+  isSaving = false;
+});
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "${selectedRole == "mentor" ? "Mentor" : "Teacher"} Added Successfully ✅\nTemporary Password: $password",
+          ),
+          backgroundColor: Colors.green,
         ),
-        backgroundColor: Colors.green,
+      );
+
+if (!mounted) return;
+
+Navigator.pushAndRemoveUntil(
+
+  context,
+
+  MaterialPageRoute(
+
+    builder: (_) =>
+        const TeachersScreen(),
+  ),
+
+  (route) => false,
+); 
+
+    } on FirebaseAuthException catch (e) {
+
+      String message = "Something went wrong";
+
+      if (e.code == 'email-already-in-use') {
+        message = "Email already exists";
+      } else if (e.code == 'invalid-email') {
+        message = "Invalid email address";
+      } else if (e.code == 'weak-password') {
+        message = "Weak password";
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+
+    } catch (e) {
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+
+    }
+
+   
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Widget _input({
+    required TextEditingController controller,
+    required String label,
+    TextInputType? type,
+    int? maxLength,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: type,
+      maxLength: maxLength,
+      decoration: InputDecoration(
+        labelText: label,
+        counterText: "",
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
       ),
     );
-
-    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xffF5F7FB),
-      appBar: AppBar(
-        title: const Text("Add Staff"),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xff1E3A8A),
-        elevation: 0,
-      ),
+     
+   appBar: AppBar(
+
+  elevation: 0,
+
+  backgroundColor: Colors.transparent,
+
+  foregroundColor: Colors.black,
+
+  titleSpacing: 0,
+
+  title: const Text(
+
+    "Add Teacher",
+
+    style: TextStyle(
+      fontWeight: FontWeight.bold,
+      fontSize: 22,
+    ),
+  ),
+),
+
+
+
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            /// 🧑 NAME
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: "Name"),
-            ),
-
+            _input(controller: _nameController, label: "Name"),
+           
+           
             const SizedBox(height: 12),
 
-            /// 📧 EMAIL
-            TextField(
+            _input(
               controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: "Email"),
+              label: "Email",
+              type: TextInputType.emailAddress,
             ),
-
             const SizedBox(height: 12),
 
-            /// 📱 PHONE
-            TextField(
+            _input(
               controller: _phoneController,
-              keyboardType: TextInputType.number,
+              label: "Phone",
+              type: TextInputType.number,
               maxLength: 10,
-              decoration: const InputDecoration(labelText: "Phone"),
             ),
-
+            
+            
+            
             const SizedBox(height: 12),
+             DropdownButtonFormField<String>(
 
-            /// 🔥 ROLE SELECTOR
-            DropdownButtonFormField<String>(
-              value: selectedRole,
-              decoration: const InputDecoration(labelText: "Role"),
-              items: const [
-                DropdownMenuItem(value: "teacher", child: Text("Teacher")),
-                DropdownMenuItem(value: "mentor", child: Text("Mentor")),
-              ],
-              onChanged: (value) {
-                setState(() => selectedRole = value!);
-              },
-            ),
+  value: selectedRole,
 
-            const SizedBox(height: 25),
+  decoration: const InputDecoration(
+    labelText: 'Role',
+    border: OutlineInputBorder(),
+  ),
 
-            /// 💾 SAVE BUTTON
+  items: const [
+
+    DropdownMenuItem(
+      value: 'teacher',
+      child: Text('Teacher'),
+    ),
+
+    DropdownMenuItem(
+      value: 'mentor',
+      child: Text('Mentor'),
+    ),
+  ],
+
+  onChanged: (value) {
+
+    setState(() {
+
+      selectedRole = value!;
+    });
+  },
+),
+
+const SizedBox(height: 12),
+
             SizedBox(
               width: double.infinity,
+              height: 50,
+
+
+
+
+
+
+
               child: ElevatedButton(
                 onPressed: isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xff6366F1),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: isSaving
                     ? const CircularProgressIndicator(color: Colors.white)

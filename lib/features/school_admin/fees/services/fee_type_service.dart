@@ -83,7 +83,7 @@ class FeeTypeService {
         throw Exception('Fee type not found');
       }
 
-      final data = doc.data() ?? <String, dynamic>{};
+      final data = doc.data() as Map<String, dynamic>;
       final oldLower = (data['nameLower'] ?? '').toString();
 
       if (oldLower.isNotEmpty && oldLower != lower) {
@@ -124,7 +124,7 @@ class FeeTypeService {
       final doc = await tx.get(ref);
       if (!doc.exists) return;
 
-      final data = doc.data() ?? <String, dynamic>{};
+      final data = doc.data() as Map<String, dynamic>;
       final lower = (data['nameLockId'] ?? data['nameLower'] ?? '').toString();
       if (lower.isNotEmpty) {
         tx.delete(_nameLock(schoolId, lower));

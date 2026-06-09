@@ -5,8 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:school_app/providers/core_providers.dart';
 import 'package:school_app/features/teacher/providers/teacher_profile_provider.dart';
 
+// ✅ IMPORT PROFILE SCREEN
+import 'teacher_profile_screen.dart';
+
 class TeacherDashboardScreen extends ConsumerWidget {
   const TeacherDashboardScreen({super.key});
+
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,46 +52,61 @@ class TeacherDashboardScreen extends ConsumerWidget {
                   ),
                 ),
                 data: (doc) {
-                  final data = doc.data() ?? const <String, dynamic>{};
+                  final data = doc.data() as Map<String, dynamic>;
                   final name = (data['name'] ?? 'Teacher').toString();
                   final assignments = ref.watch(teacherAssignmentsProvider);
+
+                  // final teacherId = doc.id;
+                  // final assignmentKeys = data['assignmentKeys'];
+                  
+                  // print("Teacher ID: $teacherId");
+                  // print("Assignments: $assignmentKeys");
 
                   return ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(18),
-                              blurRadius: 14,
-                              offset: const Offset(0, 7),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome, $name',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF111827),
+
+
+
+                      // 🔥 CLICKABLE PROFILE CARD
+                      GestureDetector(
+                                            onTap: () {
+                                    context.push('/teacher/profile');
+},
+                        child: Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(18),
+                                blurRadius: 14,
+                                offset: const Offset(0, 7),
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Select a class to mark attendance. This is locked to your assigned classes.',
-                              style: TextStyle(
-                                color: Color(0xFF4B5563),
-                                height: 1.4,
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Welcome, $name',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF111827),
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Tap here to view your profile',
+                                style: TextStyle(
+                                  color: Color(0xFF4B5563),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -95,6 +114,9 @@ class TeacherDashboardScreen extends ConsumerWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
+
+
+
                         child: Padding(
                           padding: const EdgeInsets.all(14),
                           child: Column(

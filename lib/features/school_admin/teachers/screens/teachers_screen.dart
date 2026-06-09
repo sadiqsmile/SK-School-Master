@@ -1,639 +1,1150 @@
-// features/school_admin/teachers/screens/teachers_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
+import 'package:school_app/core/widgets/profile_avatar.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
-import 'package:school_app/services/teacher_account_service.dart';
+import 'package:school_app/providers/current_school_provider.dart';
+import 'teacher_profile_screen.dart';
+import '../services/teacher_export_service.dart';
+import '../services/teacher_import_service.dart';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:school_app/core/services/image_service.dart';
+
+
+
+
+Future<void> uploadTeacherPhotos(
+  BuildContext context,
+  String schoolId,
+) async {
+
+  final result =
+      await FilePicker.platform.pickFiles(
+    allowMultiple: true,
+    type: FileType.image,
+    withData: true,
+  );
+
+  if (result == null) return;
+
+  int uploaded = 0;
+
+  for (final file in result.files) {
+
+    try {
+
+      final email = file.name
+          .replaceAll(
+            RegExp(r'\.[^/.]+$'),
+            '',
+          )
+          .trim()
+          .toLowerCase();
+
+      final fileBytes = file.bytes;
+
+      if (fileBytes == null) continue;
+
+      final compressed =
+          await FlutterImageCompress
+              .compressWithList(
+
+        fileBytes,
+
+        quality: 55,
+
+        minWidth: 300,
+        minHeight: 300,
+
+        format:
+            CompressFormat.jpeg,
+      );
+
+      final teacherSnap =
+          await FirebaseFirestore.instance
+              .collection('schools')
+              .doc(schoolId)
+              .collection('teachers')
+              .where(
+                'email',
+                isEqualTo: email,
+              )
+              .limit(1)
+              .get();
+
+      if (teacherSnap.docs.isEmpty) {
+        continue;
+      }
+
+      final teacherDoc =
+          teacherSnap.docs.first;
+
+      final teacherId =
+          teacherDoc.id;
+
+      final url =
+          await ImageService.uploadImage(
+
+        schoolId: schoolId,
+
+        module: 'teachers',
+
+        type: 'profile',
+
+        fileName: teacherId,
+
+        bytes: compressed,
+      );
+
+      await teacherDoc.reference.update({
+        'photoUrl': url,
+      });
+
+      uploaded++;
+
+    } catch (e) {
+
+      debugPrint(
+        'Teacher Photo Upload Error: $e',
+      );
+    }
+  }
+
+  if (context.mounted) {
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+
+      SnackBar(
+        content: Text(
+          '$uploaded teacher photos uploaded',
+        ),
+      ),
+    );
+  }
+}
 
 class TeachersScreen extends ConsumerWidget {
   const TeachersScreen({super.key});
 
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const lightBg = Color(0xFFF6F5FF);
-    const accent = Color(0xFF7C83FD);
-    final teachersAsync = ref.watch(teachersProvider);
+    final teachersAsync =
+        ref.watch(teachersProvider);
+
+    final schoolIdAsync = ref.watch(schoolIdProvider);
 
     return AdminLayout(
       title: 'Teachers',
-      body: _TeachersBody(
-        lightBg: lightBg,
-        accent: accent,
-        teachersAsync: teachersAsync,
+      onSettingsPressed: () => showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _TeacherSettingsSheet(context: context),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/add-teacher'),
-        icon: const Icon(Icons.person_add_alt_1_rounded),
-        label: const Text('Add Teacher'),
+
+      floatingActionButton:
+          FloatingActionButton.extended(
+        onPressed: () =>
+            context.go(
+          '/add-teacher',
+        ),
+        icon: const Icon(
+          Icons.person_add_alt_1,
+        ),
+        label: const Text(
+          'Add Teacher',
+        ),
       ),
-    );
-  }
-}
+      body: teachersAsync.when(
+        loading: () =>
+            const Center(
+          child:
+              CircularProgressIndicator(),
+        ),
+        error: (e, _) =>
+            Center(
+          child: Text(
+            'Error: $e',
+          ),
+        ),
+        data: (snapshot) {
+          final teachers = snapshot.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            return data['archived'] != true;
+          }).toList();
 
-class _TeachersBody extends ConsumerWidget {
-  const _TeachersBody({
-    required this.lightBg,
-    required this.accent,
-    required this.teachersAsync,
-  });
-
-  final Color lightBg;
-  final Color accent;
-  final AsyncValue teachersAsync;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      color: lightBg,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: Row(
+          if (teachers.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: const Color(0xFFEFF6FF),
-                    child: Icon(Icons.school_rounded, color: accent),
+
+                  Container(
+                    height: 90,
+                    width: 90,
+                    decoration: BoxDecoration(
+                      color: Colors.deepPurple.withOpacity(0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.groups_rounded,
+                      size: 42,
+                      color: Colors.deepPurple,
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Manage teachers, assignments, and logins from one place.',
-                      style: TextStyle(height: 1.4, color: Color(0xFF374151)),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    "No Active Teachers",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xff374151),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  Text(
+                    "Add teachers to manage classes,\nsubjects and timetable.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      context.push('/add-teacher');
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text("Add Teacher"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            teachersAsync.when(
-              data: (snapshot) {
-                final teachers = snapshot.docs;
-                final totalCount = teachers.length;
-                final recentTeachers = teachers.take(3).toList();
+            );
+          }
 
-                final sorted = [...teachers]
-                  ..sort((a, b) {
-                    final an = (a.data()['name'] ?? '').toString();
-                    final bn = (b.data()['name'] ?? '').toString();
-                    return an.compareTo(bn);
-                  });
+          return LayoutBuilder(
+            builder:
+                (context, box) {
+              final mobile =
+                  box.maxWidth <
+                      760;
 
-                return Column(
+              return SingleChildScrollView(
+                padding:
+                    const EdgeInsets.all(
+                  13,
+                ),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .start,
                   children: [
-                    Row(
+                    _heroHeader(
+                      teachers
+                          .length,
+                    ),
+
+                    const SizedBox(
+                      height: 18,
+                    ),
+
+
+
+
+                    GridView.count(
+                      crossAxisCount:
+                          mobile
+                              ? 2
+                              : 4,
+                      shrinkWrap: true,
+                      physics:
+                          const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing:
+                          14,
+                      mainAxisSpacing:
+                          14,
+                      childAspectRatio:
+                          mobile
+                              ? 2.1
+                              : 2.8,
                       children: [
-                        Expanded(
-                          child: _statCard(
-                            'Total Teachers',
-                            '$totalCount',
-                            Icons.groups_2_rounded,
+                        _statCard(
+                          'Total',
+                          teachers
+                              .length
+                              .toString(),
+                          Icons.groups_rounded,
+                          const Color(
+                            0xFF2563EB,
+                          ),
+                          const Color(
+                            0xFF3B82F6,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _statCard(
-                            'Active Today',
-                            '${(totalCount * 0.8).round()}',
-                            Icons.how_to_reg_rounded,
+                        _statCard(
+                          'Assigned',
+                          teachers
+                              .where(
+                                (
+                                  e,
+                                ) {
+                                  final d = e
+                                          .data()
+                                      as Map<String,
+                                          dynamic>;
+
+                                  final a = d[
+                                          'assignmentKeys'] ??
+                                      [];
+
+                                  return a
+                                      .isNotEmpty;
+                                },
+                              )
+                              .length
+                              .toString(),
+                          Icons.school_rounded,
+                          const Color(
+                            0xFF10B981,
+                          ),
+                          const Color(
+                            0xFF059669,
+                          ),
+                        ),
+                        _statCard(
+                          'Unassigned',
+                          teachers
+                              .where(
+                                (
+                                  e,
+                                ) {
+                                  final d = e
+                                          .data()
+                                      as Map<String,
+                                          dynamic>;
+
+                                  final a = d[
+                                          'assignmentKeys'] ??
+                                      [];
+
+                                  return a
+                                      .isEmpty;
+                                },
+                              )
+                              .length
+                              .toString(),
+                          Icons.pending_actions_rounded,
+                          const Color(
+                            0xFFEF4444,
+                          ),
+                          const Color(
+                            0xFFDC2626,
+                          ),
+                        ),
+                        _statCard(
+                          'Active',
+                          teachers
+                              .length
+                              .toString(),
+                          Icons.verified_user_rounded,
+                          const Color(
+                            0xFF8B5CF6,
+                          ),
+                          const Color(
+                            0xFF6366F1,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Recent Teacher Updates',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1F2937),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          if (recentTeachers.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Text(
-                                'No teachers added yet.',
-                                style: TextStyle(color: Color(0xFF6B7280)),
-                              ),
-                            )
-                          else
-                            ...recentTeachers.map((doc) {
-                              final data = doc.data();
-                              final name = data['name'] ?? 'Teacher';
-                              final email = (data['email'] ?? '').toString();
-                              return _listRow(
-                                name,
-                                email.isEmpty ? 'No email' : email,
-                                Icons.person_rounded,
-                              );
-                            }),
-                        ],
-                      ),
+
+                    const SizedBox(
+                      height: 18,
                     ),
 
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Expanded(
-                                child: Text(
-                                  'All Teachers',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF1F2937),
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '${sorted.length}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF6B7280),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          if (sorted.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Text(
-                                'No teachers added yet. Tap “Add Teacher”.',
-                                style: TextStyle(color: Color(0xFF6B7280)),
-                              ),
-                            )
-                          else
-                            ...sorted.map((doc) {
-                              final data = doc.data();
-                              final teacherId = doc.id;
-                              final name = (data['name'] ?? 'Teacher')
-                                  .toString();
-                              final email = (data['email'] ?? '').toString();
-                              final phone = (data['phone'] ?? '').toString();
-                              final subjects =
-                                  (data['subjects'] as List?)
-                                      ?.map((e) => e.toString())
-                                      .toList() ??
-                                  const <String>[];
+                    ListView.builder(
+                      itemCount:
+                          teachers
+                              .length,
+                      shrinkWrap: true,
+                      physics:
+                          const NeverScrollableScrollPhysics(),
+                      itemBuilder:
+                          (
+                        context,
+                        index,
+                      ) {
+                        final doc =
+                            teachers[
+                                index];
 
-                              final assignments = _parseTeacherAssignments(
-                                data,
-                              );
+                        final data = doc
+                                .data()
+                            as Map<String,
+                                dynamic>;
 
-                              return _TeacherRow(
-                                accent: accent,
-                                teacherId: teacherId,
-                                name: name,
-                                email: email,
-                                phone: phone,
-                                subjects: subjects,
-                                assignments: assignments,
-                                onResetPassword: () async {
-                                  final ok = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text(
-                                        'Reset teacher password?',
-                                      ),
-                                      content: Text(
-                                        'This will reset "$name" password to the first 6 characters of their email and force a password change on next login.',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        FilledButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(true),
-                                          child: const Text('Reset'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
+                        final teacherId =
+                            doc.id;
 
-                                  if (ok != true) return;
-                                  try {
-                                    final schoolId = await ref.read(
-                                      schoolIdProvider.future,
-                                    );
-                                    final result = await TeacherAccountService()
-                                        .resetTeacherLogin(
-                                          schoolId: schoolId,
-                                          teacherName: name,
-                                          email: email,
-                                          phone: phone,
-                                          role: 'teacher',
-                                          teacherId: teacherId,
-                                        );
+                        final name =
+                            (data['name'] ??
+                                    '')
+                                .toString();
 
-                                    final tempPassword =
-                                        (result['temporaryPassword'] ?? '')
-                                            .toString();
-                                    if (!context.mounted) return;
-                                    await showDialog<void>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Text('Password reset'),
-                                        content: SelectableText(
-                                          'Email: $email\n'
-                                          'Temporary password: $tempPassword\n\n'
-                                          'Teacher must change password after login.',
-                                        ),
-                                        actions: [
-                                          FilledButton(
-                                            onPressed: () =>
-                                                Navigator.of(context).pop(),
-                                            child: const Text('OK'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  } catch (e) {
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Reset failed: $e'),
-                                      ),
-                                    );
-                                  }
-                                },
-                                onSendPasswordResetEmail: () async {
-                                  if (email.trim().isEmpty) {
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'No email found for this teacher.',
-                                        ),
-                                      ),
-                                    );
-                                    return;
-                                  }
+                        final email =
+                            (data['email'] ??
+                                    '')
+                                .toString();
 
-                                  final ok = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text(
-                                        'Send password reset email?',
-                                      ),
-                                      content: Text(
-                                        'This will send a password reset link to:\n\n$email',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        FilledButton(
-                                          onPressed: () =>
-                                              Navigator.of(context).pop(true),
-                                          child: const Text('Send'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
+                        final phone =
+                            (data['phone'] ??
+                                    '')
+                                .toString();
 
-                                  if (ok != true) return;
+                        final photoUrl =
+                          (data['photoUrl'] ??
+                              '')
+                            .toString();
 
-                                  try {
-                                    await FirebaseAuth.instance
-                                        .sendPasswordResetEmail(
-                                          email: email.trim(),
-                                        );
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Password reset email sent to $email',
-                                        ),
-                                      ),
-                                    );
-                                  } catch (e) {
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Failed to send email: $e',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                              );
-                            }),
-                        ],
-                      ),
+                        final assignmentKeys =
+                            (data['assignmentKeys'] ??
+                                    [])
+                                as List;
+
+                       return _teacherCard(
+  context: context,
+  ref: ref,
+  schoolId: schoolIdAsync.value ?? '',
+  teacherId: teacherId,
+  name: name,
+  email: email,
+  phone: phone,
+  photoUrl: photoUrl,
+  assignmentKeys: assignmentKeys,
+
+  classTeacher: data['classTeacherOf'],
+
+  attendanceClasses: List<String>.from(
+    data['attendanceClasses'] ?? [],
+  ),
+
+  subjects: List<String>.from(
+    data['subjects'] ?? [],
+  ),
+);
+
+
+
+                      },
                     ),
                   ],
-                );
-              },
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: CircularProgressIndicator(color: Color(0xFF7C83FD)),
                 ),
-              ),
-              error: (e, _) =>
-                  Center(child: Text('Error loading teachers: $e')),
-            ),
-          ],
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }
 
-  Widget _statCard(String title, String value, IconData icon) {
+  Widget _heroHeader(
+    int total,
+  ) {
+   
     return Container(
-      padding: const EdgeInsets.all(12),
+      width: double.infinity,
+      padding:
+          const EdgeInsets.all(
+        20,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius:
+            BorderRadius.circular(
+          22,
+        ),
+        gradient:
+            const LinearGradient(
+          colors: [
+            Color(0xFF0EA5E9),
+            Color(0xFF2563EB),
+          ],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(
+              0x220EA5E9,
+            ),
+            blurRadius: 24,
+            offset: Offset(
+              0,
+              12,
+            ),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment
+                .start,
         children: [
-          Icon(icon, color: accent),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          const Text(
+            'Staff Management 👨‍🏫',
+            style: TextStyle(
+              color:
+                  Colors.white70,
+            ),
+          ),
+          const SizedBox(
+            height: 6,
+          ),
+          const Text(
+            'Teachers Dashboard',
+            style: TextStyle(
+              color:
+                  Colors.white,
+              fontSize: 26,
+              fontWeight:
+                  FontWeight.w800,
+            ),
+          ),
+          const SizedBox(
+            height: 8,
           ),
           Text(
-            title,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            '$total teachers registered in your school.',
+            style:
+                const TextStyle(
+              color:
+                  Colors.white70,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _listRow(String name, String subtitle, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
-          borderRadius: BorderRadius.circular(12),
+
+
+Widget _statCard(
+  String title,
+  String value,
+  IconData icon,
+  Color start,
+  Color end,
+) {
+  return Container(
+
+    padding: const EdgeInsets.symmetric(
+      horizontal: 14,
+      vertical: 12,
+    ),
+
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius:
+          BorderRadius.circular(18),
+
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x10000000),
+          blurRadius: 12,
+          offset: Offset(0, 4),
         ),
-        child: Row(
-          children: [
-            Icon(icon, color: accent),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                ],
-              ),
+      ],
+    ),
+
+    child: Row(
+      children: [
+
+        Container(
+          width: 42,
+          height: 42,
+
+          decoration: BoxDecoration(
+            borderRadius:
+                BorderRadius.circular(12),
+
+            gradient: LinearGradient(
+              colors: [start, end],
             ),
-          ],
+          ),
+
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 20,
+          ),
         ),
-      ),
-    );
-  }
-}
 
-class _TeacherRow extends StatelessWidget {
-  const _TeacherRow({
-    required this.accent,
-    required this.teacherId,
-    required this.name,
-    required this.email,
-    required this.phone,
-    required this.subjects,
-    required this.assignments,
-    required this.onResetPassword,
-    required this.onSendPasswordResetEmail,
-  });
+        const SizedBox(width: 12),
 
-  final Color accent;
-  final String teacherId;
-  final String name;
-  final String email;
-  final String phone;
-  final List<String> subjects;
-  final List<String> assignments;
-  final VoidCallback onResetPassword;
-  final VoidCallback onSendPasswordResetEmail;
+        Expanded(
+          child: Column(
+            mainAxisAlignment:
+                MainAxisAlignment.center,
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+
             children: [
-              CircleAvatar(
-                backgroundColor: const Color(0xFFEFF6FF),
-                child: Icon(Icons.person_rounded, color: accent),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name.isEmpty ? 'Teacher' : name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF111827),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      email.isEmpty ? 'No email' : email,
-                      style: const TextStyle(color: Color(0xFF6B7280)),
-                    ),
-                    if (phone.trim().isNotEmpty)
-                      Text(
-                        phone,
-                        style: const TextStyle(color: Color(0xFF6B7280)),
-                      ),
-                  ],
+
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
                 ),
               ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  TextButton.icon(
-                    onPressed: onSendPasswordResetEmail,
-                    icon: const Icon(Icons.mark_email_read_rounded, size: 18),
-                    label: const Text('Send reset email'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF2563EB),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  FilledButton.icon(
-                    onPressed: onResetPassword,
-                    icon: const Icon(Icons.lock_reset_rounded, size: 18),
-                    label: const Text('Reset password'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: accent,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 10,
-                      ),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ],
+
+              const SizedBox(height: 3),
+
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          _chips('Subjects', subjects),
-          const SizedBox(height: 6),
-          _chips('Assigned', assignments),
+        ),
+      ],
+    ),
+  );
+}
+
+
+
+
+Widget _teacherCard({
+  required BuildContext context,
+  required WidgetRef ref,
+  required String schoolId,
+  required String teacherId,
+  required String name,
+  required String email,
+  required String phone,
+  required String photoUrl,
+  required List assignmentKeys,
+
+  required dynamic classTeacher,
+  required List<String> attendanceClasses,
+  required List<String> subjects,
+})
+  
+  
+   {
+    final assignmentTags = assignmentKeys
+        .map((e) => e.toString())
+        .toSet()
+        .toList();
+
+final classTeacherText =
+    classTeacher == null
+        ? 'Not Assigned'
+        : '${classTeacher['classId']} ${classTeacher['sectionId']}';
+
+
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TeacherProfileScreen(
+              schoolId: schoolId,
+              teacherId: teacherId,
+            ),
+          ),
+        );
+      },
+      child: Container(
+      margin:
+          const EdgeInsets.only(
+        bottom: 14,
+      ),
+      padding:
+          const EdgeInsets.all(
+        16,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+            BorderRadius.circular(
+          22,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(
+              0x12000000,
+            ),
+            blurRadius: 18,
+            offset: Offset(
+              0,
+              8,
+            ),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          
+          Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+
+    ProfileAvatar(
+      name: name,
+      imageUrl: photoUrl,
+      radius: 25,
+    ),
+
+    const SizedBox(width: 20),
+
+    Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          Text(
+            ' $name',
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          Text('📞  $phone'),
+
+          const SizedBox(height: 8),
+
+          Text('✉️ : $email'),
+
+          const SizedBox(height: 8),
+
+          Text('🎓 Class Teacher : $classTeacherText'),
+
+          const SizedBox(height: 8),
+
+          Text(
+            '📚 Subject : ${subjects.isEmpty ? "Not Assigned" : subjects.join(", ")}',
+          ),
+        ],
+      ),
+    ),
+  ],
+),
+
+      const SizedBox(height: 16),
+
+Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+
+    // LEFT
+    Expanded(
+      flex: 3,
+      child: const SizedBox.shrink(),
+    ),
+
+    const SizedBox(width: 20),
+
+  ],
+),
+
+        ],
+      ),
+    ),
+    );
+   
+  }
+
+
+  Future<void>
+      _resetAssignments(
+    BuildContext context,
+    WidgetRef ref,
+    String teacherId,
+  ) async {
+    final ok =
+        await showDialog<bool>(
+      context: context,
+      builder: (_) =>
+          AlertDialog(
+        title: const Text(
+          'Reset Assignment',
+        ),
+        content: const Text(
+          'Remove all assigned classes?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(
+              context,
+              false,
+            ),
+            child:
+                const Text(
+              'Cancel',
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () =>
+                Navigator.pop(
+              context,
+              true,
+            ),
+            child:
+                const Text(
+              'Reset',
+            ),
+          ),
         ],
       ),
     );
-  }
 
-  Widget _chips(String label, List<String> values) {
-    if (values.isEmpty) {
-      return Text(
-        '$label: -',
-        style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-      );
-    }
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text(
-          '$label:',
-          style: const TextStyle(
-            color: Color(0xFF6B7280),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+    if (ok != true) return;
+
+    final school = await ref.read(
+      currentSchoolProvider.future,
+    );
+
+    await FirebaseFirestore
+        .instance
+        .collection('schools')
+        .doc(school.id)
+        .collection('teachers')
+        .doc(teacherId)
+        .update({
+      'assignmentKeys': [],
+    });
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Assignments cleared',
           ),
         ),
-        for (final v in values)
-          Chip(label: Text(v), visualDensity: VisualDensity.compact),
-      ],
+      );
+    }
+  }
+}
+
+
+
+
+
+
+// ─── Teacher Settings Bottom Sheet ─────────────────────────────────────────
+
+class _TeacherSettingsSheet extends ConsumerWidget {
+  final BuildContext context;
+  const _TeacherSettingsSheet({required this.context});
+
+  @override
+  Widget build(
+  BuildContext ctx,
+  WidgetRef ref,
+)
+      
+   {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      
+      
+    child: SingleChildScrollView(
+  child: Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment:
+        CrossAxisAlignment.start,
+
+        children: [
+          // handle bar
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xffE5E7EB),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Teacher Settings',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xff1F2937),
+            ),
+          ),
+          
+
+
+          const SizedBox(height: 16),
+          _SheetTile(
+            icon: Icons.archive_outlined,
+            iconColor: const Color(0xff5B5FEF),
+            iconBg: const Color(0xffEEEFFF),
+            title: 'Archived Teachers',
+            subtitle: 'View and restore deleted teachers',
+            onTap: () {
+              Navigator.pop(ctx);
+              context.push('/school-admin/settings/archived-teachers');
+            },
+          ),
+          const SizedBox(height: 8),
+         
+         
+         
+         _SheetTile(
+  icon: Icons.file_download_outlined,
+  iconColor: const Color(0xff0891B2),
+  iconBg: const Color(0xffE0F7FA),
+  title: 'Export Teachers',
+  subtitle: 'Download teacher list as spreadsheet',
+
+onTap: () async {
+
+  Navigator.pop(ctx);
+
+  final school =
+      await ref.read(
+    currentSchoolProvider.future,
+  );
+
+  await TeacherExportService
+      .exportTeachers(
+    school.id,
+  );
+},
+),
+
+          const SizedBox(height: 8),
+
+_SheetTile(
+  icon: Icons.file_upload_outlined,
+
+  iconColor:
+      const Color(0xff059669),
+
+  iconBg:
+      const Color(0xffD1FAE5),
+
+  title: 'Import Teachers',
+
+  subtitle:
+      'Bulk import teachers from Excel',
+
+  onTap: () async {
+
+    Navigator.pop(ctx);
+
+    final school =
+        await ref.read(
+      currentSchoolProvider.future,
+    );
+
+    await TeacherImportService
+        .pickAndImportTeachers(
+
+      context: ctx,
+      schoolId: school.id,
+    );
+  },
+),
+
+const SizedBox(height: 8),
+
+_SheetTile(
+  icon: Icons.photo_library_outlined,
+
+  iconColor:
+      const Color(0xff2563EB),
+
+  iconBg:
+      const Color(0xffDBEAFE),
+
+  title: 'Upload Teacher Photos',
+
+  subtitle:
+      'Bulk upload teacher profile photos',
+
+ onTap: () async {
+
+  Navigator.pop(ctx);
+
+  final school =
+      await ref.read(
+    currentSchoolProvider.future,
+  );
+
+  await uploadTeacherPhotos(
+    ctx,
+    school.id,
+  );
+   
+  },
+),
+
+
+//------------------------------------
+          const SizedBox(height: 8),
+          _SheetTile(
+            icon: Icons.lock_outline_rounded,
+            iconColor: const Color(0xffD97706),
+            iconBg: const Color(0xffFEF3C7),
+            title: 'Teacher Permissions',
+            subtitle: 'Control what teachers can access',
+            comingSoon: true,
+          ),
+          const SizedBox(height: 8),
+          _SheetTile(
+            icon: Icons.badge_outlined,
+            iconColor: const Color(0xffDC2626),
+            iconBg: const Color(0xffFEE2E2),
+            title: 'Teacher Roles',
+            subtitle: 'Assign roles like HOD, Class Teacher',
+            comingSoon: true,
+          ),
+        ],
+      ),
+    ),
     );
   }
 }
 
-List<String> _parseTeacherAssignments(Map<String, dynamic> data) {
-  final raw = data['classes'];
 
-  // New format: classes = [{classId, className, sectionId, sectionName}, ...]
-  if (raw is List) {
-    final labels = <String>[];
-    for (final item in raw) {
-      if (item is Map) {
-        final className = (item['className'] ?? '').toString().trim();
-        final sectionName = (item['sectionName'] ?? '').toString().trim();
-        final classId = (item['classId'] ?? '').toString().trim();
-        final sectionId = (item['sectionId'] ?? '').toString().trim();
 
-        final c = className.isNotEmpty ? className : classId;
-        final s = sectionName.isNotEmpty ? sectionName : sectionId;
-        if (c.isEmpty && s.isEmpty) continue;
 
-        if (c.isNotEmpty && s.isNotEmpty) {
-          labels.add('Class $c$s');
-        } else if (c.isNotEmpty) {
-          labels.add('Class $c');
-        } else {
-          labels.add(s);
-        }
-      } else if (item != null) {
-        // Old fallback: classes stored as List<String>
-        final v = item.toString().trim();
-        if (v.isNotEmpty) labels.add(v);
-      }
-    }
-    if (labels.isNotEmpty) return labels;
+
+class _SheetTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final bool comingSoon;
+
+  const _SheetTile({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+    this.comingSoon = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xffF9FAFB),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: comingSoon ? null : onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                height: 42,
+                width: 42,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xff1F2937),
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xff6B7280),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (comingSoon)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xffF3F4F6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Soon',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xff9CA3AF),
+                    ),
+                  ),
+                )
+              else
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xff9CA3AF),
+                  size: 20,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
-
-  // Older format: classes + sections stored separately.
-  final classes =
-      (data['classes'] as List?)?.map((e) => e.toString()).toList() ??
-      const <String>[];
-  final sections =
-      (data['sections'] as List?)?.map((e) => e.toString()).toList() ??
-      const <String>[];
-  if (classes.isEmpty && sections.isEmpty) return const <String>[];
-
-  // If we don't have pairing information, show a reasonable summary.
-  if (classes.isNotEmpty && sections.isNotEmpty) {
-    final minLen = classes.length < sections.length
-        ? classes.length
-        : sections.length;
-    final paired = <String>[];
-    for (var i = 0; i < minLen; i++) {
-      final c = classes[i].trim();
-      final s = sections[i].trim();
-      if (c.isEmpty && s.isEmpty) continue;
-      paired.add(s.isEmpty ? c : '$c $s');
-    }
-    if (paired.isNotEmpty) return paired;
-  }
-
-  return [...classes.where((e) => e.trim().isNotEmpty)];
 }

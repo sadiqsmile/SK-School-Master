@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/exam_provider.dart';
 import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:school_app/services/exam_service.dart';
@@ -16,17 +17,15 @@ class ExamTypesScreen extends ConsumerWidget {
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Scaffold(
-        appBar: AppBar(title: const Text('Exam Types')),
+      error: (e, _) => AdminLayout(
+        title: 'Exam Types',
         body: Center(child: Text(e.toString())),
       ),
       data: (schoolId) {
         final typesAsync = ref.watch(examTypesProvider);
 
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Exam Types'),
-          ),
+        return AdminLayout(
+          title: 'Exam Types',
           body: typesAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Failed to load: $e')),
@@ -56,7 +55,7 @@ class ExamTypesScreen extends ConsumerWidget {
               return ListView.separated(
                 padding: const EdgeInsets.all(12),
                 itemCount: types.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
                   final t = types[i];
                   return Card(

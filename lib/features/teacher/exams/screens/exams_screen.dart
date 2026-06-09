@@ -85,7 +85,7 @@ class TeacherExamsScreen extends ConsumerWidget {
               return ListView.separated(
                 padding: const EdgeInsets.all(12),
                 itemCount: sorted.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
                   final exam = sorted[i];
                   final subtitle = _formatCreatedAt(exam.createdAt);

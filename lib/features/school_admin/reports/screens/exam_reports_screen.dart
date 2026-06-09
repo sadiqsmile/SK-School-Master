@@ -262,7 +262,7 @@ class _ExamReportsScreenState extends ConsumerState<ExamReportsScreen> {
                         data: (snap) {
                           final items = snap.docs
                               .map((d) {
-                                final data = d.data();
+                                final data = d.data() as Map<String, dynamic>;
                                 final name = (data['name'] ?? d.id).toString();
                                 return (id: d.id, name: name);
                               })
@@ -305,7 +305,9 @@ class _ExamReportsScreenState extends ConsumerState<ExamReportsScreen> {
                               data: (snap) {
                                 final sections = snap.docs
                                     .map((d) {
-                                      final data = d.data();
+                                      final data =
+    d.data()
+        as Map<String, dynamic>;
                                       final name = (data['name'] ?? d.id).toString();
                                       return (id: d.id, name: name);
                                     })

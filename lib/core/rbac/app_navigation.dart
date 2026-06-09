@@ -3,10 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/models/user_role.dart';
 
-/// A single navigation entry used to build role-based navigation.
-///
-/// - If [header] is non-null, the entry is rendered as a section header.
-/// - Otherwise [label]/[icon]/[route] describe a clickable destination.
 class AppNavEntry {
   const AppNavEntry.header(this.header)
       : label = null,
@@ -47,7 +43,6 @@ class AppNavigation {
     }
   }
 
-  /// Drawer entries for a given role.
   static List<AppNavEntry> drawerEntriesFor(
     UserRole role, {
     SchoolModules? modules,
@@ -57,15 +52,17 @@ class AppNavigation {
         final m = modules ?? SchoolModules.defaults();
         return [
           const AppNavEntry.item(
-            label: 'Dashboard',
-            icon: Icons.dashboard_rounded,
+            label: 'School Dashboard',
+            icon: Icons.space_dashboard_rounded,
             route: '/school-admin',
           ),
+
+          const AppNavEntry.header('Management'),
 
           if (m.teachers)
             const AppNavEntry.item(
               label: 'Teachers',
-              icon: Icons.school_rounded,
+              icon: Icons.badge_rounded,
               route: '/school-admin/teachers',
             ),
 
@@ -79,7 +76,7 @@ class AppNavigation {
           if (m.students)
             const AppNavEntry.item(
               label: 'Classes',
-              icon: Icons.class_rounded,
+              icon: Icons.meeting_room_rounded,
               route: '/classes',
             ),
 
@@ -100,7 +97,7 @@ class AppNavigation {
           if (m.fees)
             const AppNavEntry.item(
               label: 'Fees',
-              icon: Icons.payments_rounded,
+              icon: Icons.account_balance_wallet_rounded,
               route: '/school-admin/fees',
             ),
 
@@ -112,18 +109,23 @@ class AppNavigation {
             ),
 
           if (m.exams)
+            const AppNavEntry.header('Examinations'),
+
+          if (m.exams)
             const AppNavEntry.item(
-              label: 'Exam Types',
-              icon: Icons.category_rounded,
+              label: 'Exams',
+              icon: Icons.quiz_rounded,
               route: '/school-admin/exam-types',
             ),
 
           if (m.exams)
             const AppNavEntry.item(
-              label: 'Marks Card Templates',
+              label: 'Marks Card',
               icon: Icons.description_rounded,
               route: '/school-admin/marks-card-templates',
             ),
+
+          const AppNavEntry.header('Insights'),
 
           const AppNavEntry.item(
             label: 'Reports',
@@ -145,7 +147,7 @@ class AppNavigation {
             route: '/school-admin/settings/modules',
           ),
 
-          const AppNavEntry.header('Academic Management'),
+          if (m.students) const AppNavEntry.header('Academic Management'),
 
           if (m.students)
             const AppNavEntry.item(

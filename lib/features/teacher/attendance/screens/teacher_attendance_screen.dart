@@ -1,7 +1,7 @@
-// features/teacher/attendance/screens/teacher_attendance_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:school_app/core/helpers/student_helper.dart';
 import 'package:school_app/features/teacher/attendance/models/attendance_status.dart';
 import 'package:school_app/features/teacher/attendance/providers/students_by_class_section_provider.dart';
 import 'package:school_app/features/teacher/attendance/services/teacher_attendance_service.dart';
@@ -10,6 +10,10 @@ import 'package:school_app/providers/auth_provider.dart';
 import 'package:school_app/providers/current_school_provider.dart';
 import 'package:school_app/core/offline/firestore_sync_tracker.dart';
 import 'package:school_app/core/offline/firestore_sync_status_action.dart';
+import 'edit_attendance_screen.dart';
+
+
+
 
 class TeacherAttendanceScreen extends ConsumerStatefulWidget {
   const TeacherAttendanceScreen({
@@ -29,26 +33,78 @@ class TeacherAttendanceScreen extends ConsumerStatefulWidget {
 class _TeacherAttendanceScreenState
     extends ConsumerState<TeacherAttendanceScreen> {
   final _statuses = <String, AttendanceStatus>{};
+
   bool _isSaving = false;
+  bool _isOffline = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Connectivity().onConnectivityChanged.listen((results) {
+      setState(() {
+        _isOffline = results.isEmpty ||
+            (results.length == 1 &&
+                results.first == ConnectivityResult.none);
+      });
+    });
+  }
+
+  Widget _quickBtn(
+    String studentId,
+    AttendanceStatus status,
+    Color color,
+  ) {
+    final selected = _statuses[studentId] == status;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: _isSaving
+            ? null
+            : () {
+                setState(() {
+                  _statuses[studentId] = status;
+                });
+              },
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: selected
+                ? color
+                : Colors.grey.shade200,
+            borderRadius:
+                BorderRadius.circular(6),
+          ),
+          child: Center(
+            child: Text(
+              status.label[0],
+              style: TextStyle(
+                color: selected
+                    ? Colors.white
+                    : Colors.black,
+                fontWeight:
+                    FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   String _dateKey(DateTime dt) {
-    final y = dt.year.toString().padLeft(4, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
+    final y =
+        dt.year.toString().padLeft(4, '0');
+    final m =
+        dt.month.toString().padLeft(2, '0');
+    final d =
+        dt.day.toString().padLeft(2, '0');
+
     return '$y-$m-$d';
   }
 
-  Color _statusColor(AttendanceStatus s) {
-    return switch (s) {
-      AttendanceStatus.present => const Color(0xFF16A34A),
-      AttendanceStatus.absent => const Color(0xFFDC2626),
-      AttendanceStatus.late => const Color(0xFFF59E0B),
-      AttendanceStatus.leave => const Color(0xFF6366F1),
-    };
-  }
-
   String _prettyDate(DateTime dt) {
-    const months = <String>[
+    const months = [
       'Jan',
       'Feb',
       'Mar',
@@ -60,414 +116,396 @@ class _TeacherAttendanceScreenState
       'Sep',
       'Oct',
       'Nov',
-      'Dec',
+      'Dec'
     ];
-    final dd = dt.day.toString().padLeft(2, '0');
-    final m = months[dt.month - 1];
-    return '$dd $m ${dt.year}';
+
+    return '${dt.day.toString().padLeft(2, '0')} ${months[dt.month - 1]} ${dt.year}';
   }
 
-  Future<void> _pickStatus(String studentId) async {
-    final current = _statuses[studentId] ?? AttendanceStatus.present;
-
-    final chosen = await showModalBottomSheet<AttendanceStatus>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const ListTile(
-                title: Text(
-                  'Set status',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-              for (final s in AttendanceStatus.values)
-                ListTile(
-                  leading: Icon(Icons.circle, color: _statusColor(s)),
-                  title: Text(s.label),
-                  trailing: s == current
-                      ? const Icon(Icons.check_rounded)
-                      : null,
-                  onTap: () => Navigator.of(context).pop(s),
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (chosen == null) return;
-    if (!mounted) return;
-    setState(() => _statuses[studentId] = chosen);
+  Color _statusColor(
+      AttendanceStatus status) {
+    switch (status) {
+      case AttendanceStatus.present:
+        return Colors.green;
+      case AttendanceStatus.absent:
+        return Colors.red;
+      case AttendanceStatus.late:
+        return Colors.orange;
+      case AttendanceStatus.leave:
+        return Colors.blue;
+    }
   }
 
-  void _markAllPresent(Iterable<String> studentIds) {
+  void _markAllPresent(
+      Iterable<String> ids) {
     setState(() {
-      for (final id in studentIds) {
-        _statuses[id] = AttendanceStatus.present;
+      for (final id in ids) {
+        _statuses[id] =
+            AttendanceStatus.present;
+      }
+    });
+  }
+
+  void _markAllHoliday(
+      Iterable<String> ids) {
+    setState(() {
+      for (final id in ids) {
+        _statuses[id] =
+            AttendanceStatus.leave;
       }
     });
   }
 
   Future<void> _submit() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
+    final auth =
+        ref.read(authStateProvider).value;
 
-    final auth = ref.read(authStateProvider).value;
-    if (auth == null) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('You are not logged in.')),
-      );
-      return;
-    }
+    if (auth == null) return;
 
     setState(() => _isSaving = true);
+
     try {
-      final school = await ref.read(currentSchoolProvider.future);
-      final dateKey = _dateKey(DateTime.now());
+      final school = await ref
+          .read(currentSchoolProvider.future);
 
-      await TeacherAttendanceService().submitAttendance(
-        schoolId: school.id,
-        teacherUid: auth.uid,
-        dateKey: dateKey,
-        classId: widget.classId,
-        sectionId: widget.sectionId,
-        statuses: Map<String, AttendanceStatus>.from(_statuses),
-      );
+      final allHoliday =
+          _statuses.isNotEmpty &&
+              _statuses.values.every(
+                (e) =>
+                    e ==
+                    AttendanceStatus.leave,
+              );
 
-      // Tell the app bar indicator that a write is queued (or syncing).
-      FirestoreSyncTracker.instance.notifyWriteQueued();
+     await TeacherAttendanceService()
+    .submitAttendance(
+  schoolId: school.id,
+  teacherUid: auth.uid,
+  dateKey: _dateKey(DateTime.now()),
+  classId: widget.classId,
+  sectionId: widget.sectionId,
+  statuses: Map.from(_statuses),
+);
 
-      int present = 0;
-      int absent = 0;
-      int late = 0;
-      int leave = 0;
-      for (final s in _statuses.values) {
-        switch (s) {
-          case AttendanceStatus.present:
-            present++;
-          case AttendanceStatus.absent:
-            absent++;
-          case AttendanceStatus.late:
-            late++;
-          case AttendanceStatus.leave:
-            leave++;
-        }
-      }
+      FirestoreSyncTracker.instance
+          .notifyWriteQueued();
 
       if (!mounted) return;
 
-      // Best-effort: if online, we can often confirm sync quickly.
-      final synced = await FirestoreSyncTracker.instance.waitForServerSync(
-        timeout: const Duration(seconds: 2),
-      );
-
-      if (!mounted) return;
-
-      await showDialog<void>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text(synced ? 'Attendance Submitted' : 'Attendance Saved'),
-            content: Text(
-              'Present: $present\n'
-              'Absent: $absent\n'
-              'Late: $late\n'
-              'Leave: $leave\n\n'
-              '${synced ? 'Synced to server.' : 'Saved locally. Will sync automatically when internet returns.'}',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          );
-        },
-      );
-
-      navigator.pop();
-    } on AttendanceAlreadyMarkedException {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
           content: Text(
-            'Attendance already marked for this class/section today.',
+            allHoliday
+                ? "Holiday Saved"
+                : "Attendance Saved",
           ),
         ),
       );
+
+      Navigator.pop(context);
     } catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text('Failed to submit attendance: $e')),
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text("Error: $e"),
+        ),
       );
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+    }
+
+    if (mounted) {
+      setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final assignments = ref.watch(teacherAssignmentsProvider);
-    final isAssigned = assignments.any(
-      (a) => a.classId == widget.classId && a.sectionId == widget.sectionId,
+  
+  
+   final assignments =
+    ref.watch(
+        teacherAssignmentsProvider);
+
+
+final profileAsync =
+    ref.watch(
+      teacherProfileProvider,
     );
 
-    if (!isAssigned) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Attendance • ${widget.classId} - ${widget.sectionId}'),
-        ),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'You are not assigned to this class/section.',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
+final isMentor =
+    profileAsync.maybeWhen(
+
+      data: (doc) {
+
+        final data =
+            doc.data();
+
+        return data?['role'] ==
+            'mentor';
+      },
+
+      orElse: () => false,
+    );
+
+
+
+final isAssigned =
+    assignments.any(
+      (a) =>
+          a.classId ==
+              widget.classId &&
+          a.sectionId ==
+              widget.sectionId,
+    );
+
+if (!isAssigned &&
+    !isMentor) {
+
+  return Scaffold(
+
+    appBar: AppBar(
+      title: const Text(
+        "Attendance",
+      ),
+    ),
+
+    body: const Center(
+      child: Text(
+        "Not assigned",
+      ),
+    ),
+  );
+}
 
     final studentsAsync = ref.watch(
       studentsByClassSectionProvider(
         TeacherClassSectionKey(
           classId: widget.classId,
-          sectionId: widget.sectionId,
+          sectionId:
+              widget.sectionId,
         ),
       ),
     );
 
-    final date = DateTime.now();
-    final dateKey = _dateKey(date);
+    final today = DateTime.now();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Today's Attendance"),
-        actions: const [
-          FirestoreSyncStatusAction(),
-        ],
+        title:
+            const Text("Attendance"),
+       
+
+
+actions: [
+
+  IconButton(
+
+    icon: const Icon(
+      Icons.edit_calendar,
+    ),
+
+    onPressed:
+        (isMentor || isAssigned)
+
+            ? () {
+
+                Navigator.push(
+
+                  context,
+
+                  MaterialPageRoute(
+
+                    builder: (_) =>
+                        EditAttendanceScreen(
+
+                      schoolId: ref
+                          .read(
+                            currentSchoolProvider,
+                          )
+                          .value!
+                          .id,
+
+                      classId:
+                          widget.classId,
+
+                      sectionId:
+                          widget.sectionId,
+                    ),
+                  ),
+                );
+              }
+
+            : null,
+  ),
+
+  const FirestoreSyncStatusAction(),
+],
+
+
+
+
       ),
       body: studentsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load students: $e')),
+        loading: () => const Center(
+          child:
+              CircularProgressIndicator(),
+        ),
+        error: (e, _) =>
+            Center(child: Text("$e")),
         data: (snapshot) {
           final docs = snapshot.docs;
 
-          // Ensure every student has a status default.
           for (final doc in docs) {
-            _statuses.putIfAbsent(doc.id, () => AttendanceStatus.present);
-          }
-
-          if (docs.isEmpty) {
-            return const Center(
-              child: Text('No students found for this class/section.'),
+            _statuses.putIfAbsent(
+              doc.id,
+              () => AttendanceStatus
+                  .present,
             );
-          }
-
-          int present = 0;
-          int absent = 0;
-          int late = 0;
-          int leave = 0;
-          for (final doc in docs) {
-            final s = _statuses[doc.id] ?? AttendanceStatus.present;
-            switch (s) {
-              case AttendanceStatus.present:
-                present++;
-              case AttendanceStatus.absent:
-                absent++;
-              case AttendanceStatus.late:
-                late++;
-              case AttendanceStatus.leave:
-                leave++;
-            }
           }
 
           return Column(
             children: [
+              if (_isOffline)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  color: Colors.orange.shade100,
+                  child: const Row(
+                    children: [
+                      Icon(Icons.wifi_off, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Offline Mode — Attendance will sync automatically',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Class ${widget.classId}${widget.sectionId}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Date: ${_prettyDate(date)}  •  Students: ${docs.length}',
-                      style: const TextStyle(color: Color(0xFF6B7280)),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _CountChip(
-                          label: 'Present',
-                          value: present,
-                          color: _statusColor(AttendanceStatus.present),
-                        ),
-                        _CountChip(
-                          label: 'Absent',
-                          value: absent,
-                          color: _statusColor(AttendanceStatus.absent),
-                        ),
-                        _CountChip(
-                          label: 'Late',
-                          value: late,
-                          color: _statusColor(AttendanceStatus.late),
-                        ),
-                        _CountChip(
-                          label: 'Leave',
-                          value: leave,
-                          color: _statusColor(AttendanceStatus.leave),
-                        ),
-                        _CountChip(
-                          label: 'Total',
-                          value: docs.length,
-                          color: const Color(0xFF2563EB),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _isSaving
-                                ? null
-                                : () => _markAllPresent(
-                                      docs.map((d) => d.id),
-                                    ),
-                            icon: const Icon(Icons.done_all_rounded),
-                            label: const Text('Mark All Present'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: _isSaving ? null : _submit,
-                            icon: _isSaving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.save_rounded),
-                            label: Text(_isSaving
-                                ? 'Submitting...'
-                                : 'Submit Attendance'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tip: swipe → present/absent, tap → late/leave. Default is Present.',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Saves to: $dateKey / class_${widget.classId}_${widget.sectionId}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF9CA3AF),
-                      ),
-                    ),
-                  ],
+                padding:
+                    const EdgeInsets.all(
+                        12),
+                child: Text(
+                  "Class ${widget.classId}${widget.sectionId} • ${_prettyDate(today)}",
                 ),
               ),
-              const Divider(height: 1),
+
               Expanded(
-                child: ListView.separated(
-                  itemCount: docs.length,
-                  separatorBuilder: (context, index) =>
-                      const Divider(height: 1),
-                  itemBuilder: (context, i) {
-                    final doc = docs[i];
-                    final data = doc.data();
-                    final name = (data['name'] ?? '').toString();
-                    final admissionNo = (data['admissionNo'] ?? doc.id).toString();
+                child:
+                    ListView.builder(
+                  itemCount:
+                      docs.length,
+                  itemBuilder:
+                      (context, i) {
+                    final doc =
+                        docs[i];
 
-                    final status = _statuses[doc.id] ?? AttendanceStatus.present;
-                    final statusColor = _statusColor(status);
+                   final name =
 
-                    return Dismissible(
-                      key: ValueKey<String>('att_${doc.id}'),
-                      direction: _isSaving
-                          ? DismissDirection.none
-                          : DismissDirection.horizontal,
-                      background: Container(
-                        color: _statusColor(AttendanceStatus.present),
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: const Text(
-                          'PRESENT',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+    StudentHelper
+        .name(doc);
+
+
+
+
+                    final status =
+                        _statuses[
+                            doc.id]!;
+
+                    return Card(
+                      margin:
+                          const EdgeInsets.symmetric(
+                        horizontal:
+                            10,
+                        vertical: 5,
                       ),
-                      secondaryBackground: Container(
-                        color: _statusColor(AttendanceStatus.absent),
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: const Text(
-                          'ABSENT',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                          ),
+                      child:
+                          ListTile(
+                        
+                        
+                       leading:
+    CircleAvatar(
+
+  backgroundColor:
+      Colors.deepPurple
+          .withOpacity(0.12),
+
+  backgroundImage:
+
+      StudentHelper
+              .hasPhoto(
+                  doc)
+
+          ? NetworkImage(
+
+              StudentHelper
+                  .photo(
+                      doc),
+            )
+
+          : null,
+
+  child:
+
+      StudentHelper
+              .hasPhoto(
+                  doc)
+
+          ? null
+
+          : Text(
+
+              StudentHelper
+                  .initial(
+                      doc),
+            ),
+),
+
+title:
+    Text(
+  name,
+),
+
+
+
+
+
+                        subtitle:
+                            Row(
+                          children: [
+                            _quickBtn(
+                              doc.id,
+                              AttendanceStatus.present,
+                              Colors.green,
+                            ),
+                            const SizedBox(
+                                width:
+                                    6),
+                            _quickBtn(
+                              doc.id,
+                              AttendanceStatus.absent,
+                              Colors.red,
+                            ),
+                            const SizedBox(
+                                width:
+                                    6),
+                            _quickBtn(
+                              doc.id,
+                              AttendanceStatus.leave,
+                              Colors.orange,
+                            ),
+                          ],
                         ),
-                      ),
-                      confirmDismiss: (direction) async {
-                        if (direction == DismissDirection.startToEnd) {
-                          setState(() =>
-                              _statuses[doc.id] = AttendanceStatus.present);
-                        } else if (direction == DismissDirection.endToStart) {
-                          setState(() =>
-                              _statuses[doc.id] = AttendanceStatus.absent);
-                        }
-                        // Don't actually dismiss the tile.
-                        return false;
-                      },
-                      child: ListTile(
-                        onTap: _isSaving ? null : () => _pickStatus(doc.id),
-                        title: Text(name.isEmpty ? 'Student' : name),
-                        subtitle: Text('Admission: $admissionNo'),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withAlpha(18),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: statusColor.withAlpha(80)),
-                          ),
-                          child: Text(
-                            status.label.toUpperCase(),
-                            style: TextStyle(
-                              color: statusColor,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 11,
+                        trailing:
+                            Text(
+                          status
+                              .label,
+                          style:
+                              TextStyle(
+                            color:
+                                _statusColor(
+                              status,
                             ),
                           ),
                         ),
@@ -476,34 +514,68 @@ class _TeacherAttendanceScreenState
                   },
                 ),
               ),
+
+              SafeArea(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.all(
+                          12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child:
+                            OutlinedButton(
+                          onPressed: () =>
+                              _markAllPresent(
+                            docs.map(
+                              (e) =>
+                                  e.id,
+                            ),
+                          ),
+                          child: const Text(
+                              "Present All"),
+                        ),
+                      ),
+                      const SizedBox(
+                          width: 10),
+                      Expanded(
+                        child:
+                            OutlinedButton(
+                          onPressed: () =>
+                              _markAllHoliday(
+                            docs.map(
+                              (e) =>
+                                  e.id,
+                            ),
+                          ),
+                          child: const Text(
+                              "Holiday"),
+                        ),
+                      ),
+                      const SizedBox(
+                          width: 10),
+                      Expanded(
+                        child:
+                            ElevatedButton(
+                          onPressed:
+                              _isSaving
+                                  ? null
+                                  : _submit,
+                          child: Text(
+                            _isSaving
+                                ? "Saving..."
+                                : "Save",
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           );
         },
       ),
-    );
-  }
-}
-
-class _CountChip extends StatelessWidget {
-  const _CountChip({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final int value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      label: Text(
-        '$label: $value',
-        style: TextStyle(color: color, fontWeight: FontWeight.w700),
-      ),
-      backgroundColor: color.withAlpha(18),
-      side: BorderSide(color: color.withAlpha(60)),
     );
   }
 }

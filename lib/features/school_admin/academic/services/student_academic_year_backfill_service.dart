@@ -51,7 +51,7 @@ class StudentAcademicYearBackfillService {
       final batch = _db.batch();
 
       for (final doc in chunk) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         final existing = (data['academicYear'] ?? '').toString().trim();
         if (existing.isNotEmpty) {
           skipped++;

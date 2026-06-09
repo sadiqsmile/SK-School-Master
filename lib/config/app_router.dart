@@ -1,4 +1,26 @@
+import 'package:flutter/material.dart';
+import 'package:school_app/features/teacher/screens/teacher_profile_screen.dart';
+import 'package:school_app/features/school_admin/teachers/screens/assign_teacher_screen.dart';
+import 'package:school_app/features/school_admin/fees/screens/fee_list_screen.dart';
+import 'package:school_app/features/school_admin/attendance/screens/attendance_report_screen.dart';
+import 'package:school_app/features/school_admin/fees/screens/add_fee_screen.dart';
+
+import 'package:school_app/features/import_export/screens/import_export_dashboard_screen.dart';
+import 'package:school_app/features/import_export/screens/import_subject_screen.dart';
+import 'package:school_app/features/school_admin/teachers/screens/archived_teachers_screen.dart';
+import 'package:school_app/features/import_export/screens/subject_template_screen.dart';
+import 'package:school_app/features/import_export/screens/import_classes_screen.dart';
+import 'package:school_app/features/import_export/screens/export_classes_screen.dart';
+import 'package:school_app/features/import_export/screens/student_import_screen.dart';
+import 'package:school_app/features/import_export/screens/teacher_import_screen.dart';
+import 'package:school_app/features/import_export/screens/attendance_import_export_screen.dart';
+import 'package:school_app/features/import_export/screens/exam_import_export_screen.dart';
+import 'package:school_app/features/import_export/screens/marks_import_export_screen.dart';
+import 'package:school_app/features/import_export/screens/timetable_import_export_screen.dart';
+import 'package:school_app/features/school_admin/exams/screens/grade_templates_screen.dart';
 // config/app_router.dart
+import 'package:school_app/features/school_admin/groups/screens/groups_screen.dart';
+import 'package:school_app/features/school_admin/classes/screens/class_students_screen.dart';
 import 'package:school_app/features/school_admin/teachers/screens/add_teacher_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:school_app/features/auth/screens/auth_gate.dart';
@@ -11,9 +33,11 @@ import 'package:school_app/features/school_admin/teachers/screens/teachers_scree
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:school_app/features/school_admin/students/screens/students_screen.dart';
 import 'package:school_app/features/school_admin/students/screens/add_student_screen.dart';
+import 'package:school_app/features/school_admin/students/screens/edit_student_screen.dart';
+import 'package:school_app/features/school_admin/students/screens/student_profile_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/classes_screen.dart';
 import 'package:school_app/features/school_admin/classes/screens/add_class_screen.dart';
-import 'package:school_app/features/school_admin/classes/screens/sections_screen.dart';
+
 import 'package:school_app/features/school_admin/attendance/screens/attendance_screen.dart';
 import 'package:school_app/features/school_admin/academic/screens/promote_students_screen.dart';
 import 'package:school_app/features/school_admin/homework/screens/homework_screen.dart';
@@ -21,7 +45,7 @@ import 'package:school_app/features/school_admin/fees/screens/fees_screen.dart';
 import 'package:school_app/features/school_admin/announcements/screens/announcements_screen.dart';
 import 'package:school_app/features/school_admin/exams/screens/exam_types_screen.dart';
 import 'package:school_app/features/school_admin/exams/screens/marks_card_templates_screen.dart';
-import 'package:school_app/features/school_admin/reports/screens/attendance_reports_screen.dart';
+
 import 'package:school_app/features/school_admin/reports/screens/exam_reports_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/fee_reports_screen.dart';
 import 'package:school_app/features/school_admin/reports/screens/reports_screen.dart';
@@ -31,19 +55,30 @@ import 'package:school_app/features/school_admin/analytics/screens/school_analyt
 import 'package:school_app/features/school_admin/analytics/screens/student_risk_list_screen.dart';
 import 'package:school_app/features/school_admin/notifications/screens/notifications_screen.dart';
 import 'package:school_app/features/school_admin/settings/screens/modules_control_screen.dart';
+import 'package:school_app/features/import_export/screens/import_export_screen.dart';
+
+import 'package:school_app/features/school_admin/exams/screens/exams_dashboard_screen.dart';
+import 'package:school_app/features/school_admin/academic_setup/screens/academic_setup_dashboard.dart';
 import 'package:school_app/features/parent/screens/parent_login_screen.dart';
 import 'package:school_app/features/teacher/attendance/screens/teacher_attendance_screen.dart';
 import 'package:school_app/features/teacher/homework/screens/homework_screen.dart';
 import 'package:school_app/features/teacher/screens/teacher_class_home_screen.dart';
-import 'package:school_app/features/teacher/screens/teacher_dashboard.dart';
+import 'package:school_app/features/teacher/dashboard/screens/teacher_dashboard.dart';
 import 'package:school_app/features/teacher/screens/teacher_students_screen.dart';
 import 'package:school_app/features/teacher/risk/screens/class_risk_screen.dart';
-
+import 'package:school_app/features/school_admin/exams/screens/exams_screen.dart';
 import 'package:school_app/core/rbac/role_guard.dart';
 import 'package:school_app/models/school_modules.dart';
 import 'package:school_app/models/user_role.dart';
+import 'package:school_app/main.dart' show navigatorKey;
+import 'package:school_app/features/school_admin/students/screens/restore_students_screen.dart';
+import 'package:school_app/features/school_admin/students/screens/bulk_delete_students_screen.dart';
+
+import 'package:school_app/providers/school_admin_provider.dart' show schoolIdProvider;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final appRouter = GoRouter(
+  navigatorKey: navigatorKey,
   initialLocation: '/school-loader',
 
   /// 🔥 ADD THIS BLOCK (VERY IMPORTANT)
@@ -64,18 +99,48 @@ final appRouter = GoRouter(
     }
 
     // 🟢 LOGGED IN
-    if (user != null) {
-      // prevent going back to login
-      if (isAuthRoute) {
-        return '/school-loader'; // let loader decide role
-      }
+    // prevent going back to login
+    if (isAuthRoute) {
+      return '/school-loader'; // let loader decide role
     }
-
+  
     return null;
   },
 
- 
+
+
   routes: [
+    GoRoute(
+      path: '/class-students',
+      builder: (context, state) {
+        final data = state.extra as Map;
+        return ClassStudentsScreen(
+          className: data['className'],
+        );
+      },
+    ),
+    
+    GoRoute(
+      path: '/assign-class',
+      builder: (context, state) {
+        final teacherId = state.extra as String;
+        return AssignTeacherScreen(teacherId: teacherId);
+      },
+    ),
+    GoRoute(
+      path: '/fees',
+      builder: (context, state) {
+        final studentId = state.extra as String;
+        return FeeListScreen(studentId: studentId);
+      },
+    ),
+    GoRoute(
+      path: '/add-fee',
+      builder: (context, state) {
+        final studentId = state.extra as String;
+        return AddFeeScreen(studentId: studentId);
+      },
+    ),
     GoRoute(
       path: '/school-loader',
       builder: (context, state) => const SchoolLoaderScreen(),
@@ -105,21 +170,36 @@ final appRouter = GoRouter(
         child: MaintenanceScreen(),
       ),
     ),
+    
+    
     GoRoute(
       path: '/school-admin',
-      builder: (context, state) => const RoleGuard(
-        title: 'School Admin',
-        allowedRoles: [UserRole.admin],
-        child: SchoolAdminDashboard(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'School Admin',
+          allowedRoles: [UserRole.admin],
+          child: SchoolAdminDashboard(),
+        ),
       ),
     ),
+
+
+GoRoute(
+  path: '/groups',
+  builder: (context, state) {
+    return const GroupsScreen();
+  },
+),
+    
     GoRoute(
       path: '/school-admin/teachers',
-      builder: (context, state) => const RoleGuard(
-        title: 'Teachers',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.teachers],
-        child: TeachersScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Teachers',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.teachers],
+          child: TeachersScreen(),
+        ),
       ),
     ),
     GoRoute(
@@ -133,11 +213,13 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/school-admin/students',
-      builder: (context, state) => const RoleGuard(
-        title: 'Students',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.students],
-        child: StudentsScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Students',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.students],
+          child: StudentsScreen(),
+        ),
       ),
     ),
     GoRoute(
@@ -151,11 +233,13 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/school-admin/classes',
-      builder: (context, state) => const RoleGuard(
-        title: 'Classes',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.students],
-        child: ClassesScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Classes',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.students],
+          child: ClassesScreen(),
+        ),
       ),
     ),
     GoRoute(
@@ -176,64 +260,65 @@ final appRouter = GoRouter(
         child: AddClassScreen(),
       ),
     ),
-    GoRoute(
-      path: '/sections/:classId',
-      builder: (context, state) {
-        final raw = state.pathParameters['classId'] ?? '';
-        final classId = Uri.decodeComponent(raw);
-        return RoleGuard(
-          title: 'Sections',
-          allowedRoles: const [UserRole.admin],
-          requiredModules: const [SchoolModuleKey.students],
-          child: SectionsScreen(classId: classId),
-        );
-      },
-    ),
+   
+
     GoRoute(
       path: '/school-admin/attendance',
-      builder: (context, state) => const RoleGuard(
-        title: 'Attendance',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.attendance],
-        child: AttendanceScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Attendance',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.attendance],
+          child: AttendanceScreen(),
+        ),
       ),
     ),
     GoRoute(
       path: '/school-admin/homework',
-      builder: (context, state) => const RoleGuard(
-        title: 'Homework',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.homework],
-        child: HomeworkScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Homework',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.homework],
+          child: HomeworkScreen(),
+        ),
       ),
     ),
     GoRoute(
       path: '/school-admin/fees',
-      builder: (context, state) => const RoleGuard(
-        title: 'Fees',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.fees],
-        child: FeesScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Fees',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.fees],
+          child: FeesScreen(),
+        ),
       ),
     ),
     GoRoute(
       path: '/school-admin/announcements',
-      builder: (context, state) => const RoleGuard(
-        title: 'Announcements',
-        allowedRoles: [UserRole.admin],
-        requiredModules: [SchoolModuleKey.messages],
-        child: AnnouncementsScreen(),
+      pageBuilder: (context, state) => NoTransitionPage(
+        child: const RoleGuard(
+          title: 'Announcements',
+          allowedRoles: [UserRole.admin],
+          requiredModules: [SchoolModuleKey.messages],
+          child: AnnouncementsScreen(),
+        ),
       ),
     ),
+    
     GoRoute(
       path: '/school-admin/exam-types',
       builder: (context, state) => const RoleGuard(
         title: 'Exam Types',
         allowedRoles: [UserRole.admin],
         requiredModules: [SchoolModuleKey.exams],
-        child: ExamTypesScreen(),
+        child: ExamsDashboardScreen(),
       ),
     ),
+    
+    //----EXAM----------------------------------------------------------
+    
     GoRoute(
       path: '/school-admin/marks-card-templates',
       builder: (context, state) => const RoleGuard(
@@ -244,6 +329,30 @@ final appRouter = GoRouter(
       ),
     ),
 
+
+GoRoute(
+  path: '/school-admin/grade-templates',
+  builder: (context, state) => const RoleGuard(
+    title: 'Grade Templates',
+    allowedRoles: [UserRole.admin],
+    requiredModules: [SchoolModuleKey.exams],
+    child: GradeTemplatesScreen(),
+  ),
+),
+
+
+GoRoute(
+  path: '/school-admin/exams',
+  builder: (context, state) => const RoleGuard(
+    title: 'Exams',
+    allowedRoles: [UserRole.admin],
+    requiredModules: [SchoolModuleKey.exams],
+    child: ExamsScreen(),
+  ),
+),
+
+
+
     GoRoute(
       path: '/school-admin/settings/modules',
       builder: (context, state) => const RoleGuard(
@@ -252,6 +361,22 @@ final appRouter = GoRouter(
         child: ModulesControlScreen(),
       ),
     ),
+   
+   
+    GoRoute(
+
+  path:
+      '/school-admin/settings/archived-teachers',
+
+  builder:
+      (context, state) =>
+          const ArchivedTeachersScreen(),
+),
+
+
+
+
+
     GoRoute(
       path: '/school-admin/reports',
       builder: (context, state) => const RoleGuard(
@@ -296,7 +421,7 @@ final appRouter = GoRouter(
         title: 'Attendance Reports',
         allowedRoles: [UserRole.admin],
         requiredModules: [SchoolModuleKey.attendance],
-        child: AttendanceReportsScreen(),
+        child: AttendanceReportScreen(),
       ),
     ),
     GoRoute(
@@ -340,6 +465,122 @@ final appRouter = GoRouter(
       },
     ),
     GoRoute(
+      path: '/school-admin/academic-setup',
+      builder: (context, state) {
+        final schoolId = state.extra as String;
+        return RoleGuard(
+          title: 'Academic Setup',
+          allowedRoles: const [UserRole.admin],
+          child: AcademicSetupDashboard(
+            schoolId: schoolId,
+          ),
+        );
+      },
+    ),
+   
+    GoRoute(
+      path: '/import-export',
+      builder: (context, state) => Consumer(
+        builder: (context, ref, _) {
+          final schoolIdAsync = ref.watch(schoolIdProvider);
+          return schoolIdAsync.when(
+            data: (schoolId) => RoleGuard(
+              title: 'Imports & Exports',
+              allowedRoles: const [UserRole.admin],
+              child: ImportExportScreen(schoolId: schoolId),
+            ),
+            loading: () => const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => const Scaffold(
+              body: Center(child: Text('Error loading schoolId')),
+            ),
+          );
+        },
+      ),
+    ),
+   
+   
+   
+    GoRoute(
+      path: '/import-subjects',
+      builder: (context, state) {
+        return ImportSubjectScreen(
+          schoolId: 'demo-school',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/export-subjects',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Export Subjects'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/subject-template',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Subject Template'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/import-classes',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Import Classes'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/export-classes',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Export Classes'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/attendance-import-export',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Attendance Import Export'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/exam-import-export',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Exam Import Export'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/timetable-import-export',
+      builder: (context, state) {
+        return const Scaffold(
+          body: Center(
+            child: Text('Timetable Import Export'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
       path: '/school-admin/academic/promote',
       builder: (context, state) => const RoleGuard(
         title: 'Promote Students',
@@ -348,8 +589,6 @@ final appRouter = GoRouter(
         child: PromoteStudentsScreen(),
       ),
     ),
-
-    // Teacher routes
     GoRoute(
       path: '/teacher-dashboard',
       builder: (context, state) => const RoleGuard(
@@ -436,5 +675,141 @@ final appRouter = GoRouter(
         );
       },
     ),
+    GoRoute(
+      path: '/student-profile',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return StudentProfileScreen(
+          studentId: extra['studentId'] as String,
+          schoolId: extra['schoolId'] as String,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/edit-student',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return EditStudentScreen(
+          studentId: data['studentId'],
+          data: Map<String, dynamic>.from(data['data']),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/restore-students',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return RestoreStudentsScreen(schoolId: data['schoolId']);
+      },
+    ),
+    GoRoute(
+      path: '/school-admin/students/bulk-delete',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return RoleGuard(
+          title: 'Bulk Delete Students',
+          allowedRoles: const [UserRole.admin],
+          requiredModules: const [SchoolModuleKey.students],
+          child: BulkDeleteStudentsScreen(schoolId: data['schoolId']),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/teacher/profile',
+      builder: (context, state) => const TeacherProfileScreen(),
+    ),
+  
+  GoRoute(
+  path: '/imports-exports',
+  builder: (context, state) {
+    return ImportExportDashboardScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/import-subjects',
+  builder: (context, state) {
+    return ImportSubjectScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+
+
+GoRoute(
+  path: '/subject-template',
+  builder: (context, state) {
+    return const SubjectTemplateScreen();
+  },
+),
+
+GoRoute(
+  path: '/import-classes',
+  builder: (context, state) {
+    return ImportClassesScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/export-classes',
+  builder: (context, state) {
+    return ExportClassesScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/import-students',
+  builder: (context, state) {
+    return StudentImportScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/import-teachers',
+  builder: (context, state) {
+    return TeacherImportScreen(
+      schoolId: 'demo-school',
+    );
+  },
+),
+
+GoRoute(
+  path: '/attendance-import-export',
+  builder: (context, state) {
+    return const AttendanceImportExportScreen();
+  },
+),
+
+GoRoute(
+  path: '/exam-import-export',
+  builder: (context, state) {
+    return const ExamImportExportScreen();
+  },
+),
+
+GoRoute(
+  path: '/marks-import-export',
+  builder: (context, state) {
+    return const MarksImportExportScreen();
+  },
+),
+
+GoRoute(
+  path: '/timetable-import-export',
+  builder: (context, state) {
+    return const TimetableImportExportScreen();
+  },
+),
+  
+  
   ],
 );

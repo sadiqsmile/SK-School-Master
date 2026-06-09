@@ -62,10 +62,10 @@ class TeacherHomeworkScreen extends ConsumerWidget {
               return ListView.separated(
                 padding: const EdgeInsets.all(12),
                 itemCount: docs.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
                   final doc = docs[index];
-                  final data = doc.data();
+                  final data = doc.data() as Map<String, dynamic>;
                   final due = _readDueDate(data);
 
                   final subject = (data['subject'] ?? '').toString();

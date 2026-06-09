@@ -1,15 +1,12 @@
 // features/school_admin/students/screens/add_student_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:school_app/features/school_admin/classes/providers/classes_provider.dart';
-import 'package:school_app/features/school_admin/classes/providers/sections_provider.dart';
-import 'package:school_app/features/school_admin/academic/providers/academic_years_provider.dart';
 import 'package:school_app/features/school_admin/students/services/student_service.dart';
 import 'package:school_app/providers/current_school_provider.dart';
-import 'package:school_app/providers/school_modules_provider.dart';
-import 'package:school_app/services/parent_account_service.dart';
 import 'package:school_app/core/utils/text_formatters.dart';
 
 class AddStudentScreen extends ConsumerStatefulWidget {
@@ -22,19 +19,30 @@ class AddStudentScreen extends ConsumerStatefulWidget {
 class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
   final nameController = TextEditingController();
   final admissionController = TextEditingController();
-  final parentNameController = TextEditingController();
+  final fatherNameController = TextEditingController();
+  final motherNameController = TextEditingController();
   final parentPhoneController = TextEditingController();
+  final parentEmailController = TextEditingController();
 
   String? selectedClassId;
+  String? selectedClassName;
+  List<String> sections = [];
   String? selectedSection;
+
+  bool isHostel = false;
+  bool isMess = false;
+  bool isBus = false;
+
   bool _isSaving = false;
 
   @override
   void dispose() {
     nameController.dispose();
     admissionController.dispose();
-    parentNameController.dispose();
+    fatherNameController.dispose();
+    motherNameController.dispose();
     parentPhoneController.dispose();
+    parentEmailController.dispose();
     super.dispose();
   }
 
@@ -44,13 +52,10 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
 
     final name = nameController.text.trim().toUpperCase();
     final admissionNo = admissionController.text.trim().toUpperCase();
-    final parentName = parentNameController.text.trim().toUpperCase();
+    final fatherName = fatherNameController.text.trim().toUpperCase();
+    final motherName = motherNameController.text.trim().toUpperCase();
     final parentPhone = parentPhoneController.text.trim();
-    final parentService = ParentAccountService();
-    final phoneDigits = parentService.normalizePhone(parentPhone);
-
-    final modules = await ref.read(schoolModulesProvider.future);
-    final parentsEnabled = modules.parents;
+    final parentEmail = parentEmailController.text.trim().toLowerCase();
 
     if (name.isEmpty || admissionNo.isEmpty) {
       messenger.showSnackBar(
@@ -58,101 +63,57 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
       );
       return;
     }
-    if (selectedClassId == null || selectedSection == null) {
+
+    if (parentPhone.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Parent phone is required')),
+      );
+      return;
+    }
+
+    if (selectedClassId == null ||
+        selectedClassName == null ||
+        selectedSection == null) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Select class and section')),
       );
       return;
     }
-    if (parentsEnabled) {
-      if (parentName.isEmpty || parentPhone.isEmpty) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Enter parent name and phone')),
-        );
-        return;
-      }
-
-      if (phoneDigits.length < 10) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Enter a valid parent phone number')),
-        );
-        return;
-      }
-    }
 
     setState(() => _isSaving = true);
+
     try {
       final school = await ref.read(currentSchoolProvider.future);
-      final academicYear = ref.read(currentAcademicYearIdProvider);
 
-      final studentRef = await StudentService().addStudent(
+      await StudentService().addStudent(
         schoolId: school.id,
         data: {
           'name': name,
           'admissionNo': admissionNo,
           'classId': selectedClassId,
-          'section': selectedSection,
-          'academicYear': academicYear,
-          if (parentName.isNotEmpty) 'parentName': parentName,
+          'className': selectedClassName!.trim(),
+          'section': selectedSection!.trim(),
+          'classKey': "${selectedClassName!.trim()}_${selectedSection!.trim()}",
+          if (fatherName.isNotEmpty) 'fatherName': fatherName,
+          if (motherName.isNotEmpty) 'motherName': motherName,
           if (parentPhone.isNotEmpty) 'parentPhone': parentPhone,
+          if (parentEmail.isNotEmpty) 'parentEmail': parentEmail,
+          'hostel': isHostel,
+          'dayScholar': !isHostel,
+          'mess': isHostel ? true : isMess,
+          'bus': isBus,
         },
       );
-
-      // Create parent login (default password = last 4 digits) and link it.
-      String? parentUid;
-      String? initialPin;
-      if (parentsEnabled && parentName.isNotEmpty && parentPhone.isNotEmpty) {
-        try {
-          final result = await parentService.createParentLogin(
-            schoolId: school.id,
-            phone: parentPhone,
-            parentName: parentName,
-            studentId: studentRef.id,
-          );
-          parentUid = result.uid;
-
-          // Prefer server-generated PIN; fall back to legacy last-4 for older deployments.
-          initialPin = result.initialPin ?? parentService.last4OfPhone(phoneDigits);
-        } catch (e) {
-          // Don't block student creation if functions aren't deployed yet.
-          messenger.showSnackBar(
-            SnackBar(content: Text('Student saved, but parent login failed: $e')),
-          );
-        }
-      }
 
       messenger.showSnackBar(
         SnackBar(content: Text('Student "$name" added')),
       );
 
-      if (parentUid != null && initialPin != null && mounted) {
-        await showDialog<void>(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: const Text('Parent login created'),
-              content: SelectableText(
-                'Phone: $phoneDigits\n'
-                'Initial PIN: $initialPin',
-              ),
-              actions: [
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK'),
-                ),
-              ],
-            );
-          },
-        );
-      }
-
       navigator.pop();
-    } on DuplicateAdmissionNumberException {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Admission number already exists. Check admission number.')),
-      );
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Failed to save student: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -160,113 +121,186 @@ class _AddStudentScreenState extends ConsumerState<AddStudentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final classesAsync = ref.watch(classesProvider);
+    final schoolAsync = ref.watch(currentSchoolProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Add Student')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: nameController,
-              textCapitalization: TextCapitalization.characters,
-              inputFormatters: const [UpperCaseTextFormatter()],
-              decoration: const InputDecoration(labelText: 'Student Name'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: admissionController,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(labelText: 'Admission No'),
-            ),
-            const SizedBox(height: 10),
-            classesAsync.when(
-              data: (snapshot) {
-                final docs = snapshot.docs;
-                return DropdownButtonFormField<String>(
-                  key: ValueKey<String?>('class_$selectedClassId'),
-                  initialValue: selectedClassId,
-                  decoration: const InputDecoration(labelText: 'Class'),
-                  items: [
-                    for (final doc in docs)
-                      DropdownMenuItem(
-                        value: doc.id,
-                        child: Text((doc.data()['name'] ?? doc.id).toString()),
-                      ),
-                  ],
-                  onChanged: _isSaving
-                      ? null
-                      : (value) {
-                          setState(() {
-                            selectedClassId = value;
-                            // reset section when class changes
-                            selectedSection = null;
-                          });
-                        },
-                );
-              },
-              loading: () => const LinearProgressIndicator(),
-              error: (e, _) => Text('Failed to load classes: $e'),
-            ),
-            const SizedBox(height: 10),
-            if (selectedClassId == null)
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Select a class to pick a section'),
-              )
-            else
-              ref.watch(sectionsProvider(selectedClassId!)).when(
-                data: (snapshot) {
-                  final docs = snapshot.docs;
-                  return DropdownButtonFormField<String>(
-                    key: ValueKey<String?>('section_$selectedClassId:$selectedSection'),
-                    initialValue: selectedSection,
-                    decoration: const InputDecoration(labelText: 'Section'),
-                    items: [
-                      for (final doc in docs)
-                        DropdownMenuItem(
+      body: schoolAsync.when(
+        data: (school) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                TextField(
+                  controller: nameController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: const [UpperCaseTextFormatter()],
+                  decoration:
+                      const InputDecoration(labelText: 'Student Name'),
+                ),
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: admissionController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: const [UpperCaseTextFormatter()],
+                  decoration:
+                      const InputDecoration(labelText: 'Admission No'),
+                ),
+                const SizedBox(height: 10),
+
+                /// ✅ CLASS DROPDOWN (FIXED)
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('schools')
+                      .doc(school.id)
+                      .collection('classes')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const LinearProgressIndicator();
+                    }
+
+                    final docs = snapshot.data!.docs;
+
+                    return DropdownButtonFormField<String>(
+                      value: selectedClassId,
+                      hint: const Text("Select Class"),
+                      decoration:
+                          const InputDecoration(labelText: 'Class'),
+                      items: docs.map((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        return DropdownMenuItem(
                           value: doc.id,
-                          child: Text((doc.data()['name'] ?? doc.id).toString()),
+                          child: Text(data['name'] ?? ''),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        final selectedDoc =
+                            docs.firstWhere((doc) => doc.id == value);
+                        final data =
+                            selectedDoc.data() as Map<String, dynamic>;
+
+                        setState(() {
+                          selectedClassId = value;
+                          selectedClassName = data['name'];
+                          sections =
+                              List<String>.from(data['sections'] ?? []);
+                          selectedSection = null;
+                        });
+                      },
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 10),
+
+                /// ✅ SECTION DROPDOWN
+                DropdownButtonFormField<String>(
+                  value: selectedSection,
+                  hint: const Text("Select Section"),
+                  decoration:
+                      const InputDecoration(labelText: 'Section'),
+                  items: sections
+                      .map((s) =>
+                          DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() => selectedSection = value);
+                  },
+                ),
+
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: fatherNameController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: const [UpperCaseTextFormatter()],
+                  decoration:
+                      const InputDecoration(labelText: 'Father Name'),
+                ),
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: motherNameController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: const [UpperCaseTextFormatter()],
+                  decoration:
+                      const InputDecoration(labelText: 'Mother Name'),
+                ),
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: parentPhoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration:
+                      const InputDecoration(labelText: 'Parent Phone *'),
+                ),
+                const SizedBox(height: 10),
+
+                TextField(
+                  controller: parentEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration:
+                      const InputDecoration(labelText: 'Parent Email (optional)'),
+                ),
+
+                const SizedBox(height: 16),
+
+                // ── Hostel / Mess / Bus ──────────────────────────────
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Column(
+                      children: [
+                        CheckboxListTile(
+                          title: const Text('Hostel'),
+                          value: isHostel,
+                          onChanged: (v) {
+                            setState(() {
+                              isHostel = v!;
+                              if (isHostel) {
+                                isMess = true;
+                                isBus = false;
+                              }
+                            });
+                          },
                         ),
-                    ],
-                    onChanged: _isSaving
-                        ? null
-                        : (value) => setState(() => selectedSection = value),
-                  );
-                },
-                loading: () => const LinearProgressIndicator(),
-                error: (e, _) => Text('Failed to load sections: $e'),
-              ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: parentNameController,
-              textCapitalization: TextCapitalization.characters,
-              inputFormatters: const [UpperCaseTextFormatter()],
-              decoration: const InputDecoration(labelText: 'Parent Name'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: parentPhoneController,
-              keyboardType: TextInputType.phone,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s()]')),
+                        CheckboxListTile(
+                          title: const Text('Mess'),
+                          value: isMess,
+                          onChanged: isHostel
+                              ? null
+                              : (v) => setState(() => isMess = v!),
+                        ),
+                        CheckboxListTile(
+                          title: const Text('Bus / Transport'),
+                          value: isBus,
+                          onChanged: isHostel
+                              ? null
+                              : (v) => setState(() => isBus = v!),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  child: _isSaving
+                      ? const CircularProgressIndicator()
+                      : const Text('Save Student'),
+                ),
               ],
-              decoration: const InputDecoration(labelText: 'Parent Phone'),
             ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _isSaving ? null : _save,
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Save Student'),
-            ),
-          ],
-        ),
+          );
+        },
+        loading: () =>
+            const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
       ),
     );
   }

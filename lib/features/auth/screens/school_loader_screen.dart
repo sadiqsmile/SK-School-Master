@@ -28,42 +28,70 @@ class _SchoolLoaderScreenState extends State<SchoolLoaderScreen> {
     _loadSchool();
   }
 
-  Future<void> _loadSchool() async {
-    // If a user is already signed in, we can sync the school id from their
-    // user profile (and let AuthGate route them).
-    final user = FirebaseAuth.instance.currentUser;
+ Future<void> _loadSchool() async {
+  final user = FirebaseAuth.instance.currentUser;
 
-    if (user != null) {
-      // Keep super admin unblocked (super admin may not have a user doc).
-      const hardcodedSuperAdminEmails = <String>{'sadiq.smile@gmail.com'};
-      final email = user.email?.trim().toLowerCase();
-      if (email != null && hardcodedSuperAdminEmails.contains(email)) {
-        _goHome();
-        return;
-      }
+  if (user != null) {
+    const hardcodedSuperAdminEmails = <String>{'sadiq.smile@gmail.com'};
+    final email = user.email?.trim().toLowerCase();
 
-      try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        final data = userDoc.data();
-        final schoolId = (data?['schoolId'] ?? '').toString().trim();
-        if (schoolId.isNotEmpty) {
-          await SchoolStorage.saveSchoolId(schoolId);
-        }
-      } catch (_) {
-        // Ignore and let AuthGate handle any unknown state.
-      }
-
-      _goHome();
+    if (email != null && hardcodedSuperAdminEmails.contains(email)) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go('/super-admin');
+      });
       return;
     }
 
-    await SchoolStorage.getSchoolId();
-    // Login-first flow: do not block users with School ID entry before auth.
-    _goHome();
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final data = userDoc.data() ?? {};
+      final schoolId = (data['schoolId'] ?? '').toString().trim();
+      final role = (data['role'] ?? '').toString().trim();
+
+      if (schoolId.isNotEmpty) {
+        await SchoolStorage.saveSchoolId(schoolId);
+      }
+
+      if (!mounted) return;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        if (role == 'superAdmin') {
+          context.go('/super-admin');
+        } else if (role == 'admin') {
+          context.go('/school-admin');
+        } else if (role == 'teacher') {
+          context.go('/teacher-dashboard');
+        } else {
+          context.go('/');
+        }
+      });
+      return;
+    } catch (_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go('/');
+      });
+      return;
+    }
   }
+
+  await SchoolStorage.getSchoolId();
+
+  if (!mounted) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) return;
+    context.go('/');
+  });
+}
 
   @override
   Widget build(BuildContext context) {

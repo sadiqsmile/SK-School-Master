@@ -171,7 +171,7 @@ class BackfillService {
       for (final doc in snap.docs) {
         scanned++;
 
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         final classId = (data['classId'] ?? '').toString();
         final section = (data['section'] ?? data['sectionId'] ?? '').toString();
 
@@ -235,7 +235,7 @@ class BackfillService {
 
       for (final doc in snap.docs) {
         scanned++;
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
 
         final desired = _computeAssignmentKeys(data);
         final desiredSet = desired.toSet();
@@ -314,7 +314,7 @@ class BackfillService {
 
       for (final doc in snap.docs) {
         scanned++;
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         final classId = (data[classIdField] ?? '').toString();
         final section = (data[sectionField] ?? data['sectionId'] ?? '').toString();
 

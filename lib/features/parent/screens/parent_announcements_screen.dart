@@ -1,80 +1,162 @@
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:school_app/features/announcements/screens/announcement_detail_screen.dart';
-import 'package:school_app/features/parent/providers/parent_children_provider.dart';
-import 'package:school_app/models/announcement.dart';
-import 'package:school_app/models/student.dart';
-import 'package:school_app/providers/announcement_provider.dart';
+class ParentAnnouncementsScreen extends StatelessWidget {
+  final String schoolId;
 
-class ParentAnnouncementsScreen extends ConsumerWidget {
-  const ParentAnnouncementsScreen({super.key});
+  const ParentAnnouncementsScreen({
+    super.key,
+    required this.schoolId,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final announcementsAsync = ref.watch(announcementsProvider);
-    final childrenAsync = ref.watch(parentChildrenProvider);
-
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Announcements')),
-      body: childrenAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load children: $e')),
-        data: (children) {
-          return announcementsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Failed to load: $e')),
-            data: (snapshot) {
-              final docs = snapshot.docs;
-              final visible = docs
-                  .map(Announcement.fromDoc)
-                  .where((a) => _isVisibleForParent(a.target, children))
-                  .toList(growable: false);
+      backgroundColor: const Color(0xffF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text("Announcements"),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('schools')
+            .doc(schoolId)
+            .collection('announcements')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-              if (visible.isEmpty) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'No announcements for you yet.',
-                      style: TextStyle(color: Color(0xFF6B7280)),
-                    ),
-                  ),
-                );
+          final allDocs = snapshot.data!.docs;
+
+          final docs = allDocs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final roles = List<String>.from(data['targetRoles'] ?? []);
+            return roles.contains("parent");
+          }).toList();
+
+          if (docs.isEmpty) {
+            return _emptyState();
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              final priority = data['priority'];
+
+              Color badgeColor = const Color(0xffDBEAFE);
+              Color textColor = const Color(0xff1D4ED8);
+              IconData icon = Icons.notifications;
+
+              if (priority == "High") {
+                badgeColor = const Color(0xffFEE2E2);
+                textColor = const Color(0xff991B1B);
+                icon = Icons.warning_amber_rounded;
               }
 
-              return ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: visible.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, i) {
-                  final a = visible[i];
-                  return Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.campaign_rounded),
-                      title: Text(
-                        a.title.trim().isEmpty ? '(Untitled)' : a.title.trim(),
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+              if (priority == "Medium") {
+                badgeColor = const Color(0xffFEF3C7);
+                textColor = const Color(0xff92400E);
+                icon = Icons.info_outline;
+              }
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: Colors.grey.shade100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          height: 52,
+                          width: 52,
+                          decoration: BoxDecoration(
+                            color: badgeColor,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(icon, color: textColor),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                data['title'] ?? '',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xff111827),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: badgeColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  priority,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: textColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      data['description'] ?? '',
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.7,
+                        color: Colors.grey.shade700,
                       ),
-                      subtitle: Text(
-                        a.message.trim().isEmpty
-                            ? '(No message)'
-                            : a.message.trim(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => AnnouncementDetailScreen(
-                              announcement: a,
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xffEEF2FF),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            data['createdBy'] ?? 'Admin',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xff5B5FEF),
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
-                  );
-                },
+                  ],
+                ),
               );
             },
           );
@@ -82,36 +164,46 @@ class ParentAnnouncementsScreen extends ConsumerWidget {
       ),
     );
   }
-}
 
-bool _isVisibleForParent(String target, List<Student> children) {
-  final t = target.trim();
-  if (t == 'all') return true;
-  if (t == 'parents') return true;
-
-  if (!t.startsWith('class_')) return false;
-
-  final parsed = _parseClassTarget(t);
-  if (parsed == null) return false;
-
-  final (classId, sectionId) = parsed;
-
-  for (final c in children) {
-    final sClass = c.classId.trim();
-    final sSection = c.section.trim();
-    if (sClass == classId && sSection == sectionId) {
-      return true;
-    }
+  Widget _emptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            height: 90,
+            width: 90,
+            decoration: const BoxDecoration(
+              color: Color(0xffEEF2FF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.campaign_outlined,
+              size: 42,
+              color: Color(0xff5B5FEF),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            "No Announcements",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Color(0xff374151),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "School announcements and\nimportant notices will appear here.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
-
-  return false;
-}
-
-(String, String)? _parseClassTarget(String target) {
-  final parts = target.split('_');
-  if (parts.length < 3) return null;
-  final classId = parts[1].trim();
-  final sectionId = parts.sublist(2).join('_').trim();
-  if (classId.isEmpty || sectionId.isEmpty) return null;
-  return (classId, sectionId);
 }
