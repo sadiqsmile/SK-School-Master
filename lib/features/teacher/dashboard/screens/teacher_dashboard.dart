@@ -21,6 +21,8 @@ import 'package:school_app/features/teacher/screens/teacher_announcements_screen
 import 'package:school_app/features/teacher/screens/teacher_timetable_screen.dart';
 import 'package:school_app/core/services/image_service.dart';
 import 'package:school_app/features/teacher/attendance/reports/screens/attendance_reports_home_screen.dart';
+import 'package:school_app/features/teacher/attendance/screens/attendance_class_selector_screen.dart';
+import 'dart:async';
 
 class TeacherDashboard extends StatefulWidget {
   const TeacherDashboard({super.key});
@@ -37,8 +39,12 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
   String schoolId = "";
   String className = "";
   String section = "";
+String? selectedAttendanceClass;
   String teacherId = "";
   Map<String, dynamic> teacherData = {};
+
+StreamSubscription<DocumentSnapshot>? teacherListener;
+
   String schoolName = "";
   String schoolLogo = "";
 
@@ -64,12 +70,7 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
 
     try {
       email = user.email ?? "";
-
-
-
-
-//----------------------------------------------------------------
-     
+    
       final userDoc = await FirebaseFirestore.instance
           .collection("users")
           .doc(user.uid)
@@ -81,6 +82,49 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
       schoolId = userData["schoolId"] ?? "";
 
       teacherId = userData["teacherId"] ?? user.uid;
+teacherListener?.cancel();
+
+teacherListener = FirebaseFirestore.instance
+    .collection("schools")
+    .doc(schoolId)
+    .collection("teachers")
+    .doc(teacherId)
+    .snapshots()
+    .listen((doc) {
+
+  if (!doc.exists) return;
+
+  final data = doc.data()!;
+
+  if (!mounted) return;
+
+  setState(() {
+
+    teacherData = data;
+
+    teacherName = data["name"] ?? "";
+
+    if (data['classTeacherOf'] != null) {
+
+      className =
+    (data['classTeacherOf']['classId'] ?? '')
+        .toString()
+        .trim();
+
+      section =
+          (data['classTeacherOf']['sectionId'] ?? '')
+              .toString()
+              .trim();
+    } else {
+
+      className = '';
+      section = '';
+    }
+  });
+});
+
+
+
 
       if (schoolId.isEmpty) {
         if (mounted) {setState(() {dashboardReady = true; });
@@ -96,62 +140,37 @@ class _TeacherDashboardState extends State<TeacherDashboard> {
           .doc(teacherId)
           .get();
 
-
-
-
-
-
-//---------------------------------------------
-
-
-
-
       if (teacherDoc.exists) {
         final data = teacherDoc.data()!;
         teacherName = data["name"] ?? "";
         teacherData = data;
+      if (data['classTeacherOf'] != null) {
 
-        final keys = List<String>.from(
-          data["assignmentKeys"] ?? [],
-        );
+className =
+    (data['classTeacherOf']['classId'] ?? '')
+        .toString()
+        .trim();
 
-        if (keys.isNotEmpty) {
-          final parts = keys.first.split("_");
+  section =
+      (data['classTeacherOf']['sectionId'] ?? '')
+          .toString()
+          .trim();
+}
 
-          if (parts.length == 2) {
-            className = parts[0].replaceAll("Class ", "").trim();
-            section = parts[1].trim();
-          }
-        }
+debugPrint(
+  'CLASS TEACHER = $className $section',
+);
       }
-
-//----------------------------------------------------
-//--------------------------------------------------------
 
       if (mounted) {
 
   setState(() {
-
     dashboardReady = true;
   });
 }
 
 
-
-
-
-
-
-
-
-
-
    // Save FCM token to teacher document
-
-
-
-
-
 
 if (!kIsWeb) {
 
@@ -174,17 +193,6 @@ if (!kIsWeb) {
     }
   });
 }
-
-
-
-
-
-
-
-
-
-
-
     } catch (e) {
      debugPrint("Load Teacher Error: $e");
 
@@ -195,8 +203,8 @@ if (mounted) {
     dashboardReady = true;
   });
 }
-    
-    
+  
+   
     
     }
   }
@@ -324,7 +332,8 @@ minHeight: 600,
           sigmaX: 14,
           sigmaY: 14,
         ),
-        child: Container(
+        child: AnimatedContainer(
+  duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
             color: isDark
                 ? Colors.white.withOpacity(0.07)
@@ -443,11 +452,14 @@ minHeight: 600,
           section:
               teacherData['classTeacherOf']?['sectionId'] ?? '',
         ),
+
       ),
     );
   },
 ),
-              
+
+        if (teacherData['classTeacherOf'] != null)
+
       tile(
   Icons.people,
   "Student History",
@@ -483,6 +495,7 @@ minHeight: 600,
 tile(
   Icons.edit_calendar,
   "Edit Attendance",
+
   () {
 
     Navigator.pop(context);
@@ -545,18 +558,55 @@ tile(
   // TODAY CARD
   // ==========================
   Widget todayCard() {
-    if (schoolId.isEmpty || className.isEmpty || section.isEmpty) {
-      return glass(
-        child: const Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(
-            child: CircularProgressIndicator(),
-          ),
-        ),
-      );
-    }
+    final classes = <String>[];
+
+if (teacherData['classTeacherOf'] != null) {
+  classes.add(
+    '${teacherData['classTeacherOf']['classId']} ${teacherData['classTeacherOf']['sectionId']}',
+  );
+}
+
+classes.addAll(
+  List<String>.from(
+    teacherData['attendanceClasses'] ?? [],
+  ),
+);
+
+final uniqueClasses =
+    classes.toSet().toList();
+
+if (uniqueClasses.isEmpty) {
+  return const SizedBox();
+}
+
+selectedAttendanceClass ??=
+    uniqueClasses.first;
+
+
+
+if (uniqueClasses.isEmpty) {
+  return const SizedBox();
+}
+
+if (schoolId.isEmpty ||
+    className.isEmpty ||
+    section.isEmpty) {
+  return const SizedBox();
+}
 
     final today = DateTime.now().toIso8601String().split("T")[0];
+    final parts =
+    selectedAttendanceClass!.split(' ');
+
+final selectedSection =
+    parts.last;
+
+final selectedClass =
+    selectedAttendanceClass!
+        .replaceAll(
+          ' $selectedSection',
+          '',
+        );
 
     return StreamBuilder<DocumentSnapshot>(
      
@@ -566,15 +616,21 @@ stream: FirebaseFirestore.instance
 
     .doc(schoolId)
 
+
     .collection("attendance")
 
     .doc(today)
 
     .collection("classes")
+  
 
-    .doc("${className}_$section")
-
+    .doc(
+      "${selectedClass}_$selectedSection",
+    )
     .snapshots(),
+
+
+
 
       builder: (_, snap) {
         String title = "0%";
@@ -587,7 +643,23 @@ stream: FirebaseFirestore.instance
           color = Colors.orange;
         }
 
+
+debugPrint(
+  "LOOKING FOR = $today / ${className}_$section",
+);
+
+
         if (snap.hasData && snap.data!.exists) {
+
+debugPrint(
+  "ATTENDANCE DOC FOUND = ${snap.data!.id}",
+);
+
+debugPrint(
+  "ATTENDANCE DATA = ${snap.data!.data()}",
+);
+
+
           final data = snap.data!.data() as Map<String, dynamic>;
 
           final students = Map<String, dynamic>.from(
@@ -612,17 +684,105 @@ stream: FirebaseFirestore.instance
         return glass(
           child: Padding(
             padding: const EdgeInsets.all(24),
+            
+            
+            
             child: Column(
+              
               children: [
+              
+              if (uniqueClasses.length > 1)
+SizedBox(
+  height: 38,
+  child: ListView.separated(
+    scrollDirection: Axis.horizontal,
+    physics: const BouncingScrollPhysics(),
+
+    
+    itemCount: uniqueClasses.length,
+
+    separatorBuilder: (_, __) =>
+        const SizedBox(width: 8),
+
+    itemBuilder: (context, index) {
+
+      final item =
+          uniqueClasses[index];
+
+      final selected =
+          item ==
+              selectedAttendanceClass;
+
+      return GestureDetector(
+
+        onTap: () {
+
+          setState(() {
+
+            selectedAttendanceClass =
+                item;
+          });
+        },
+
+        child: Container(
+
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 8,
+          ),
+
+          decoration: BoxDecoration(
+
+            color: selected
+                ? const Color(
+                    0xff5B5FEF,
+                  )
+                : Colors.grey.shade200,
+
+            borderRadius:
+                BorderRadius.circular(
+              20,
+            ),
+          ),
+
+          child: Text(
+
+            item,
+
+            style: TextStyle(
+
+              color: selected
+                  ? Colors.white
+                  : Colors.black87,
+
+              fontWeight:
+                  FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    },
+  ),
+),
+
+if (uniqueClasses.length > 1)
+const SizedBox(height: 12),
+              
+              
+              
+              
                 Text(
                   "Today's Attendance",
+
+
                   style: TextStyle(
                     color: textSub(),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "Class $className - $section",
+                  "$selectedClass - $selectedSection",
                   style: TextStyle(
                     color: textMain(),
                     fontWeight: FontWeight.w800,
@@ -666,12 +826,94 @@ stream: FirebaseFirestore.instance
     );
   }
 
+
+Widget _teacherInfoSection() {
+
+  final user = FirebaseAuth.instance.currentUser;
+
+  return Row(
+    children: [
+
+      if (user != null) ...[
+        profileAvatar(user),
+        const SizedBox(width: 14),
+      ],
+
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+
+            Text(
+              teacherName,
+              style: TextStyle(
+                color: textMain(),
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            Text(
+              email,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: textSub(),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              teacherData['classTeacherOf'] != null
+                  ? 'Class Teacher : ${teacherData['classTeacherOf']['classId']} ${teacherData['classTeacherOf']['sectionId']}'
+                  : 'Class Teacher : Not Assigned',
+              style: TextStyle(
+                color: textMain(),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+
+
+
+
+
+
+
   // ==========================
   // UI
   // ==========================
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+
+    final attendanceGroups =
+        List.from(
+      teacherData['attendanceGroups'] ?? [],
+    );
+
+ final attendanceClasses = <String>[];
+
+if (teacherData['classTeacherOf'] != null) {
+  attendanceClasses.add(
+    '${teacherData['classTeacherOf']['classId']} ${teacherData['classTeacherOf']['sectionId']}',
+  );
+}
+
+
+
+final classes =
+    attendanceClasses.toSet().toList();
 
     return Scaffold(
       backgroundColor: bg(),
@@ -894,50 +1136,28 @@ stream: FirebaseFirestore.instance
                         child: Padding(
                           padding: const EdgeInsets.all(18),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              profileAvatar(user),
-                              const SizedBox(width: 14),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      teacherName,
-                                      style: TextStyle(
-                                        color: textMain(),
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      email,
-                                      style: TextStyle(
-                                        color: textSub(),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                flex: 2,
+                                child: _teacherInfoSection(),
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
 
-
+    ],
+  ),
+),
+                   ),
+                        
+                          
 
 
                   const SizedBox(height: 18),
 
 if (teacherData['classTeacherOf'] != null)
-  todayCard(),
+todayCard(),
 
 if (teacherData['classTeacherOf'] != null)
   const SizedBox(height: 18),
-
-
-
-
-
 
                       GridView.count(
                         crossAxisCount: MediaQuery.of(context).size.width > 1100
@@ -956,32 +1176,111 @@ if (teacherData['classTeacherOf'] != null)
                         children: [
                           
                           
-                        if (teacherData['classTeacherOf'] != null)
+                     if (
+    teacherData['classTeacherOf'] != null ||
+    (teacherData['attendanceClasses'] ?? []).isNotEmpty
+)
 
-  menu(
-    Icons.check_circle,
-    "Mark Attendance",
+menu(
+  Icons.check_circle,
+  "Mark Attendance",
     () {
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-        builder: (_) => QuickAttendanceScreen(
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) {
+
+       
+       final classes = <String>[];
+
+if (teacherData['classTeacherOf'] != null) {
+  classes.add(
+    '${teacherData['classTeacherOf']['classId']} ${teacherData['classTeacherOf']['sectionId']}',
+  );
+}
+
+classes.addAll(
+  List<String>.from(
+    teacherData['attendanceClasses'] ?? [],
+  ),
+);
+
+
+final uniqueClasses =
+    classes.toSet().toList();
+       if (uniqueClasses.length > 1)
+              
+        {
+
+          return 
+          AttendanceClassSelectorScreen(
+            schoolId: schoolId,
+            teacherId: teacherId,
+            teacherData: teacherData,
+          );
+        }
+
+       if (uniqueClasses.length == 1)
+        
+        
+        {
+
+         final item = uniqueClasses.first;
+
+          final parts =
+              item.split(' ');
+
+          final section =
+              parts.last;
+
+          final className =
+              item.replaceAll(
+            ' $section',
+            '',
+          );
+
+          return QuickAttendanceScreen(
 
             schoolId: schoolId,
 
             teacherId: teacherId,
 
-            teacherData: teacherData,
-          ),
-        ),
-      );
+            teacherData: {
+
+              ...teacherData,
+
+              'selectedAttendanceClass':
+                  className,
+
+              'selectedAttendanceSection':
+                  section,
+            },
+          );
+        }
+
+        return QuickAttendanceScreen(
+
+          schoolId: schoolId,
+
+          teacherId: teacherId,
+
+          teacherData: teacherData,
+        );
+      },
+    ),
+  );
+
     },
-  ),
+),
+
+
+
 
 menu(
   Icons.analytics,
   "Attendance Reports",
+ 
   () {
 
     Navigator.push(
@@ -998,6 +1297,17 @@ menu(
     );
   },
 ),
+
+
+menu(
+  Icons.history,
+  "Attendance Tools",
+  () {
+    openAttendanceHub();
+  },
+),
+
+
 
                           menu(
                             Icons.schedule,
@@ -1104,48 +1414,111 @@ menu(
                 ),
               ),
             ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+
+
+
+//       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       
-   floatingActionButton:
-    teacherData['classTeacherOf'] == null
 
-        ? null
 
-        : FloatingActionButton(
+//   floatingActionButton:
+// (teacherData['assignmentKeys'] ?? []).isEmpty
 
-            backgroundColor:
-                const Color(
-                  0xFF6366F1,
-                ),
+//         ? null
 
-            onPressed: () {
+//         : FloatingActionButton(
 
-              Navigator.push(
+//             backgroundColor:
+//                 const Color(
+//                   0xFF6366F1,
+//                 ),
 
-                context,
+//             onPressed: () {
 
-                MaterialPageRoute(
+//               Navigator.push(
 
-                  builder: (_) =>
-                      QuickAttendanceScreen(
+//                 context,
 
-                    schoolId:
-                        schoolId,
+//                 MaterialPageRoute(
 
-                    teacherId:
-                        teacherId,
 
-                    teacherData:
-                        teacherData,
-                  ),
-                ),
-              );
-            },
+//                builder: (_) {
 
-            child: const Icon(
-              Icons.check,
-            ),
-          ),
+//   final attendanceClasses =
+//       List<String>.from(
+//     teacherData[
+//         'attendanceClasses'] ?? [],
+//   );
+
+//   if (attendanceClasses.length > 1) {
+
+//     return AttendanceClassSelectorScreen(
+
+//       schoolId: schoolId,
+
+//       teacherId: teacherId,
+
+//       teacherData: teacherData,
+//     );
+//   }
+
+//   if (attendanceClasses.length == 1) {
+
+//     final item =
+//         attendanceClasses.first;
+
+//     final parts =
+//         item.split(' ');
+
+//     final section =
+//         parts.last;
+
+//     final className =
+//         item.replaceAll(
+//       ' $section',
+//       '',
+//     );
+
+//     return QuickAttendanceScreen(
+
+//       schoolId: schoolId,
+
+//       teacherId: teacherId,
+
+//       teacherData: {
+
+//         ...teacherData,
+
+//         'selectedAttendanceClass':
+//             className,
+
+//         'selectedAttendanceSection':
+//             section,
+//       },
+//     );
+//   }
+
+//   return QuickAttendanceScreen(
+
+//     schoolId: schoolId,
+
+//     teacherId: teacherId,
+
+//     teacherData: teacherData,
+//   );
+// },
+
+
+
+
+//                 ),
+//               );
+//             },
+
+//             child: const Icon(
+//               Icons.check,
+//             ),
+//           ),
       
       
       
@@ -1279,4 +1652,17 @@ height: 70,
     },
   );
 }
+
+
+
+@override
+void dispose() {
+
+  teacherListener?.cancel();
+
+  super.dispose();
+}
+
 } 
+
+

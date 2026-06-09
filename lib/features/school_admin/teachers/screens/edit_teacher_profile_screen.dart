@@ -38,9 +38,12 @@ class _EditTeacherProfileScreenState
   String? classTeacherClass;
   String? classTeacherSection;
 
+  List<String> subjects = [];
   List<String> assignedClasses = [];
-
-  List<QueryDocumentSnapshot> classDocs = [];
+  List attendanceClasses = [];
+  List attendanceGroups = [];
+  List allGroups = [];
+  List<Map<String, dynamic>> classDocs = [];
 
   bool isSaving = false;
 
@@ -51,6 +54,8 @@ List<String> allClasses = [];
     super.initState();
 
     final d = widget.data;
+
+subjects = List<String>.from( d['subjects'] ?? [],);
 
     nameController =
         TextEditingController(text: d['name'] ?? '');
@@ -98,6 +103,26 @@ List<String> allClasses = [];
       d['assignmentKeys'] ?? [],
     );
 
+    attendanceClasses = List.from(
+      d['attendanceClasses'] ?? [],
+    );
+
+if (classTeacherClass != null &&
+    classTeacherSection != null) {
+
+  attendanceClasses.remove(
+    '$classTeacherClass $classTeacherSection',
+  );
+}
+
+
+
+
+
+    attendanceGroups = List.from(
+      d['attendanceGroups'] ?? [],
+    );
+
 _loadClasses();
 
 
@@ -126,11 +151,26 @@ Future<void> _loadClasses() async {
       .collection('classes')
       .get();
 
+  classDocs = [];
+
+  final groups = <String>{};
+
   final temp = <String>[];
 
   for (final doc in snap.docs) {
 
     final data = doc.data();
+
+    classDocs.add(data);
+
+    final groupName =
+        (data['groupName'] ?? '')
+            .toString()
+            .trim();
+
+    if (groupName.isNotEmpty) {
+      groups.add(groupName);
+    }
 
     final className =
         (data['name'] ?? '').toString();
@@ -148,9 +188,9 @@ Future<void> _loadClasses() async {
 if (mounted) {
   setState(() {
 
-    classDocs = snap.docs;
-
     allClasses = temp;
+    allGroups = groups.toList()
+      ..sort();
 
   });
 }
@@ -169,6 +209,8 @@ if (mounted) {
           .collection('teachers')
           .doc(widget.teacherId)
           .update({
+
+        "subjects": subjects,
 
         "name": nameController.text.trim(),
         "phone": phoneController.text.trim(),
@@ -195,6 +237,8 @@ if (mounted) {
 
 
         "assignmentKeys": assignedClasses,
+        "attendanceClasses": attendanceClasses,
+        "attendanceGroups": attendanceGroups,
         "updatedAt": FieldValue.serverTimestamp(),
       });
 
@@ -231,6 +275,195 @@ if (userSnap.exists) {
     }
 
     if (mounted) setState(() => isSaving = false);
+  }
+
+  void _showAttendancePermissionDialog() {
+
+    showDialog(
+      context: context,
+      builder: (context) {
+
+        return AlertDialog(
+
+          title: const Text(
+            'Attendance Permissions',
+          ),
+
+          content: StatefulBuilder(
+            builder: (context, setDialogState) {
+
+              return SizedBox(
+                width: 600,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+
+                      const Text(
+                        'Attendance Groups',
+                        style: TextStyle(
+                          fontWeight:
+                              FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children:
+                            allGroups.map(
+                          (group) {
+
+                            return FilterChip(
+
+                              label: Text(group),
+
+                              selected:
+                                  attendanceGroups
+                                      .contains(
+                                group,
+                              ),
+
+                              onSelected: (value) {
+
+                                setDialogState(() {
+
+                                  if (value) {
+
+                                    attendanceGroups
+                                        .add(group);
+
+                                  } else {
+
+                                    attendanceGroups
+                                        .remove(group);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ).toList(),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      const Divider(),
+
+                      const SizedBox(height: 10),
+
+                      const Text(
+                        'Attendance Classes',
+                        style: TextStyle(
+                          fontWeight:
+                              FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: classDocs
+                            .where((data) {
+
+                              if (attendanceGroups.isEmpty) {
+                                return false;
+                              }
+
+                              return attendanceGroups.contains(
+                                data['groupName'],
+                              );
+                            })
+                            .expand((data) {
+
+                              final className =
+                                  (data['name'] ?? '')
+                                      .toString();
+
+                              final sections =
+                                  List.from(
+                                data['sections'] ?? [],
+                              );
+
+                              return sections.map(
+                                (s) => '$className $s',
+                              );
+                            })
+                            .map((classSection) {
+
+                              return FilterChip(
+
+                                label: Text(
+                                  classSection,
+                                ),
+
+                                selected:
+                                    attendanceClasses.contains(
+                                  classSection,
+                                ),
+
+                                onSelected: (value) {
+
+                                  setDialogState(() {
+
+                                    if (value) {
+
+                                      attendanceClasses.add(
+                                        classSection,
+                                      );
+
+                                    } else {
+
+                                      attendanceClasses.remove(
+                                        classSection,
+                                      );
+                                    }
+                                  });
+                                },
+                              );
+                            })
+                            .toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+
+          actions: [
+
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Cancel',
+              ),
+            ),
+
+            ElevatedButton(
+              onPressed: () {
+
+                setState(() {});
+
+                Navigator.pop(context);
+              },
+              child: const Text(
+                'Save',
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _sectionTitle(String caption, String title) {
@@ -486,12 +719,16 @@ if (userSnap.exists) {
 
                 const SizedBox(height: 20),
 
+               
                 Row(
                   children: [
 
                     Expanded(
                       child:
                           DropdownButtonFormField<String>(
+
+
+
                         value: classTeacherClass,
                         decoration: _dropDecor("Class"),
 
@@ -499,12 +736,8 @@ if (userSnap.exists) {
 
 
                      items: classDocs.map((doc) {
-
-  final data =
-      doc.data() as Map<String, dynamic>;
-
   final className =
-      (data['name'] ?? '').toString();
+              (doc['name'] ?? '').toString();
 
   return DropdownMenuItem(
     value: className,
@@ -526,9 +759,6 @@ if (userSnap.exists) {
 
   });
 },
-
-
-
                       ),
                     ),
 
@@ -549,10 +779,7 @@ if (classDocs.isEmpty) {
 
 final match = classDocs.where((d) {
 
-  final data =
-      d.data() as Map<String, dynamic>;
-
-  return data['name'] ==
+  return d['name'] ==
       classTeacherClass;
 
 }).toList();
@@ -566,13 +793,9 @@ final selectedClass = match.first;
 
 
 
-  final data =
-      selectedClass.data()
-          as Map<String, dynamic>;
-
   final sections =
       List<String>.from(
-    data['sections'] ?? [],
+    selectedClass['sections'] ?? [],
   );
 
   return sections.map((e) {
@@ -604,6 +827,28 @@ onChanged: (v) {
                     ),
                   ],
                 ),
+
+
+
+
+
+
+
+const SizedBox(height: 12),
+
+OutlinedButton.icon(
+  onPressed: () {
+    setState(() {
+      classTeacherClass = null;
+      classTeacherSection = null;
+    });
+  },
+  icon: const Icon(Icons.clear),
+  label: const Text(
+    'Remove Class Teacher',
+  ),
+),
+
 
                 // ── ASSIGNED CLASSES ──────────────
                 const SizedBox(height: 36),
@@ -676,6 +921,94 @@ onChanged: (v) {
 
   }).toList(),
 ),
+
+                const SizedBox(height: 20),
+
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+
+                      const Text(
+                        'Attendance Permissions',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+
+
+Text(
+  'Groups: ${attendanceGroups.length}',
+),
+
+Text(
+  'Classes: ${attendanceClasses.length}',
+),
+
+
+
+
+
+                      const SizedBox(height: 12),
+
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          _showAttendancePermissionDialog();
+                        },
+                        icon: const Icon(Icons.settings),
+                        label: const Text(
+                          'Manage Attendance Access',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+
+
+
+const SizedBox(height: 30),
+
+_sectionTitle(
+  "Academic",
+  "Subjects",
+),
+
+const SizedBox(height: 16),
+
+Wrap(
+  spacing: 10,
+  runSpacing: 10,
+  children: subjects.map((subject) {
+
+    return Chip(
+      label: Text(subject),
+
+      deleteIcon: const Icon(
+        Icons.close,
+        size: 18,
+      ),
+
+      onDeleted: () {
+
+        setState(() {
+          subjects.remove(subject);
+        });
+      },
+    );
+
+  }).toList(),
+),
+
 
 
                 // ── SAVE BUTTON ───────────────────

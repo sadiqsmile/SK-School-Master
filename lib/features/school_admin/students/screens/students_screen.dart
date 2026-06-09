@@ -11,6 +11,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:school_app/main.dart' show messengerKey, navigatorKey;
 import 'package:school_app/features/school_admin/layout/admin_layout.dart';
 import 'package:school_app/providers/current_school_provider.dart';
+import 'package:school_app/providers/school_admin_provider.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../services/student_import_service.dart';
 import '../services/student_template_service.dart';
@@ -69,7 +70,6 @@ double _fs(BuildContext context, double size) {
 double _gap(BuildContext context) {
   return MediaQuery.of(context).size.width < 360 ? 6 : 10;
 }
-
 class StudentsScreen extends ConsumerStatefulWidget {
   const StudentsScreen({super.key});
 
@@ -140,6 +140,18 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
               }
 
               final docs = snap.data?.docs ?? [];
+             final classesAsync =
+    ref.watch(classesProvider);
+
+final classDocs =
+    classesAsync.value?.docs
+        .map((doc) => doc.data())
+        .toList() ??
+    [];
+print('CLASS DOCS COUNT = ${classDocs.length}');
+                debugPrint(classDocs.toString());
+                  debugPrint('Selected Group = $selectedGroup');
+debugPrint('Classes Loaded = $classDocs');
               final classList = docs
                   .map((e) => ((e.data() as Map<String, dynamic>)['className'] ?? '').toString())
                   .where((e) => e.isNotEmpty)
@@ -147,84 +159,181 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                   .toList()
                 ..sort();
               final students = docs.where((e) {
-                final d = e.data() as Map<String, dynamic>;
-                final name = (d['name'] ?? '').toString().toLowerCase();
-                
-               final className =
-    (d['className'] ?? '')
-        .toString()
-        .trim();
+                final d = e.data() as Map;
 
-final normalizedClassName =
-    className.replaceAll('Class ', '').trim();
-                
-                if (selectedClass != 'All' &&
-    normalizedClassName != selectedClass) {
-  return false;
-}
-                
-              final section =
-    (d['section'] ?? '')
-        .toString()
-        .trim()
-        .toUpperCase();
+                final name =
+                    (d['name'] ?? '')
+                        .toString()
+                        .toLowerCase();
 
-if (selectedSection != 'All' &&
-    section != selectedSection.toUpperCase()) {
-  return false;
-}
+                final className =
+                    (d['className'] ?? '')
+                        .toString()
+                        .trim();
 
+                final normalizedClassName =
+                    className.replaceAll(
+                      'Class ',
+                      '',
+                    ).trim();
 
+                // GROUP FILTER
 
+                if (selectedGroup != 'All') {
 
+                  final classDoc = classDocs.firstWhere(
+                    (c) =>
+                        (c['name'] ?? '')
+                            .toString()
+                            .trim() ==
+                        className,
+                    orElse: () => {},
+                  );
 
+                  final groupName =
+                      (classDoc['groupName'] ?? '')
+                          .toString()
+                          .trim();
 
-
-                if (selectedSection != 'All' && section != selectedSection) return false;
-                if (!name.contains(search.toLowerCase())) return false;
-                if (facilityFilter != 'All') {
-                  final hostelV = (d['type'] ?? d['residence'] ?? '').toString().trim().toLowerCase();
-                  final isHostel = hostelV == 'hostel' || hostelV == 'h';
-                  final messV = (d['mess'] ?? '').toString().trim().toLowerCase();
-                  final isMess = isHostel ? true : (messV == 'yes' || messV == 'y' || messV == '1' || messV == 'true');
-                  final transV = (d['transport'] ?? '').toString().trim().toLowerCase();
-                  final isBus = isHostel ? false : (transV == 'yes' || transV == 'y' || transV == '1' || transV == 'true');
-                  switch (facilityFilter) {
-                    case 'Hostel': if (!isHostel) return false;
-                    case 'Day': if (isHostel) return false;
-                    case 'Mess': if (!isMess) return false;
-                    case 'Bus': if (!isBus) return false;
+                  if (groupName != selectedGroup) {
+                    return false;
                   }
                 }
+
+                // CLASS FILTER
+
+                if (selectedClass != 'All' &&
+                    normalizedClassName != selectedClass) {
+                  return false;
+                }
+
+                // SECTION FILTER
+
+                final section =
+                    (d['section'] ?? '')
+                        .toString()
+                        .trim()
+                        .toUpperCase();
+
+                if (selectedSection != 'All' &&
+                    section !=
+                        selectedSection.toUpperCase()) {
+                  return false;
+                }
+
+
+
+// FACILITY FILTER
+
+if (facilityFilter != 'All') {
+
+  final type =
+      (d['type'] ?? '')
+          .toString()
+          .trim()
+          .toUpperCase();
+
+  final mess =
+      (d['mess'] ?? '')
+          .toString()
+          .trim()
+          .toUpperCase();
+
+  final transport =
+      (d['transport'] ?? '')
+          .toString()
+          .trim()
+          .toUpperCase();
+
+  final isHostel =
+      type == 'HOSTEL';
+
+  final isDay =
+      type == 'DAY';
+
+  final isMess =
+      mess == 'YES';
+
+  final isBus =
+      transport == 'YES';
+
+  if (facilityFilter == 'Hostel' &&
+      !isHostel) {
+    return false;
+  }
+
+  if (facilityFilter == 'Day' &&
+      !isDay) {
+    return false;
+  }
+
+  if (facilityFilter == 'Mess' &&
+      !isMess) {
+    return false;
+  }
+
+  if (facilityFilter == 'Bus' &&
+      !isBus) {
+    return false;
+  }
+}
+
+
+
+
+
+                // SEARCH FILTER
+
+                if (!name.contains(
+                    search.toLowerCase())) {
+                  return false;
+                }
+
                 return true;
               }).toList();
 
+              students.sort((a, b) {
+                final aName =
+                    ((a.data() as Map<String, dynamic>)['name'] ?? '')
+                        .toString()
+                        .toUpperCase();
 
+                final bName =
+                    ((b.data() as Map<String, dynamic>)['name'] ?? '')
+                        .toString()
+                        .toUpperCase();
 
-
-           students.sort((a, b) {
-  final aName =
-      ((a.data() as Map<String, dynamic>)['name'] ?? '')
-          .toString()
-          .toUpperCase();
-
-  final bName =
-      ((b.data() as Map<String, dynamic>)['name'] ?? '')
-          .toString()
-          .toUpperCase();
-
-  return aName.compareTo(bName);
-});
-
-
-
-
-
+                return aName.compareTo(bName);
+              });
 
               final groupCount = docs.where((e) {
-                final d = e.data() as Map<String, dynamic>;
-                return _matchGroup((d['className'] ?? '').toString(), selectedGroup);
-              }).length;
+
+  if (selectedGroup == 'All') {
+    return false;
+  }
+
+  final d = e.data() as Map<String, dynamic>;
+
+  final className =
+      (d['className'] ?? '')
+          .toString()
+          .trim();
+
+  final classDoc = classDocs.firstWhere(
+    (c) =>
+        (c['name'] ?? '')
+            .toString()
+            .trim() ==
+        className,
+    orElse: () => {},
+  );
+
+  return (classDoc['groupName'] ?? '')
+          .toString()
+          .trim() ==
+      selectedGroup;
+
+}).length;
 
               final mobile = MediaQuery.of(context).size.width < 800;
 
@@ -247,13 +356,69 @@ if (selectedSection != 'All' &&
                 filteredLabel = 'Class $selectedClass $selectedSection';
               }
 
-              final filteredClassList = _getFilteredClasses(selectedGroup, classList);
-              final filteredSectionList = docs.where((e) {
-                final d = e.data() as Map<String, dynamic>;
-                return selectedClass != 'All' && (d['className'] ?? '').toString() == selectedClass;
-              }).map((e) {
-                return ((e.data() as Map<String, dynamic>)['section'] ?? '').toString();
-              }).where((e) => e.isNotEmpty).toSet().toList()..sort();
+       final filteredClassList = classDocs
+    .where((c) {
+
+      if (selectedGroup == 'All') {
+        return true;
+      }
+
+      return (c['groupName'] ?? '')
+              .toString()
+                         
+                           
+                           
+                            .trim() ==
+                        selectedGroup;
+
+                  })
+                  .map((c) {
+
+                    return (c['name'] ?? '')
+                        .toString()
+                        .replaceAll('Class ', '')
+                        .trim();
+
+                  })
+                  .toList()
+                ..sort();
+
+              debugPrint(
+                'FILTERED CLASSES = $filteredClassList',
+              );
+              final filteredSectionList = docs
+                  .where((e) {
+                    final d = e.data() as Map;
+
+                    if (selectedClass == 'All') {
+                      return false;
+                    }
+
+                    final studentClass =
+                        (d['className'] ?? '')
+                            .toString()
+                            .replaceAll('Class ', '')
+                            .trim();
+
+                    return studentClass == selectedClass;
+                  })
+                  .map((e) {
+                    final d = e.data() as Map;
+
+                    return (d['section'] ?? '')
+                        .toString()
+                        .trim()
+                        .toUpperCase();
+                  })
+                  .where((e) => e.isNotEmpty)
+                  .toSet()
+                  .toList()
+                ..sort();
+
+              debugPrint(
+                  'Sections = $filteredSectionList');
+
+
 
               // ── cache for helper methods ──────────────────────────────
               _cDocs = docs;
@@ -327,11 +492,6 @@ if (selectedSection != 'All' &&
     color: Colors.blue,
   ),
 ),
-
-
-
-
-
 
               const SizedBox(width: 16),
               Expanded(child: _dataCard(icon: Icons.school, label: groupLabel, value: selectedGroup == 'All' ? '-' : groupCount.toString(), color: Colors.purple)),
@@ -444,7 +604,7 @@ if (selectedSection != 'All' &&
                   : ListView.builder(
                       cacheExtent: 800,
                       itemCount: students.length,
-                      itemBuilder: (context, i) {
+                      itemBuilder: (context, i) { 
                         final doc = students[i];
                         final d = doc.data() as Map<String, dynamic>;
                         final name = (d['name'] ?? '').toString();
@@ -1309,39 +1469,6 @@ if (selectedSection != 'All' &&
     );
   }
 
-  List<String> _getFilteredClasses(
-    String group,
-    List<String> classList,
-  ) {
-    if (group == 'Primary School') {
-      return [
-        '1',
-        '2',
-        '3',
-        '4',
-        '5',
-      ];
-    }
-
-    if (group == 'Middle School') {
-      return ['6', '7', '8'];
-    }
-
-    if (group == 'High School') {
-      return ['9', '10'];
-    }
-
-    if (group == 'Nursery') {
-      return ['LKG', 'UKG'];
-    }
-
-    if (group == 'College') {
-      return ['1-PU', '2-PU'];
-    }
-
-    return classList;
-  }
-
   static const _exportFields = [
     'SL NO',
     'Name',
@@ -1361,20 +1488,12 @@ if (selectedSection != 'All' &&
   ];
 
   String _buildExportFileName() {
-    // Only group selected — use group name alone
-    if (selectedClass == 'All' &&
-        selectedSection == 'All' &&
-        facilityFilter == 'All') {
-      if (selectedGroup != 'All') {
-        return selectedGroup.replaceAll(' ', '');
-      }
-      return 'Students';
-    }
-
     final parts = <String>[];
     if (selectedClass != 'All') parts.add('Class$selectedClass');
     if (selectedSection != 'All') parts.add(selectedSection);
-    if (facilityFilter != 'All') parts.add(facilityFilter.replaceAll(' ', ''));
+    if (facilityFilter != 'All') {
+      parts.add(facilityFilter.replaceAll(' ', ''));
+    }
     if (parts.isEmpty) return 'Students';
     return parts.join('_');
   }

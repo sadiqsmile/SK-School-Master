@@ -67,12 +67,21 @@ class StudentLiveAnalyticsService {
                   ?? {})
               as Map;
 
+print('Checking date: ${dateDoc.id}');
+print('Searching studentId: $studentId');
+print('Students map: $students');
+
+
       final value =
           students[
                   studentId]
               ?.toString()
               .trim()
               .toLowerCase();
+
+
+print('Found value: $value');
+
 
       if (value == 'p') {
 

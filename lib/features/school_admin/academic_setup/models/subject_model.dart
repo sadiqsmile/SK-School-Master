@@ -35,12 +35,17 @@ class SubjectModel {
 
       id: doc.id,
 
-      name: data['name'] ?? '',
+     name: (data['name'] ?? '')
+    .toString()
+    .toUpperCase(),
 
-      shortName:
-          data['shortName'] ?? '',
+shortName: (data['shortName'] ?? '')
+    .toString()
+    .toUpperCase(),
 
-      code: data['code'] ?? '',
+code: (data['code'] ?? '')
+    .toString()
+    .toUpperCase(),
 
       groups:
           List<String>.from(

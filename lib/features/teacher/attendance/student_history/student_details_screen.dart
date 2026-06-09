@@ -67,25 +67,45 @@ class _StudentDetailsScreenState
       final schoolId =
           school.id;
 
-      final studentId =
-          StudentHelper.admissionNo(
-        widget.student,
-      );
+     final studentId =
+    (widget.student['studentDocId'] ?? '')
+        .toString();
 
-      final result =
-          await StudentLiveAnalyticsService()
-              .getStudentAnalytics(
+        print('DETAIL studentDocId = $studentId');
 
-        schoolId: schoolId,
+      print(
+  'DETAILS classId = ${widget.student['classId']}',
+);
 
-        studentId: studentId,
+print(
+  'DETAILS className = ${widget.student['className']}',
+);
 
-        classId:
-            widget.student['classId'],
+print(
+  'DETAILS section = ${widget.student['section']}',
+);
 
-        section:
-            widget.student['section'],
-      );
+print(
+  'DETAILS admissionNo = ${widget.student['admissionNo']}',
+);
+
+final result =
+    await StudentLiveAnalyticsService()
+        .getStudentAnalytics(
+
+  schoolId: schoolId,
+  studentId: studentId,
+
+  classId:
+      (widget.student['classId'] ??
+              widget.student['className'] ??
+              '')
+          .toString(),
+
+  section:
+      (widget.student['section'] ?? '')
+          .toString(),
+);
 
       analytics = result;
 

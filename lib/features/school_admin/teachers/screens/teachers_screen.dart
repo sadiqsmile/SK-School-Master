@@ -435,25 +435,30 @@ class TeachersScreen extends ConsumerWidget {
                                     [])
                                 as List;
 
-                        return _teacherCard(
-                          context:
-                              context,
-                          ref: ref,
-                          schoolId:
-                              schoolIdAsync.value ?? '',
-                          teacherId:
-                              teacherId,
-                          name:
-                              name,
-                          email:
-                              email,
-                          phone:
-                              phone,
-                            photoUrl:
-                              photoUrl,
-                          assignmentKeys:
-                              assignmentKeys,
-                        );
+                       return _teacherCard(
+  context: context,
+  ref: ref,
+  schoolId: schoolIdAsync.value ?? '',
+  teacherId: teacherId,
+  name: name,
+  email: email,
+  phone: phone,
+  photoUrl: photoUrl,
+  assignmentKeys: assignmentKeys,
+
+  classTeacher: data['classTeacherOf'],
+
+  attendanceClasses: List<String>.from(
+    data['attendanceClasses'] ?? [],
+  ),
+
+  subjects: List<String>.from(
+    data['subjects'] ?? [],
+  ),
+);
+
+
+
                       },
                     ),
                   ],
@@ -637,21 +642,35 @@ Widget _statCard(
 
 
 
-  Widget _teacherCard({
-    required BuildContext context,
-    required WidgetRef ref,
-    required String schoolId,
-    required String teacherId,
-    required String name,
-    required String email,
-    required String phone,
-    required String photoUrl,
-    required List assignmentKeys,
-  }) {
+Widget _teacherCard({
+  required BuildContext context,
+  required WidgetRef ref,
+  required String schoolId,
+  required String teacherId,
+  required String name,
+  required String email,
+  required String phone,
+  required String photoUrl,
+  required List assignmentKeys,
+
+  required dynamic classTeacher,
+  required List<String> attendanceClasses,
+  required List<String> subjects,
+})
+  
+  
+   {
     final assignmentTags = assignmentKeys
         .map((e) => e.toString())
         .toSet()
         .toList();
+
+final classTeacherText =
+    classTeacher == null
+        ? 'Not Assigned'
+        : '${classTeacher['classId']} ${classTeacher['sectionId']}';
+
+
 
     return GestureDetector(
       onTap: () {
@@ -695,294 +714,78 @@ Widget _statCard(
       ),
       child: Column(
         children: [
+          
           Row(
-            children: [
-              ProfileAvatar(
-                name: name,
-                imageUrl:
-                    photoUrl,
-                radius: 22,
-              ),
-              const SizedBox(
-                width: 12,
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-                  children: [
-                    Text(
-                      name,
-                      style:
-                          const TextStyle(
-                        fontSize:
-                            16,
-                        fontWeight:
-                            FontWeight
-                                .w700,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: 3,
-                    ),
-                    Text(
-                      email,
-                      style:
-                          const TextStyle(
-                        color: Color(
-                          0xFF6B7280,
-                        ),
-                        fontSize:
-                            13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal:
-                      10,
-                  vertical:
-                      6,
-                ),
-                decoration:
-                    BoxDecoration(
-                  color: assignmentKeys
-                          .isEmpty
-                      ? const Color(
-                          0xFFFEF2F2)
-                      : const Color(
-                          0xFFECFDF5),
-                  borderRadius:
-                      BorderRadius.circular(
-                    20,
-                  ),
-                ),
-                child: Text(
-                  assignmentKeys
-                          .isEmpty
-                      ? 'Free'
-                      : 'Assigned',
-                  style:
-                      TextStyle(
-                    fontSize:
-                        12,
-                    fontWeight:
-                        FontWeight
-                            .w700,
-                    color: assignmentKeys
-                            .isEmpty
-                        ? const Color(
-                            0xFFDC2626)
-                        : const Color(
-                            0xFF059669),
-                  ),
-                ),
-              ),
-            ],
-          ),
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
 
-          const SizedBox(
-            height: 14,
-          ),
+    ProfileAvatar(
+      name: name,
+      imageUrl: photoUrl,
+      radius: 25,
+    ),
 
-          Row(
-            children: [
-              const Icon(
-                Icons.call_rounded,
-                size: 16,
-                color: Color(
-                  0xFF64748B,
-                ),
-              ),
-              const SizedBox(
-                width: 6,
-              ),
-              Text(phone),
-            ],
-          ),
+    const SizedBox(width: 20),
 
-          const SizedBox(
-            height: 10,
-          ),
+    Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
 
-          Row(
-            crossAxisAlignment:
-                CrossAxisAlignment
-                    .start,
-            children: [
-              const Icon(
-                Icons.school_rounded,
-                size: 16,
-                color: Color(
-                  0xFF64748B,
-                ),
-              ),
-              const SizedBox(
-                width: 6,
-              ),
-              Expanded(
-                child: assignmentTags
-                        .isEmpty
-                    ? const Text(
-                        'Not Assigned',
-                        style:
-                            TextStyle(
-                          color: Color(
-                            0xFF475569,
-                          ),
-                        ),
-                      )
-                    : Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: assignmentTags
-                            .map((item) {
-                          return Container(
-                            padding:
-                                const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  const Color(
-                                0xffEEF2FF,
-                              ),
-                              borderRadius:
-                                  BorderRadius.circular(
-                                12,
-                              ),
-                            ),
-                            child: Text(
-                              item.replaceAll(
-                                '_',
-                                '-',
-                              ),
-                              style:
-                                  const TextStyle(
-                                fontWeight:
-                                    FontWeight.w600,
-                                color: Color(
-                                  0xff5B5FEF,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-              ),
-            ],
-          ),
-
-          const SizedBox(
-            height: 16,
-          ),
-
-         Align(
-  alignment: Alignment.centerLeft,
-  child: Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-
-      SizedBox(
-        width: 120,
-        height: 38,
-
-        child: OutlinedButton.icon(
-
-          onPressed: () {
-            context.push(
-              '/assign-class',
-              extra: teacherId,
-            );
-          },
-
-          icon: const Icon(
-            Icons.edit_note_rounded,
-            size: 16,
-          ),
-
-          label: const Text(
-            'Assign',
-            style: TextStyle(
-              fontSize: 13,
+          Text(
+            ' $name',
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
             ),
           ),
 
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(12),
-            ),
+          const SizedBox(height: 8),
+
+          Text('📞  $phone'),
+
+          const SizedBox(height: 8),
+
+          Text('✉️ : $email'),
+
+          const SizedBox(height: 8),
+
+          Text('🎓 Class Teacher : $classTeacherText'),
+
+          const SizedBox(height: 8),
+
+          Text(
+            '📚 Subject : ${subjects.isEmpty ? "Not Assigned" : subjects.join(", ")}',
           ),
-        ),
+        ],
       ),
-
-      const SizedBox(width: 10),
-
-      SizedBox(
-        width: 110,
-        height: 38,
-
-        child: ElevatedButton.icon(
-
-          onPressed: () =>
-              _resetAssignments(
-            context,
-            ref,
-            teacherId,
-          ),
-
-          icon: const Icon(
-            Icons.restart_alt,
-            size: 16,
-          ),
-
-          label: const Text(
-            'Reset',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          style: ElevatedButton.styleFrom(
-
-            backgroundColor:
-                const Color(0xffF5F3FF),
-
-            foregroundColor:
-                const Color(0xff5B5FEF),
-
-            elevation: 0,
-
-            shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(12),
-            ),
-          ),
-        ),
-      ),
-    ],
-  ),
+    ),
+  ],
 ),
-        
-        
-        
-        
+
+      const SizedBox(height: 16),
+
+Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+
+    // LEFT
+    Expanded(
+      flex: 3,
+      child: const SizedBox.shrink(),
+    ),
+
+    const SizedBox(width: 20),
+
+  ],
+),
+
         ],
       ),
     ),
     );
+   
   }
+
 
   Future<void>
       _resetAssignments(
@@ -1058,6 +861,11 @@ Widget _statCard(
   }
 }
 
+
+
+
+
+
 // ─── Teacher Settings Bottom Sheet ─────────────────────────────────────────
 
 class _TeacherSettingsSheet extends ConsumerWidget {
@@ -1106,6 +914,9 @@ class _TeacherSettingsSheet extends ConsumerWidget {
               color: Color(0xff1F2937),
             ),
           ),
+          
+
+
           const SizedBox(height: 16),
           _SheetTile(
             icon: Icons.archive_outlined,
@@ -1239,6 +1050,10 @@ _SheetTile(
   }
 }
 
+
+
+
+
 class _SheetTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -1281,9 +1096,11 @@ class _SheetTile extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(
+
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+
                     Text(
                       title,
                       style: const TextStyle(

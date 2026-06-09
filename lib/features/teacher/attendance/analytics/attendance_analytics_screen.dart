@@ -105,8 +105,10 @@ Future<void> loadStudents() async {
           .collection('schools')
           .doc(widget.schoolId)
        .collection('students')
+
+
 .where(
-  'classId',
+  'className',
   isEqualTo: widget.classId,
 )
 .where(
@@ -116,30 +118,29 @@ Future<void> loadStudents() async {
 .get();
 
 
-print(
-  'Students loaded: ${snapshot.docs.length}',
-);
+print('Analytics Class = ${widget.classId}');
+print('Analytics Section = ${widget.section}');
+print('Students loaded = ${snapshot.docs.length}');
 
 
 
 
   studentsData.clear();
 
+
   for (final doc in snapshot.docs) {
 
-    final data = doc.data();
+  final data = doc.data();
 
-    studentsData[
-      data['admissionNo']
-    ] = {
+  studentsData[doc.id] = {
 
-      'name':
-          data['name'] ?? '',
+    'name': data['name'] ?? '',
+    'photoUrl': data['photoUrl'] ?? '',
+  };
+}
 
-      'photoUrl':
-          data['photoUrl'] ?? '',
-    };
-  }
+
+
 
   if (mounted) {
     setState(() {});
@@ -245,7 +246,7 @@ _lowAttendanceCard(),
 
           Text(
 
-            "Class ${widget.classId} - ${widget.section}",
+            "${widget.classId} - ${widget.section}",
 
             style:
                 const TextStyle(

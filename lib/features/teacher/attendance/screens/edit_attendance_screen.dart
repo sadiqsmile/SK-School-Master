@@ -45,29 +45,18 @@ Future<void> loadStudentNames() async {
 
  studentsData.clear();
 
-  for (final doc in snapshot.docs) {
+for (final doc in snapshot.docs) {
 
-    final data = doc.data();
+  final data = doc.data();
 
-    final admissionNo =
-        data['admissionNo']
-            ?.toString()
-            .trim();
+  final studentId = doc.id;
 
-    final name =
-        data['name']
-            ?.toString()
-            .trim();
+  studentsData[studentId] = {
 
-    if (admissionNo != null &&
-        name != null) {
-
-      studentsData[admissionNo] = {
-  'name': data['name'] ?? '',
-  'photoUrl': data['photoUrl'] ?? '',
-};
-    }
-  }
+    'name': data['name'] ?? '',
+    'photoUrl': data['photoUrl'] ?? '',
+  };
+}
 
   setState(() {});
 }

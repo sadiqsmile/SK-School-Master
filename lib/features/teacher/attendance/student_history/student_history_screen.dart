@@ -99,23 +99,32 @@ class _StudentHistoryScreenState
 
                   .collection('students')
 
-                  .where(
-                    'classId',
-                    isEqualTo:
-                        widget.classId,
-                  )
+             .where(
+  'className',
+  isEqualTo:
+      widget.classId,
+)
 
                   .where(
                     'section',
                     isEqualTo:
                         widget.section,
                   )
-
-
                   .snapshots(),
+
+
+                
+
+
+
 
               builder:
                   (context, snapshot) {
+
+print('History Class = ${widget.classId}');
+print('History Section = ${widget.section}');
+
+
 
                 if (!snapshot.hasData) {
 
@@ -189,10 +198,18 @@ filtered.sort((a, b) {
                   itemBuilder:
                       (context, index) {
 
-                    final student =
-                        filtered[index]
-                            .data()
-                            as Map<String, dynamic>;
+                   final student =
+    Map<String, dynamic>.from(
+      filtered[index].data()
+          as Map<String, dynamic>,
+    );
+
+student['studentDocId'] =
+    filtered[index].id;
+
+print(
+  'Passing studentDocId = ${filtered[index].id}',
+);
 
                     final photo =
                         student['photoUrl']
@@ -260,21 +277,30 @@ filtered.sort((a, b) {
 
                         onTap: () {
 
-                          Navigator.push(
 
-                            context,
 
-                            MaterialPageRoute(
+                         final studentData =
+    Map<String, dynamic>.from(
+      student,
+    );
 
-                              builder: (_) =>
+studentData['studentDocId'] =
+    filtered[index].id;
 
-                                  StudentDetailsScreen(
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) =>
+        StudentDetailsScreen(
+      student: studentData,
+    ),
+  ),
+);
 
-                                student:
-                                    student,
-                              ),
-                            ),
-                          );
+
+
+
+
                         },
                       ),
                     );

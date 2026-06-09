@@ -11,6 +11,7 @@ import 'teacher_profile_screen.dart';
 class TeacherDashboardScreen extends ConsumerWidget {
   const TeacherDashboardScreen({super.key});
 
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     const deepBlue = Color(0xFF1E40AF);
@@ -55,24 +56,23 @@ class TeacherDashboardScreen extends ConsumerWidget {
                   final name = (data['name'] ?? 'Teacher').toString();
                   final assignments = ref.watch(teacherAssignmentsProvider);
 
-                  final teacherId = doc.id;
-                  final assignmentKeys = data['assignmentKeys'];
-                  print("Teacher ID: $teacherId");
-                  print("Assignments: $assignmentKeys");
+                  // final teacherId = doc.id;
+                  // final assignmentKeys = data['assignmentKeys'];
+                  
+                  // print("Teacher ID: $teacherId");
+                  // print("Assignments: $assignmentKeys");
 
                   return ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+
+
+
                       // 🔥 CLICKABLE PROFILE CARD
                       GestureDetector(
-                        
-                        
-                      onTap: () {
-  context.push('/teacher/profile');
+                                            onTap: () {
+                                    context.push('/teacher/profile');
 },
-
-
-
                         child: Container(
                           padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
@@ -109,13 +109,14 @@ class TeacherDashboardScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 14),
-
                       Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
+
+
+
                         child: Padding(
                           padding: const EdgeInsets.all(14),
                           child: Column(

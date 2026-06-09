@@ -48,13 +48,44 @@ class _QuickAttendanceScreenState extends State<QuickAttendanceScreen> {
 
     isSunday = DateTime.now().weekday == DateTime.sunday;
 
-    final classTeacherOf = widget.teacherData['classTeacherOf'];
 
-    if (classTeacherOf != null) {
-      classId = classTeacherOf['classId'];
 
-      section = classTeacherOf['sectionId'];
-    }
+   final selectedClass =
+    widget.teacherData[
+        'selectedAttendanceClass'];
+
+final selectedSection =
+    widget.teacherData[
+        'selectedAttendanceSection'];
+
+if (selectedClass != null &&
+    selectedSection != null) {
+
+  classId =
+      selectedClass.toString();
+
+  section =
+      selectedSection.toString();
+
+} else {
+
+  final classTeacherOf =
+      widget.teacherData[
+          'classTeacherOf'];
+
+  if (classTeacherOf != null) {
+
+    classId =
+        classTeacherOf['classId'];
+
+    section =
+        classTeacherOf['sectionId'];
+  }
+}
+
+
+
+
 
     _loadTodayAttendance();
   }
@@ -281,58 +312,54 @@ class _QuickAttendanceScreenState extends State<QuickAttendanceScreen> {
     );
   }
 
-  Widget _summaryCard() {
-    int present = 0;
 
-    int absent = 0;
+//---replace------
 
-    attendanceMap.forEach(
-      (key, value) {
-        if (value == 'P') {
-          present++;
-        }
+ Widget _summaryCard() {
+  int present = 0;
+  int absent = 0;
 
-        if (value == 'A') {
-          absent++;
-        }
-      },
-    );
+  attendanceMap.forEach((key, value) {
+    if (value == 'P') present++;
+    if (value == 'A') absent++;
+  });
 
-    return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 16,
-      ),
-      padding: const EdgeInsets.all(
-        18,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(
-          20,
+  final total = present + absent;
+
+  return Container(
+    margin: const EdgeInsets.symmetric(
+      horizontal: 16,
+    ),
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        _summaryItem(
+          "Present",
+          present,
+          Colors.green,
         ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _summaryItem(
-            "Present",
-            present,
-            Colors.green,
-          ),
-          _summaryItem(
-            "Absent",
-            absent,
-            Colors.red,
-          ),
-          _summaryItem(
-            "Total",
-            attendanceMap.length,
-            Colors.blue,
-          ),
-        ],
-      ),
-    );
-  }
+        _summaryItem(
+          "Absent",
+          absent,
+          Colors.red,
+        ),
+        _summaryItem(
+          "Total",
+          total,
+          Colors.blue,
+        ),
+      ],
+    ),
+  );
+}
+
+
+
 
   Widget _summaryItem(
     String title,
@@ -406,11 +433,16 @@ class _QuickAttendanceScreenState extends State<QuickAttendanceScreen> {
       );
     }
 
+print('Attendance Class = $classId');
+print('Attendance Section = $section');
+
+
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('schools')
           .doc(widget.schoolId)
           .collection('students')
+          
           .where(
             'className',
             isEqualTo: classId,
@@ -440,7 +472,7 @@ class _QuickAttendanceScreenState extends State<QuickAttendanceScreen> {
 
         final docs = snapshot.data!.docs;
 
-       studentDocs.sort((a, b) {
+ docs.sort((a, b) {
   final aName =
       ((a.data() as Map<String, dynamic>)['name'] ?? '')
           .toString()
@@ -456,8 +488,27 @@ class _QuickAttendanceScreenState extends State<QuickAttendanceScreen> {
 
 
 
+bool changed = false;
+
+for (final doc in docs) {
+  if (!attendanceMap.containsKey(doc.id)) {
+    attendanceMap[doc.id] = 'P';
+    changed = true;
+  }
+}
+
+if (changed) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) {
+      setState(() {
+        _updatePercentage();
+      });
+    }
+  });
+}
 
 
+print('Students Found = ${docs.length}');
 
 
         studentDocs = docs;
